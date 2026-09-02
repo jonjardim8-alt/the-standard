@@ -1272,6 +1272,21 @@
   function dayAbbrFromDateStr(s){ return DAYS[dateFromStr(s).getDay()]; }
   function todayStr(){ return toDateStr(new Date()); }
 
+  // "Habit day" for daily habits — resets at 3:00 AM US Eastern instead of
+  // local midnight, so staying up late doesn't roll habits over early.
+  // Everything else in the app keeps using todayStr() (local midnight).
+  function habitDayStr(){
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit',
+      hourCycle: 'h23'
+    }).formatToParts(new Date());
+    const get = t => Number(parts.find(p => p.type === t).value);
+    const d = new Date(get('year'), get('month') - 1, get('day'));
+    if(get('hour') < 3) d.setDate(d.getDate() - 1);
+    return toDateStr(d);
+  }
+
   function weekDates(){
     return DAYS.map((_, i) => {
       const d = new Date(weekAnchor);
@@ -1580,12 +1595,12 @@
   // Today not yet checked doesn't break the streak — the day isn't over.
   function computeDailyGoalStreak(goalId){
     let streak = 0;
-    const cur = new Date();
-    cur.setHours(0,0,0,0);
+    const habitToday = habitDayStr();
+    const cur = dateFromStr(habitToday);
     for(let i = 0; i < 90; i++){
       const ds = toDateStr(cur);
       if(isDailyGoalDone(goalId, ds)){ streak++; }
-      else if(ds === todayStr()){ /* not logged yet today — don't break */ }
+      else if(ds === habitToday){ /* not logged yet today — don't break */ }
       else { break; }
       cur.setDate(cur.getDate() - 1);
     }
@@ -1598,7 +1613,7 @@
   function weekStatsForDailyGoal(goalId, dates){
     dates = dates || weekDates();
     let total = 0, done = 0;
-    const today = todayStr();
+    const today = habitDayStr();
     dates.forEach(d => {
       const ds = toDateStr(d);
       if(ds > today) return;
@@ -1634,7 +1649,7 @@
   function renderHabitsSection(){
     const wrap = document.getElementById('habitsContent');
     wrap.innerHTML = '';
-    const dateStr = todayStr();
+    const dateStr = habitDayStr();
     const weekStart = realCurrentWeekStart();
 
     if(!state.dailyGoals.length && !state.weeklyGoals.length){
@@ -2230,7 +2245,7 @@
     }));
 
     // Habits
-    const dailyDone = state.dailyGoals.filter(g => isDailyGoalDone(g.id, today)).length;
+    const dailyDone = state.dailyGoals.filter(g => isDailyGoalDone(g.id, habitDayStr())).length;
     grid.appendChild(makeDashTile({
       color: '#3CBF8C',
       title: 'Habits',
@@ -4879,10 +4894,11 @@
       }
     });
 
+    const habitToday = habitDayStr();
     Object.keys(state.dailyGoalLog).forEach(key => {
       if(!state.dailyGoalLog[key]) return;
       coreAll += POINTS.habitDaily;
-      if(key.endsWith('_' + today)) coreToday += POINTS.habitDaily;
+      if(key.endsWith('_' + habitToday)) coreToday += POINTS.habitDaily;
     });
 
     const thisWeekStart = realCurrentWeekStart();
