@@ -3762,8 +3762,13 @@
   /* ---------------- Modals ---------------- */
 
   function closeModal(){
-    document.getElementById('modalOverlay').classList.add('hidden');
-    document.getElementById('modalContent').innerHTML = '';
+    const overlay = document.getElementById('modalOverlay');
+    overlay.classList.add('hidden');
+    setTimeout(() => {
+      if(overlay.classList.contains('hidden')){
+        document.getElementById('modalContent').innerHTML = '';
+      }
+    }, 300);
   }
   document.getElementById('modalOverlay').addEventListener('click', (e) => {
     if(e.target.id === 'modalOverlay') closeModal();
@@ -4979,11 +4984,13 @@
       track.classList.remove('no-anim');
       const t = (e.changedTouches && e.changedTouches[0]) || null;
       const dx = t ? (t.clientX - startX) : 0;
-      let newIdx = baseIdx;
       const threshold = window.innerWidth * 0.18;
-      if(dx <= -threshold && baseIdx < PRIMARY_SECTIONS.length - 1) newIdx = baseIdx + 1;
+      const atLastTab = baseIdx === PRIMARY_SECTIONS.length - 1;
+      let newIdx = baseIdx;
+      if(dx <= -threshold && !atLastTab) newIdx = baseIdx + 1;
       else if(dx >= threshold && baseIdx > 0) newIdx = baseIdx - 1;
       switchSection(PRIMARY_SECTIONS[newIdx]);
+      if(dx <= -threshold && atLastTab) openMoreSheet();
     }
 
     viewport.addEventListener('touchend', endDrag, { passive: true });
