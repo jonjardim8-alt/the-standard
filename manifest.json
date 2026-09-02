@@ -1,6 +1,6 @@
 {
-  "name": "Weekly Schedule",
-  "short_name": "Week",
+  "name": "The Standard",
+  "short_name": "The Standard",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
