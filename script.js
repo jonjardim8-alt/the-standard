@@ -4821,6 +4821,7 @@
       <div class="modal-title">More</div>
       <div class="more-grid">${gridHtml}</div>
       <div class="modal-actions">
+        <button class="cancel" id="moreBackup" style="flex:1">⤓ Backup data</button>
         <button class="cancel" id="moreClose" style="flex:1">Close</button>
       </div>
     `;
@@ -4831,7 +4832,22 @@
         switchSection(btn.dataset.go);
       };
     });
+    document.getElementById('moreBackup').onclick = exportBackup;
     document.getElementById('moreClose').onclick = closeModal;
+  }
+
+  function exportBackup(){
+    const data = localStorage.getItem(STORAGE_KEY);
+    if(!data) return;
+    const blob = new Blob([JSON.stringify({ [STORAGE_KEY]: data }, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const stamp = new Date().toISOString().slice(0, 10);
+    a.download = 'the-standard-backup-' + stamp + '.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
   }
 
   const PRIMARY_SECTIONS = ['dashboard', 'calendar', 'tasks', 'habits'];
