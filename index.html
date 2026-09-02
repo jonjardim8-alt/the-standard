@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Week">
+<meta name="theme-color" content="#12151A">
+<title>Weekly Schedule</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+</head>
+<body>
+
+<header>
+  <div class="title-row">
+    <h1>Schedule</h1>
+    <button class="review-btn" id="reviewBtn">▤ Review week</button>
+  </div>
+</header>
+
+<div class="legend" id="legend" style="display:none"></div>
+
+<div id="calendarSection" style="display:none">
+  <div class="week-nav">
+    <button class="week-nav-btn" id="prevWeek" aria-label="Previous week">‹</button>
+    <button class="week-label-btn" id="calendarBtn">
+      <span class="eyebrow" id="weekLabel">Week of —</span>
+      <span class="caret">▾</span>
+    </button>
+    <button class="week-nav-btn" id="nextWeek" aria-label="Next week">›</button>
+  </div>
+  <div class="day-tabs" id="dayTabs"></div>
+
+  <div id="allDayBanners"></div>
+  <div id="fixedBanners"></div>
+
+  <div class="view-toggle">
+    <button id="btnToday">Today</button>
+    <button id="btnBlock" class="active">Blocks</button>
+    <button id="btnList">List</button>
+  </div>
+
+  <div id="todayView"></div>
+  <div id="blockView"></div>
+  <div id="listView"></div>
+</div>
+
+<div id="tasksSection" style="display:none">
+  <div id="taskSection"></div>
+</div>
+
+<div id="habitsSection" style="display:none">
+  <div id="habitsContent"></div>
+</div>
+
+<div id="listsSection" style="display:none">
+  <div id="listsContent"></div>
+</div>
+
+<div id="longGoalsSection" style="display:none">
+  <div id="longGoalsContent"></div>
+</div>
+
+<div id="fitnessSection" style="display:none">
+  <div id="fitnessContent"></div>
+</div>
+
+<div id="budgetSection" style="display:none">
+  <div id="budgetContent"></div>
+</div>
+
+<div id="projectsSection" style="display:none">
+  <div id="projectsContent"></div>
+</div>
+
+<div id="journalSection" style="display:none">
+  <div id="journalContent"></div>
+</div>
+
+<div id="dashboardSection">
+  <div id="dashboardContent"></div>
+</div>
+
+<button class="fab-btn" id="fabBtn" aria-label="Add">+</button>
+
+<nav id="bottomNav">
+  <button class="bottom-nav-btn" data-section="dashboard">
+    <span class="bn-icon">⌂</span><span>Home</span>
+  </button>
+  <button class="bottom-nav-btn active" data-section="calendar">
+    <span class="bn-icon">▦</span><span>Calendar</span>
+  </button>
+  <button class="bottom-nav-btn" data-section="tasks">
+    <span class="bn-icon">✓</span><span>Tasks</span>
+  </button>
+  <button class="bottom-nav-btn" data-section="habits">
+    <span class="bn-icon">◎</span><span>Habits</span>
+  </button>
+  <button class="bottom-nav-btn" id="moreNavBtn">
+    <span class="bn-icon">⋯</span><span>More</span>
+  </button>
+</nav>
+
+<datalist id="classSuggestions"></datalist>
+
+<!-- Popover menu for a category's ⋮ options -->
+<div class="cat-menu hidden" id="catMenu">
+  <button id="catMenuAddEvent"><span class="ic">▤</span> Add event</button>
+  <button id="catMenuAddTask"><span class="ic">✓</span> Add task</button>
+  <button id="catMenuQuickAdd"><span class="ic">»</span> Quick add</button>
+  <div class="menu-divider"></div>
+  <button id="catMenuUpcoming"><span class="ic">›</span> View upcoming</button>
+</div>
+
+<!-- Shared modal overlay -->
+<div class="modal-overlay hidden" id="modalOverlay">
+  <div class="modal" id="modalContent"></div>
+</div>
+
+<script src="script.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js').catch(() => {});
+    });
+  }
+</script>
+
+</body>
+</html>
