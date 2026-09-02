@@ -26,7 +26,14 @@
 
 <div class="legend" id="legend" style="display:none"></div>
 
-<div id="calendarSection" style="display:none">
+<div id="tabViewport">
+<div id="tabTrack">
+
+<div id="dashboardSection">
+  <div id="dashboardContent"></div>
+</div>
+
+<div id="calendarSection">
   <div class="week-nav">
     <button class="week-nav-btn" id="prevWeek" aria-label="Previous week">‹</button>
     <button class="week-label-btn" id="calendarBtn">
@@ -51,12 +58,15 @@
   <div id="listView"></div>
 </div>
 
-<div id="tasksSection" style="display:none">
+<div id="tasksSection">
   <div id="taskSection"></div>
 </div>
 
-<div id="habitsSection" style="display:none">
+<div id="habitsSection">
   <div id="habitsContent"></div>
+</div>
+
+</div>
 </div>
 
 <div id="listsSection" style="display:none">
@@ -83,17 +93,13 @@
   <div id="journalContent"></div>
 </div>
 
-<div id="dashboardSection">
-  <div id="dashboardContent"></div>
-</div>
-
 <button class="fab-btn" id="fabBtn" aria-label="Add">+</button>
 
 <nav id="bottomNav">
-  <button class="bottom-nav-btn" data-section="dashboard">
+  <button class="bottom-nav-btn active" data-section="dashboard">
     <span class="bn-icon">⌂</span><span>Home</span>
   </button>
-  <button class="bottom-nav-btn active" data-section="calendar">
+  <button class="bottom-nav-btn" data-section="calendar">
     <span class="bn-icon">▦</span><span>Calendar</span>
   </button>
   <button class="bottom-nav-btn" data-section="tasks">

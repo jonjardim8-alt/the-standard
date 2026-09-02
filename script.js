@@ -4829,18 +4829,34 @@
     document.getElementById('moreClose').onclick = closeModal;
   }
 
-  function switchSection(section){
+  const PRIMARY_SECTIONS = ['dashboard', 'calendar', 'tasks', 'habits'];
+
+  function setTrackTransform(section, animate){
+    const track = document.getElementById('tabTrack');
+    const idx = PRIMARY_SECTIONS.indexOf(section);
+    if(idx === -1) return;
+    if(!animate){
+      track.classList.add('no-anim');
+      track.style.transform = 'translateX(-' + (idx * 25) + '%)';
+      void track.offsetHeight;
+      track.classList.remove('no-anim');
+    } else {
+      track.style.transform = 'translateX(-' + (idx * 25) + '%)';
+    }
+  }
+
+  function switchSection(section, opts){
+    opts = opts || {};
     currentSection = section;
-    document.getElementById('dashboardSection').style.display = section === 'dashboard' ? 'block' : 'none';
-    document.getElementById('calendarSection').style.display = section === 'calendar' ? 'block' : 'none';
-    document.getElementById('tasksSection').style.display = section === 'tasks' ? 'block' : 'none';
+    const isPrimary = PRIMARY_SECTIONS.indexOf(section) !== -1;
+    document.getElementById('tabViewport').style.display = isPrimary ? 'block' : 'none';
     document.getElementById('listsSection').style.display = section === 'lists' ? 'block' : 'none';
-    document.getElementById('habitsSection').style.display = section === 'habits' ? 'block' : 'none';
     document.getElementById('longGoalsSection').style.display = section === 'longgoals' ? 'block' : 'none';
     document.getElementById('fitnessSection').style.display = section === 'fitness' ? 'block' : 'none';
     document.getElementById('budgetSection').style.display = section === 'budget' ? 'block' : 'none';
     document.getElementById('projectsSection').style.display = section === 'projects' ? 'block' : 'none';
     document.getElementById('journalSection').style.display = section === 'journal' ? 'block' : 'none';
+    if(isPrimary) setTrackTransform(section, !opts.skipAnim);
     document.getElementById('fabBtn').style.display = (section === 'dashboard' || section === 'journal') ? 'none' : 'flex';
     document.querySelectorAll('.bottom-nav-btn[data-section]').forEach(b => b.classList.toggle('active', b.dataset.section === section));
     const isOverflow = OVERFLOW_SECTIONS.some(s => s.id === section);
@@ -4910,7 +4926,71 @@
     else if(currentSection === 'projects') openAddProjectModal();
   };
 
-  switchSection('dashboard');
+  (function setupSwipeNav(){
+    const track = document.getElementById('tabTrack');
+    const viewport = document.getElementById('tabViewport');
+    const EDGE_EXCLUDE_SELECTOR = '.day-tabs, .legend, .fit-day-tabs, .cat-picker';
+    let startX = 0, startY = 0, dragging = false, locked = false, baseIdx = 0;
+
+    function isBlocked(target){
+      if(target.closest && target.closest(EDGE_EXCLUDE_SELECTOR)) return true;
+      const overlay = document.getElementById('modalOverlay');
+      if(overlay && !overlay.classList.contains('hidden')) return true;
+      const catMenu = document.getElementById('catMenu');
+      if(catMenu && !catMenu.classList.contains('hidden')) return true;
+      return false;
+    }
+
+    viewport.addEventListener('touchstart', (e) => {
+      if(PRIMARY_SECTIONS.indexOf(currentSection) === -1) return;
+      if(e.touches.length !== 1) return;
+      if(isBlocked(e.target)) return;
+      const t = e.touches[0];
+      startX = t.clientX; startY = t.clientY;
+      dragging = true; locked = false;
+      baseIdx = PRIMARY_SECTIONS.indexOf(currentSection);
+    }, { passive: true });
+
+    viewport.addEventListener('touchmove', (e) => {
+      if(!dragging) return;
+      const t = e.touches[0];
+      const dx = t.clientX - startX;
+      const dy = t.clientY - startY;
+      if(!locked){
+        if(Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+        if(Math.abs(dy) > Math.abs(dx)){ dragging = false; return; }
+        locked = true;
+        track.classList.add('no-anim');
+      }
+      e.preventDefault();
+      const pct = (dx / window.innerWidth) * 25;
+      let target = -(baseIdx * 25) + pct;
+      const min = -((PRIMARY_SECTIONS.length - 1) * 25);
+      const max = 0;
+      if(target > max) target = max + (target - max) * 0.35;
+      if(target < min) target = min + (target - min) * 0.35;
+      track.style.transform = 'translateX(' + target + '%)';
+    }, { passive: false });
+
+    function endDrag(e){
+      if(!dragging) return;
+      dragging = false;
+      if(!locked) return;
+      track.classList.remove('no-anim');
+      const t = (e.changedTouches && e.changedTouches[0]) || null;
+      const dx = t ? (t.clientX - startX) : 0;
+      let newIdx = baseIdx;
+      const threshold = window.innerWidth * 0.18;
+      if(dx <= -threshold && baseIdx < PRIMARY_SECTIONS.length - 1) newIdx = baseIdx + 1;
+      else if(dx >= threshold && baseIdx > 0) newIdx = baseIdx - 1;
+      switchSection(PRIMARY_SECTIONS[newIdx]);
+    }
+
+    viewport.addEventListener('touchend', endDrag, { passive: true });
+    viewport.addEventListener('touchcancel', endDrag, { passive: true });
+  })();
+
+  switchSection('dashboard', { skipAnim: true });
   switchView('block');
   renderAll();
   setInterval(updateNowLine, 60000);
