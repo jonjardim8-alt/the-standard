@@ -1306,6 +1306,7 @@
           if(!parsed.projects) parsed.projects = [];
           if(!parsed.journalEntries) parsed.journalEntries = {};
           if(!parsed.energyLevels) parsed.energyLevels = {};
+          if(!parsed.scoreOptIn) parsed.scoreOptIn = { budget: false };
           return parsed;
         }
       }
@@ -1318,7 +1319,8 @@
       dailyGoals: [], weeklyGoals: [], dailyGoalLog: {}, weeklyGoalLog: {},
       allDayEvents: [], lists: [], longTermGoals: [],
       fitnessSplit: null, workoutLogs: {}, budgetTransactions: [], categoryBudgetLimits: {},
-      projects: [], journalEntries: {}, energyLevels: {}
+      projects: [], journalEntries: {}, energyLevels: {},
+      scoreOptIn: { budget: false }
     };
   }
   function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
@@ -2119,6 +2121,25 @@
     heading.textContent = new Date().toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' });
     wrap.appendChild(heading);
 
+    // Today's scores — tap through to the full Scores section
+    const scores = computeScores();
+    const scoreTiles = [
+      { key:'core',    accent:'#5B8DEF', label:'Core' },
+      { key:'fitness', accent:'#3CBF8C', label:'Fitness' },
+      { key:'journal', accent:'#B18CF2', label:'Journal' },
+    ];
+    if(scores.budget.optedIn) scoreTiles.push({ key:'budget', accent:'#F2A93B', label:'Budget' });
+    const scoreRow = document.createElement('div');
+    scoreRow.className = 'dash-score-row';
+    scoreRow.innerHTML = scoreTiles.map(t => `
+      <div class="dash-score-tile" style="--accent-color:${t.accent}">
+        <div class="n">${scores[t.key].today}</div>
+        <div class="l">${escapeHtml(t.label)}</div>
+      </div>
+    `).join('');
+    scoreRow.onclick = () => switchSection('scores');
+    wrap.appendChild(scoreRow);
+
     // Next up
     const nextTitle = document.createElement('div');
     nextTitle.className = 'task-section-title';
@@ -2191,7 +2212,7 @@
         const meta = row.querySelector('.task-meta');
         meta.textContent = cat.label + (t.subcategory ? ' · ' + t.subcategory : '') + ' · ' + (overdue ? 'was due ' + fmtDate(t.dueDate) : (t.dueDate === today ? 'due today' : 'due ' + fmtDate(t.dueDate)));
         if(overdue) meta.classList.add('overdue');
-        row.querySelector('.task-check').onclick = () => { t.done = true; save(); renderAll(); };
+        row.querySelector('.task-check').onclick = () => { setTaskDone(t, true); save(); renderAll(); };
         list.appendChild(row);
       });
       wrap.appendChild(list);
@@ -4339,6 +4360,14 @@
 
   /* ---------------- Tasks section (due date, shown on the active day) ---------------- */
 
+  // Single choke point for marking a task done/undone so the completion
+  // date is always recorded — scoring needs the actual day it happened,
+  // not just a boolean, and this app has several task-check buttons.
+  function setTaskDone(t, done){
+    t.done = done;
+    t.doneDate = done ? todayStr() : null;
+  }
+
   function renderTaskSection(){
     const wrap = document.getElementById('taskSection');
     wrap.innerHTML = '';
@@ -4458,7 +4487,7 @@
         meta.textContent = metaText;
         if(overdue) meta.classList.add('overdue');
         row.querySelector('.task-check').onclick = () => {
-          t.done = !t.done;
+          setTaskDone(t, !t.done);
           save();
           renderAll();
         };
@@ -4734,7 +4763,7 @@
         row.innerHTML = '<button class="task-check">✓</button><div class="task-body"><div class="task-txt"></div><div class="task-meta"></div></div>';
         row.querySelector('.task-txt').textContent = t.text;
         row.querySelector('.task-meta').textContent = cat.label + (t.subcategory ? ' · ' + t.subcategory : '');
-        row.querySelector('.task-check').onclick = () => { t.done = !t.done; save(); renderAll(); };
+        row.querySelector('.task-check').onclick = () => { setTaskDone(t, !t.done); save(); renderAll(); };
         list.appendChild(row);
       });
       wrap.appendChild(list);
@@ -4807,7 +4836,189 @@
     { id:'budget',    icon:'$', label:'Budget' },
     { id:'projects',  icon:'◈', label:'Projects' },
     { id:'journal',   icon:'✎', label:'Journal' },
+    { id:'scores',    icon:'★', label:'Scores' },
+    { id:'settings',  icon:'⚙', label:'Settings' },
   ];
+
+  /* ---------------- Scores ----------------
+     Derived entirely from existing data (nothing new is stored except a
+     task's completion date and the budget opt-in flag), so scores always
+     stay in sync with the real state — nothing to double-count or drift.
+     Point values, by design:
+       task done            +1   (core)
+       daily habit checked  +2   (core)
+       weekly goal met      +5   (core, once per week per goal)
+       workout logged       +5   (fitness — a day with real reps entered)
+       journal entry        +3   (journal, once per day)
+       budget: on-track day +3   (today only, live status)
+       budget: clean month  +10  (all-time, past months only)
+  */
+  const POINTS = { task:1, habitDaily:2, habitWeekly:5, workout:5, journal:3, budgetDay:3, budgetMonth:10 };
+
+  function computeScores(){
+    const today = todayStr();
+    let coreToday = 0, coreAll = 0;
+    let fitToday = 0, fitAll = 0;
+    let journalToday = 0, journalAll = 0;
+    let budgetToday = 0, budgetAll = 0;
+
+    state.tasks.forEach(t => {
+      if(t.done && t.doneDate){
+        coreAll += POINTS.task;
+        if(t.doneDate === today) coreToday += POINTS.task;
+      }
+    });
+
+    Object.keys(state.dailyGoalLog).forEach(key => {
+      if(!state.dailyGoalLog[key]) return;
+      coreAll += POINTS.habitDaily;
+      if(key.endsWith('_' + today)) coreToday += POINTS.habitDaily;
+    });
+
+    const thisWeekStart = realCurrentWeekStart();
+    state.weeklyGoals.forEach(goal => {
+      if(goal.auto){
+        const count = getWeeklyGoalCount(goal, thisWeekStart);
+        if(count >= goal.target){
+          coreAll += POINTS.habitWeekly;
+          coreToday += POINTS.habitWeekly;
+        }
+      } else {
+        Object.keys(state.weeklyGoalLog).forEach(key => {
+          if(!key.startsWith(goal.id + '_')) return;
+          const count = state.weeklyGoalLog[key];
+          if(count >= goal.target){
+            coreAll += POINTS.habitWeekly;
+            const weekStart = key.slice(goal.id.length + 1);
+            if(weekStart === thisWeekStart) coreToday += POINTS.habitWeekly;
+          }
+        });
+      }
+    });
+
+    Object.keys(state.workoutLogs).forEach(date => {
+      const log = state.workoutLogs[date];
+      const hasRealSet = Object.values(log.exercises || {}).some(sets => sets.some(s => s.reps));
+      if(hasRealSet){
+        fitAll += POINTS.workout;
+        if(date === today) fitToday += POINTS.workout;
+      }
+    });
+
+    Object.keys(state.journalEntries).forEach(date => {
+      const entry = state.journalEntries[date];
+      if(entry && entry.text && entry.text.trim()){
+        journalAll += POINTS.journal;
+        if(date === today) journalToday += POINTS.journal;
+      }
+    });
+
+    const budgetOptedIn = !!(state.scoreOptIn && state.scoreOptIn.budget);
+    if(budgetOptedIn){
+      const limitedCats = Object.keys(state.categoryBudgetLimits);
+      const monthWithinLimits = (monthKey) => {
+        if(!limitedCats.length) return false;
+        return limitedCats.every(catId => {
+          const limit = state.categoryBudgetLimits[catId];
+          const spent = state.budgetTransactions
+            .filter(t => t.category === catId && t.date.startsWith(monthKey))
+            .reduce((s,t) => s + t.amount, 0);
+          return spent <= limit;
+        });
+      };
+      const thisMonth = today.slice(0,7);
+      if(monthWithinLimits(thisMonth)) budgetToday += POINTS.budgetDay;
+      const pastMonths = Array.from(new Set(state.budgetTransactions.map(t => t.date.slice(0,7))))
+        .filter(m => m < thisMonth);
+      pastMonths.forEach(m => { if(monthWithinLimits(m)) budgetAll += POINTS.budgetMonth; });
+    }
+
+    return {
+      core:    { today: coreToday,    allTime: coreAll },
+      fitness: { today: fitToday,     allTime: fitAll },
+      journal: { today: journalToday, allTime: journalAll },
+      budget:  { today: budgetToday,  allTime: budgetAll, optedIn: budgetOptedIn },
+    };
+  }
+
+  function renderScoresSection(){
+    const wrap = document.getElementById('scoresContent');
+    wrap.innerHTML = '';
+    const scores = computeScores();
+
+    const heading = document.createElement('div');
+    heading.className = 'section-label';
+    heading.textContent = 'Scores';
+    wrap.appendChild(heading);
+
+    const cards = [
+      { key:'core',    accent:'#5B8DEF', title:'Core productivity', note:'Tasks completed, habits checked off, weekly goals hit.' },
+      { key:'fitness', accent:'#3CBF8C', title:'Fitness', note:'Days with a real workout logged.' },
+      { key:'journal', accent:'#B18CF2', title:'Journal', note:'Days with a journal entry written.' },
+      { key:'budget',  accent:'#F2A93B', title:'Budget', note:'Staying within your category limits.' },
+    ];
+
+    cards.forEach(c => {
+      if(c.key === 'budget' && !scores.budget.optedIn){
+        const row = document.createElement('div');
+        row.className = 'settings-row';
+        row.innerHTML = `
+          <div>
+            <div class="settings-row-label">Budget score is off</div>
+            <div class="settings-row-sub">Turn it on in Settings to include it here</div>
+          </div>
+        `;
+        wrap.appendChild(row);
+        return;
+      }
+      const s = scores[c.key];
+      const card = document.createElement('div');
+      card.className = 'score-card';
+      card.style.setProperty('--accent-color', c.accent);
+      card.innerHTML = `
+        <div class="score-card-title">${escapeHtml(c.title)}</div>
+        <div class="score-card-nums">
+          <div class="score-num-block"><div class="n">${s.today}</div><div class="l">Today</div></div>
+          <div class="score-num-block"><div class="n">${s.allTime}</div><div class="l">All-time</div></div>
+        </div>
+        <div class="score-card-note">${escapeHtml(c.note)}</div>
+      `;
+      wrap.appendChild(card);
+    });
+  }
+
+  function renderSettingsSection(){
+    const wrap = document.getElementById('settingsContent');
+    wrap.innerHTML = '';
+
+    const heading = document.createElement('div');
+    heading.className = 'section-label';
+    heading.textContent = 'Settings';
+    wrap.appendChild(heading);
+
+    const subheading = document.createElement('div');
+    subheading.className = 'section-label';
+    subheading.style.marginTop = '18px';
+    subheading.textContent = 'Scores';
+    wrap.appendChild(subheading);
+
+    const budgetOn = !!(state.scoreOptIn && state.scoreOptIn.budget);
+    const row = document.createElement('div');
+    row.className = 'settings-row';
+    row.innerHTML = `
+      <div>
+        <div class="settings-row-label">Include Budget score</div>
+        <div class="settings-row-sub">Off by default — spending limits are personal</div>
+      </div>
+      <button class="toggle-switch${budgetOn ? ' on' : ''}" id="budgetScoreToggle"></button>
+    `;
+    wrap.appendChild(row);
+    row.querySelector('#budgetScoreToggle').onclick = () => {
+      state.scoreOptIn.budget = !state.scoreOptIn.budget;
+      save();
+      renderAll();
+    };
+  }
 
   function openMoreSheet(){
     const overlay = document.getElementById('modalOverlay');
@@ -4877,8 +5088,10 @@
     document.getElementById('budgetSection').style.display = section === 'budget' ? 'block' : 'none';
     document.getElementById('projectsSection').style.display = section === 'projects' ? 'block' : 'none';
     document.getElementById('journalSection').style.display = section === 'journal' ? 'block' : 'none';
+    document.getElementById('scoresSection').style.display = section === 'scores' ? 'block' : 'none';
+    document.getElementById('settingsSection').style.display = section === 'settings' ? 'block' : 'none';
     if(isPrimary) setTrackTransform(section, !opts.skipAnim);
-    document.getElementById('fabBtn').style.display = (section === 'dashboard' || section === 'journal') ? 'none' : 'flex';
+    document.getElementById('fabBtn').style.display = (section === 'dashboard' || section === 'journal' || section === 'scores' || section === 'settings') ? 'none' : 'flex';
     document.querySelectorAll('.bottom-nav-btn[data-section]').forEach(b => b.classList.toggle('active', b.dataset.section === section));
     const isOverflow = OVERFLOW_SECTIONS.some(s => s.id === section);
     document.getElementById('moreNavBtn').classList.toggle('active', isOverflow);
@@ -4914,6 +5127,8 @@
     renderBudgetSection();
     renderProjectsSection();
     renderJournalSection();
+    renderScoresSection();
+    renderSettingsSection();
     if(currentSection === 'dashboard') renderDashboardSection();
   }
 
