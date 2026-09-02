@@ -1632,7 +1632,11 @@
     return state.weeklyGoalLog[weeklyGoalKey(goal, weekStartStr)] || 0;
   }
 
-  function realCurrentWeekStart(){ return toDateStr(startOfWeek(new Date())); }
+  // The Sunday that starts the current weekly-habit week — uses the habit-day
+  // boundary (3 AM Eastern) rather than local midnight, so the week itself
+  // also rolls over Sat night/Sun morning at 3 AM Eastern instead of at
+  // local midnight.
+  function realCurrentWeekStart(){ return toDateStr(startOfWeek(dateFromStr(habitDayStr()))); }
 
   function adjustWeeklyGoal(goal, delta){
     if(goal.auto) return; // auto-linked goals aren't manually adjustable
