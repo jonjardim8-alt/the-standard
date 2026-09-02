@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Restore Backup</title>
+<style>
+  body{font-family:-apple-system,sans-serif;background:#12151A;color:#EDEFF2;padding:24px;max-width:480px;margin:0 auto;}
+  h1{font-size:20px;}
+  p{color:#8B93A0;font-size:14px;line-height:1.5;}
+  code{background:#1E232A;padding:2px 6px;border-radius:4px;}
+  input[type=file]{margin:16px 0;color:#EDEFF2;display:block;}
+  button{background:#5B8DEF;color:white;border:none;padding:10px 16px;border-radius:8px;font-size:15px;cursor:pointer;}
+  #status{margin-top:16px;font-size:14px;color:#8B93A0;}
+</style>
+</head>
+<body>
+<h1>Restore backup</h1>
+<p>Select the <code>weekly-schedule-backup.json</code> file you exported earlier. This only touches this browser's local storage &mdash; nothing is uploaded anywhere.</p>
+<input type="file" id="file" accept="application/json">
+<button id="go">Restore</button>
+<div id="status"></div>
+<script>
+document.getElementById('go').onclick = function(){
+  const f = document.getElementById('file').files[0];
+  const status = document.getElementById('status');
+  if(!f){ status.textContent = 'Choose a file first.'; return; }
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const parsed = JSON.parse(e.target.result);
+      const key = 'weeklySchedule.v5';
+      let value = null;
+      if(typeof parsed[key] === 'string'){
+        value = parsed[key];
+      } else if(parsed.items){
+        value = JSON.stringify(parsed);
+      }
+      if(!value){ status.textContent = 'Could not find app data in that file.'; return; }
+      localStorage.setItem(key, value);
+      status.textContent = 'Restored! Opening the app...';
+      setTimeout(function(){ location.href = 'index.html'; }, 800);
+    }catch(err){
+      status.textContent = 'Error reading file: ' + err.message;
+    }
+  };
+  reader.readAsText(f);
+};
+</script>
+</body>
+</html>
