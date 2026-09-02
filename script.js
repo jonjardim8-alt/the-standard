@@ -1307,6 +1307,7 @@
           if(!parsed.journalEntries) parsed.journalEntries = {};
           if(!parsed.energyLevels) parsed.energyLevels = {};
           if(!parsed.scoreOptIn) parsed.scoreOptIn = { budget: false };
+          if(!parsed.blockedSenders) parsed.blockedSenders = [];
           return parsed;
         }
       }
@@ -1320,7 +1321,8 @@
       allDayEvents: [], lists: [], longTermGoals: [],
       fitnessSplit: null, workoutLogs: {}, budgetTransactions: [], categoryBudgetLimits: {},
       projects: [], journalEntries: {}, energyLevels: {},
-      scoreOptIn: { budget: false }
+      scoreOptIn: { budget: false },
+      blockedSenders: []
     };
   }
   function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
@@ -4844,6 +4846,7 @@
     { id:'projects',  icon:'◈', label:'Projects' },
     { id:'journal',   icon:'✎', label:'Journal' },
     { id:'scores',    icon:'★', label:'Scores' },
+    { id:'email',     icon:'✉', label:'Email' },
     { id:'settings',  icon:'⚙', label:'Settings' },
   ];
 
@@ -5025,6 +5028,234 @@
       save();
       renderAll();
     };
+
+    const emailSub = document.createElement('div');
+    emailSub.className = 'section-label';
+    emailSub.style.marginTop = '18px';
+    emailSub.textContent = 'Email';
+    wrap.appendChild(emailSub);
+
+    const blockNote = document.createElement('div');
+    blockNote.className = 'settings-row-sub';
+    blockNote.style.margin = '0 0 10px';
+    blockNote.textContent = 'Emails from these senders are hidden from the Email tab.';
+    wrap.appendChild(blockNote);
+
+    const addRow = document.createElement('div');
+    addRow.className = 'blocklist-add-row';
+    addRow.innerHTML = `
+      <input type="text" id="blockedSenderInput" placeholder="name@example.com or @example.com">
+      <button id="blockedSenderAdd">Block</button>
+    `;
+    wrap.appendChild(addRow);
+    const commitBlock = () => {
+      const input = document.getElementById('blockedSenderInput');
+      const val = input.value.trim().toLowerCase();
+      if(!val) return;
+      if(!state.blockedSenders.includes(val)) state.blockedSenders.push(val);
+      input.value = '';
+      save();
+      renderAll();
+    };
+    addRow.querySelector('#blockedSenderAdd').onclick = commitBlock;
+    addRow.querySelector('#blockedSenderInput').addEventListener('keydown', (e) => {
+      if(e.key === 'Enter') commitBlock();
+    });
+
+    const chipWrap = document.createElement('div');
+    chipWrap.className = 'blocklist-chips';
+    if(!state.blockedSenders.length){
+      chipWrap.innerHTML = '<div class="empty-note">No blocked senders yet.</div>';
+    } else {
+      state.blockedSenders.forEach(sender => {
+        const chip = document.createElement('div');
+        chip.className = 'blocklist-chip';
+        chip.innerHTML = `<span></span><button aria-label="Unblock">×</button>`;
+        chip.querySelector('span').textContent = sender;
+        chip.querySelector('button').onclick = () => {
+          state.blockedSenders = state.blockedSenders.filter(s => s !== sender);
+          save();
+          renderAll();
+        };
+        chipWrap.appendChild(chip);
+      });
+    }
+    wrap.appendChild(chipWrap);
+  }
+
+  /* ---------------- Email (Gmail, read-only, client-side OAuth) ----------------
+     No backend — uses Google Identity Services' token flow, so the access
+     token only lives in memory for this session (~1hr) and is never
+     persisted. Blocked senders are excluded server-side via Gmail's own
+     `-from:` search operator, so nothing sensitive round-trips further
+     than it has to.
+  */
+  const GMAIL_CLIENT_ID = 'REPLACE_WITH_YOUR_CLIENT_ID.apps.googleusercontent.com';
+  const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
+
+  let gmailTokenClient = null;
+  const gmailState = { token: null, emails: null, loading: false, error: null };
+
+  function gmailEnsureTokenClient(){
+    if(gmailTokenClient) return gmailTokenClient;
+    if(typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) return null;
+    gmailTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GMAIL_CLIENT_ID,
+      scope: GMAIL_SCOPE,
+      callback: (resp) => {
+        if(resp.error){
+          gmailState.error = 'Sign-in failed: ' + resp.error;
+          gmailState.loading = false;
+          renderEmailSection();
+          return;
+        }
+        gmailState.token = resp.access_token;
+        gmailState.error = null;
+        fetchGmailInbox();
+      },
+    });
+    return gmailTokenClient;
+  }
+
+  function connectGmail(){
+    const client = gmailEnsureTokenClient();
+    if(!client){
+      gmailState.error = 'Google sign-in is still loading — try again in a second.';
+      renderEmailSection();
+      return;
+    }
+    gmailState.error = null;
+    client.requestAccessToken({ prompt: gmailState.token ? '' : 'consent' });
+  }
+
+  function gmailBlockQuery(){
+    return state.blockedSenders.map(s => '-from:' + s.replace(/\s+/g, '')).join(' ');
+  }
+
+  async function fetchGmailInbox(){
+    gmailState.loading = true;
+    gmailState.error = null;
+    renderEmailSection();
+    try{
+      const q = ('in:inbox ' + gmailBlockQuery()).trim();
+      const listUrl = 'https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=25&q=' + encodeURIComponent(q);
+      const listRes = await fetch(listUrl, { headers: { Authorization: 'Bearer ' + gmailState.token } });
+      if(!listRes.ok) throw new Error('Gmail request failed (' + listRes.status + ')');
+      const listJson = await listRes.json();
+      const ids = (listJson.messages || []).map(m => m.id);
+      const emails = await Promise.all(ids.map(async (id) => {
+        const url = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/' + id +
+          '?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date';
+        const res = await fetch(url, { headers: { Authorization: 'Bearer ' + gmailState.token } });
+        if(!res.ok) return null;
+        const json = await res.json();
+        const headers = {};
+        ((json.payload && json.payload.headers) || []).forEach(h => { headers[h.name] = h.value; });
+        return {
+          id,
+          subject: headers.Subject || '(no subject)',
+          from: headers.From || '',
+          date: headers.Date || '',
+          unread: ((json.labelIds) || []).includes('UNREAD'),
+        };
+      }));
+      gmailState.emails = emails.filter(Boolean);
+      gmailState.loading = false;
+      renderEmailSection();
+    } catch(err){
+      gmailState.loading = false;
+      gmailState.error = (err && err.message) || 'Something went wrong loading your inbox.';
+      renderEmailSection();
+    }
+  }
+
+  function gmailShortFrom(from){
+    const match = from.match(/^"?([^"<]*)"?\s*<?/);
+    const name = match && match[1].trim();
+    return name || from;
+  }
+
+  function gmailShortDate(dateStr){
+    const d = new Date(dateStr);
+    if(isNaN(d)) return '';
+    return d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+  }
+
+  function renderEmailSection(){
+    const wrap = document.getElementById('emailContent');
+    wrap.innerHTML = '';
+
+    const heading = document.createElement('div');
+    heading.className = 'section-label';
+    heading.textContent = 'Email';
+    wrap.appendChild(heading);
+
+    if(!gmailState.token){
+      const box = document.createElement('div');
+      box.className = 'dash-info-box';
+      box.innerHTML = `
+        <div style="margin-bottom:10px">Connect your Gmail to see your inbox here, filtered by the senders you've blocked in Settings.</div>
+        <button class="btn-primary" id="gmailConnectBtn">Connect Gmail</button>
+      `;
+      wrap.appendChild(box);
+      box.querySelector('#gmailConnectBtn').onclick = connectGmail;
+      if(gmailState.error){
+        const err = document.createElement('div');
+        err.className = 'score-card-note';
+        err.style.marginTop = '10px';
+        err.style.color = '#F2617A';
+        err.textContent = gmailState.error;
+        wrap.appendChild(err);
+      }
+      return;
+    }
+
+    const refreshRow = document.createElement('div');
+    refreshRow.style.display = 'flex';
+    refreshRow.style.justifyContent = 'flex-end';
+    refreshRow.style.marginBottom = '10px';
+    refreshRow.innerHTML = `<button class="review-btn" id="gmailRefreshBtn">${gmailState.loading ? 'Loading…' : '↻ Refresh'}</button>`;
+    wrap.appendChild(refreshRow);
+    refreshRow.querySelector('#gmailRefreshBtn').onclick = () => fetchGmailInbox();
+
+    if(gmailState.error){
+      const err = document.createElement('div');
+      err.className = 'score-card-note';
+      err.style.color = '#F2617A';
+      err.style.marginBottom = '10px';
+      err.textContent = gmailState.error;
+      wrap.appendChild(err);
+    }
+
+    if(gmailState.loading && !gmailState.emails){
+      const empty = document.createElement('div');
+      empty.className = 'empty-note';
+      empty.textContent = 'Loading your inbox…';
+      wrap.appendChild(empty);
+      return;
+    }
+
+    if(!gmailState.emails || !gmailState.emails.length){
+      const empty = document.createElement('div');
+      empty.className = 'empty-note';
+      empty.textContent = 'Nothing to show — inbox is empty or everything is blocked.';
+      wrap.appendChild(empty);
+      return;
+    }
+
+    const list = document.createElement('div');
+    list.className = 'email-list';
+    gmailState.emails.forEach(e => {
+      const row = document.createElement('div');
+      row.className = 'email-row' + (e.unread ? ' unread' : '');
+      row.innerHTML = `
+        <div class="email-from">${escapeHtml(gmailShortFrom(e.from))}</div>
+        <div class="email-subject">${escapeHtml(e.subject)}</div>
+        <div class="email-date">${escapeHtml(gmailShortDate(e.date))}</div>
+      `;
+      list.appendChild(row);
+    });
+    wrap.appendChild(list);
   }
 
   function openMoreSheet(){
@@ -5096,9 +5327,10 @@
     document.getElementById('projectsSection').style.display = section === 'projects' ? 'block' : 'none';
     document.getElementById('journalSection').style.display = section === 'journal' ? 'block' : 'none';
     document.getElementById('scoresSection').style.display = section === 'scores' ? 'block' : 'none';
+    document.getElementById('emailSection').style.display = section === 'email' ? 'block' : 'none';
     document.getElementById('settingsSection').style.display = section === 'settings' ? 'block' : 'none';
     if(isPrimary) setTrackTransform(section, !opts.skipAnim);
-    document.getElementById('fabBtn').style.display = (section === 'dashboard' || section === 'journal' || section === 'scores' || section === 'settings') ? 'none' : 'flex';
+    document.getElementById('fabBtn').style.display = (section === 'dashboard' || section === 'journal' || section === 'scores' || section === 'email' || section === 'settings') ? 'none' : 'flex';
     document.querySelectorAll('.bottom-nav-btn[data-section]').forEach(b => b.classList.toggle('active', b.dataset.section === section));
     const isOverflow = OVERFLOW_SECTIONS.some(s => s.id === section);
     document.getElementById('moreNavBtn').classList.toggle('active', isOverflow);
@@ -5135,6 +5367,7 @@
     renderProjectsSection();
     renderJournalSection();
     renderScoresSection();
+    renderEmailSection();
     renderSettingsSection();
     if(currentSection === 'dashboard') renderDashboardSection();
   }
