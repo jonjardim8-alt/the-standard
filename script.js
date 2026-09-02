@@ -2121,25 +2121,6 @@
     heading.textContent = new Date().toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' });
     wrap.appendChild(heading);
 
-    // Today's scores — tap through to the full Scores section
-    const scores = computeScores();
-    const scoreTiles = [
-      { key:'core',    accent:'#5B8DEF', label:'Core' },
-      { key:'fitness', accent:'#3CBF8C', label:'Fitness' },
-      { key:'journal', accent:'#B18CF2', label:'Journal' },
-    ];
-    if(scores.budget.optedIn) scoreTiles.push({ key:'budget', accent:'#F2A93B', label:'Budget' });
-    const scoreRow = document.createElement('div');
-    scoreRow.className = 'dash-score-row';
-    scoreRow.innerHTML = scoreTiles.map(t => `
-      <div class="dash-score-tile" style="--accent-color:${t.accent}">
-        <div class="n">${scores[t.key].today}</div>
-        <div class="l">${escapeHtml(t.label)}</div>
-      </div>
-    `).join('');
-    scoreRow.onclick = () => switchSection('scores');
-    wrap.appendChild(scoreRow);
-
     // Next up
     const nextTitle = document.createElement('div');
     nextTitle.className = 'task-section-title';
@@ -2298,6 +2279,32 @@
     }));
 
     wrap.appendChild(grid);
+
+    // Today's scores — tap through to the full Scores section
+    const scoresTitle = document.createElement('div');
+    scoresTitle.className = 'task-section-title';
+    scoresTitle.style.cursor = 'default';
+    scoresTitle.style.marginTop = '18px';
+    scoresTitle.innerHTML = '<span>Scores</span>';
+    wrap.appendChild(scoresTitle);
+
+    const scores = computeScores();
+    const scoreTiles = [
+      { key:'core',    accent:'#5B8DEF', label:'Core' },
+      { key:'fitness', accent:'#3CBF8C', label:'Fitness' },
+      { key:'journal', accent:'#B18CF2', label:'Journal' },
+    ];
+    if(scores.budget.optedIn) scoreTiles.push({ key:'budget', accent:'#F2A93B', label:'Budget' });
+    const scoreRow = document.createElement('div');
+    scoreRow.className = 'dash-score-row';
+    scoreRow.innerHTML = scoreTiles.map(t => `
+      <div class="dash-score-tile" style="--accent-color:${t.accent}">
+        <div class="n">${scores[t.key].today}</div>
+        <div class="l">${escapeHtml(t.label)}</div>
+      </div>
+    `).join('');
+    scoreRow.onclick = () => switchSection('scores');
+    wrap.appendChild(scoreRow);
   }
 
   function makeDashTile(opts){

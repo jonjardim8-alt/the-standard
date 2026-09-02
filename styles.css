@@ -649,16 +649,16 @@
     padding: 11px 14px;
   }
   .dash-score-row{
-    display:grid;
-    grid-template-columns: 1fr 1fr;
+    display:flex;
     gap: 8px;
-    max-width: 220px;
     margin: 0 0 16px;
     cursor: pointer;
   }
   .dash-score-tile{
     position: relative;
-    aspect-ratio: 1;
+    flex: 1;
+    min-width: 0;
+    height: 76px;
     display:flex;
     align-items:center;
     justify-content:center;
@@ -670,7 +670,7 @@
   .dash-score-tile .n{
     font-family: var(--font-display);
     font-weight: 700;
-    font-size: 26px;
+    font-size: 24px;
     color: var(--accent-color, var(--accent));
     line-height: 1;
   }
