@@ -1205,6 +1205,50 @@
   }
   importFallSplitFromNotion();
 
+  // Rest of Week 1, logged in Notion after the Monday Chest session —
+  // Tuesday Back, Wednesday Legs, Thursday Arms.
+  function importFallSplitWeek1Remaining(){
+    if(!state.seedFlags) state.seedFlags = {};
+    if(state.seedFlags.fallSplitWeek1RemainingImported) return;
+
+    if(!state.workoutLogs['2026-09-01']) state.workoutLogs['2026-09-01'] = { exercises: {} };
+    state.workoutLogs['2026-09-01'].exercises = Object.assign(state.workoutLogs['2026-09-01'].exercises || {}, {
+      'ex-bb-row':          [{weight:135,reps:6},{weight:135,reps:6},{weight:145,reps:6},{weight:145,reps:6}],
+      'ex-sa-lat-pulldown': [{weight:155,reps:10},{weight:155,reps:10},{weight:155,reps:9}],
+      'ex-low-row-machine': [{weight:200,reps:12},{weight:200,reps:11},{weight:200,reps:10}],
+      'ex-cable-row':       [{weight:140,reps:12},{weight:140,reps:12},{weight:140,reps:11}],
+      'ex-face-pull':       [{weight:95,reps:15},{weight:95,reps:15},{weight:95,reps:15}],
+      'ex-rear-delt-fly':   [{weight:95,reps:20},{weight:95,reps:18},{weight:95,reps:15}],
+    });
+    state.workoutLogs['2026-09-01'].coachNotes = "First two sets of barbell rows were with 135 lbs and the last two sets were with 145 lbs. I can definitely do 155 lbs next week. Did two sets of cable rows before low rows because someone was on the machine. Cable rows feel very good mind muscle connection wise.\n\nCoach: Strong Fall Split debut. Barbell row is a natural fit — bumping mid-session was the right call and 155 is confirmed for Week 2. Cable row mind-muscle connection is a great sign for long-term lat development. SA lat pulldown and rear delt fly both one rep short on the last set — that's the target to chase next week. Face pulls swept clean at 95, moving to 100. Full session completed, all 6 exercises logged. This is the standard.";
+
+    if(!state.workoutLogs['2026-09-02']) state.workoutLogs['2026-09-02'] = { exercises: {} };
+    state.workoutLogs['2026-09-02'].exercises = Object.assign(state.workoutLogs['2026-09-02'].exercises || {}, {
+      'ex-pendulum-squat':  [{weight:185,reps:6},{weight:185,reps:6},{weight:185,reps:6},{weight:185,reps:6}],
+      'ex-bulgarian-split': [{weight:60,reps:8},{weight:60,reps:8},{weight:60,reps:8}],
+      'ex-rdl':             [{weight:170,reps:10},{weight:170,reps:10},{weight:170,reps:9}],
+      'ex-ham-curl':        [{weight:140,reps:12},{weight:140,reps:12},{weight:140,reps:10}],
+      'ex-leg-extension':   [{weight:165,reps:15},{weight:165,reps:15},{weight:165,reps:13}],
+      'ex-calf-raise':      [{weight:170,reps:15},{weight:170,reps:15},{weight:170,reps:15}],
+    });
+    state.workoutLogs['2026-09-02'].coachNotes = "5 minute warmup on the bike. Can definitely move up to 195 lbs next with pendulum squats. Leaning more forward with bulgarians for this split to target glutes more.\n\nCoach: Best legs opening session of any block. Pendulum squat is a natural fit — smart bump to 185 and sweeping it clean confirms 195 for Week 2. Glute-focused BSS lean is a smart adjustment, keep it consistent. RDL one rep short on the last set — that's the target next week. Hamstring curl and leg extension both dropped on the last set at new/held weights — expected, just chase the full sweep. Calf raise swept clean, moving to 180. Bike warmup is a great habit, keep it every session. 9.5/10.";
+
+    if(!state.workoutLogs['2026-09-03']) state.workoutLogs['2026-09-03'] = { exercises: {} };
+    state.workoutLogs['2026-09-03'].exercises = Object.assign(state.workoutLogs['2026-09-03'].exercises || {}, {
+      'ex-oh-tricep-ext':  [{weight:110,reps:12},{weight:110,reps:12},{weight:110,reps:10}],
+      'ex-cable-pushdown': [{weight:90,reps:12},{weight:90,reps:12},{weight:90,reps:10}],
+      'ex-cable-kickback': [{weight:20,reps:15},{weight:20,reps:14},{weight:20,reps:13}],
+      'ex-ez-curl':        [{weight:60,reps:10},{weight:60,reps:10},{weight:60,reps:10}],
+      'ex-hammer-curl':    [{weight:35,reps:10},{weight:35,reps:10},{weight:35,reps:9}],
+      'ex-cable-curl':     [{weight:50,reps:15},{weight:60,reps:15},{weight:70,reps:''}],
+    });
+    state.workoutLogs['2026-09-03'].coachNotes = "I did cable overhead extensions because I'm working out at a different gym than usual today.";
+
+    state.seedFlags.fallSplitWeek1RemainingImported = true;
+    save();
+  }
+  importFallSplitWeek1Remaining();
+
   function markSaturdayRest(){
     if(!state.seedFlags) state.seedFlags = {};
     if(state.seedFlags.saturdayRestSet) return;
