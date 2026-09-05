@@ -770,6 +770,7 @@
   }
   .dash-score-corner{
     position: relative;
+    z-index: 2;
     width: 90px;
     height: 90px;
     display:flex;
@@ -806,8 +807,8 @@
     position: absolute;
     top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    width: 112px;
-    height: 112px;
+    width: 148px;
+    height: 148px;
     z-index: 1;
     display:flex;
     align-items:center;
@@ -821,7 +822,7 @@
   .dash-score-overall .n{
     font-family: var(--font-display);
     font-weight: 700;
-    font-size: 32px;
+    font-size: 38px;
     color: var(--text);
     line-height: 1;
   }
