@@ -2355,6 +2355,7 @@
 
     const scores = computeScores();
     const scoreTiles = [
+      { key:'overall', accent:'#FFFFFF', label:'Overall' },
       { key:'core',    accent:'#5B8DEF', label:'Core' },
       { key:'fitness', accent:'#3CBF8C', label:'Fitness' },
       { key:'journal', accent:'#B18CF2', label:'Journal' },
@@ -2364,7 +2365,7 @@
     scoreRow.className = 'dash-score-row';
     scoreRow.innerHTML = scoreTiles.map(t => `
       <div class="dash-score-tile" style="--accent-color:${t.accent}">
-        <div class="n">${scores[t.key].today}</div>
+        <div class="n">${scores[t.key].score === null ? '–' : scores[t.key].score}</div>
         <div class="l">${escapeHtml(t.label)}</div>
       </div>
     `).join('');
@@ -4914,104 +4915,118 @@
   ];
 
   /* ---------------- Scores ----------------
-     Derived entirely from existing data (nothing new is stored except a
-     task's completion date and the budget opt-in flag), so scores always
-     stay in sync with the real state — nothing to double-count or drift.
-     Point values, by design:
-       task done            +1   (core)
-       daily habit checked  +2   (core)
-       weekly goal met      +5   (core, once per week per goal)
-       workout logged       +5   (fitness — a day with real reps entered)
-       journal entry        +3   (journal, once per day)
-       budget: on-track day +3   (today only, live status)
-       budget: clean month  +10  (all-time, past months only)
+     Derived entirely from existing data — nothing new is stored except the
+     budget opt-in flag — so scores always stay in sync with real state.
+
+     Each category is a 0-100 rating: for each of the last 7 days we work
+     out a 0-100 "how much of what was possible got done" value, then
+     average those across the window (days where a category genuinely
+     doesn't apply — e.g. a fitness rest day, or a day with zero tasks
+     due — are left out of that category's average rather than counted
+     as a 0, so idle days don't unfairly tank the score). A category with
+     no applicable days at all (e.g. no habits ever added) returns score
+     null and the UI shows "–" instead of a number. Overall is the average
+     of whichever category scores aren't null.
   */
-  const POINTS = { task:1, habitDaily:2, habitWeekly:5, workout:5, journal:3, budgetDay:3, budgetMonth:10 };
+  const SCORE_WINDOW_DAYS = 7;
 
-  function computeScores(){
-    const today = todayStr();
-    let coreToday = 0, coreAll = 0;
-    let fitToday = 0, fitAll = 0;
-    let journalToday = 0, journalAll = 0;
-    let budgetToday = 0, budgetAll = 0;
+  function scoreWindowDates(){
+    const end = dateFromStr(todayStr());
+    const dates = [];
+    for(let i = SCORE_WINDOW_DAYS - 1; i >= 0; i--){
+      const d = new Date(end);
+      d.setDate(d.getDate() - i);
+      dates.push(toDateStr(d));
+    }
+    return dates;
+  }
 
-    state.tasks.forEach(t => {
-      if(t.done && t.doneDate){
-        coreAll += POINTS.task;
-        if(t.doneDate === today) coreToday += POINTS.task;
-      }
-    });
+  function averageOrNull(values){
+    const applicable = values.filter(v => v !== null);
+    if(!applicable.length) return null;
+    return Math.round(applicable.reduce((s,v) => s + v, 0) / applicable.length);
+  }
 
-    const habitToday = habitDayStr();
-    Object.keys(state.dailyGoalLog).forEach(key => {
-      if(!state.dailyGoalLog[key]) return;
-      coreAll += POINTS.habitDaily;
-      if(key.endsWith('_' + habitToday)) coreToday += POINTS.habitDaily;
-    });
+  // Core: daily-habit completion, tasks done vs. due that day, and weekly
+  // goals met for the week containing that day — averaged together per day
+  // (skipping whichever of the three don't apply that day), then averaged
+  // across the window.
+  function coreDayScore(dateStr){
+    const parts = [];
 
-    const thisWeekStart = realCurrentWeekStart();
-    state.weeklyGoals.forEach(goal => {
-      if(goal.auto){
-        const count = getWeeklyGoalCount(goal, thisWeekStart);
-        if(count >= goal.target){
-          coreAll += POINTS.habitWeekly;
-          coreToday += POINTS.habitWeekly;
-        }
-      } else {
-        Object.keys(state.weeklyGoalLog).forEach(key => {
-          if(!key.startsWith(goal.id + '_')) return;
-          const count = state.weeklyGoalLog[key];
-          if(count >= goal.target){
-            coreAll += POINTS.habitWeekly;
-            const weekStart = key.slice(goal.id.length + 1);
-            if(weekStart === thisWeekStart) coreToday += POINTS.habitWeekly;
-          }
-        });
-      }
-    });
-
-    Object.keys(state.workoutLogs).forEach(date => {
-      const log = state.workoutLogs[date];
-      const hasRealSet = Object.values(log.exercises || {}).some(sets => sets.some(s => s.reps));
-      if(hasRealSet){
-        fitAll += POINTS.workout;
-        if(date === today) fitToday += POINTS.workout;
-      }
-    });
-
-    Object.keys(state.journalEntries).forEach(date => {
-      const entry = state.journalEntries[date];
-      if(entry && entry.text && entry.text.trim()){
-        journalAll += POINTS.journal;
-        if(date === today) journalToday += POINTS.journal;
-      }
-    });
-
-    const budgetOptedIn = !!(state.scoreOptIn && state.scoreOptIn.budget);
-    if(budgetOptedIn){
-      const limitedCats = Object.keys(state.categoryBudgetLimits);
-      const monthWithinLimits = (monthKey) => {
-        if(!limitedCats.length) return false;
-        return limitedCats.every(catId => {
-          const limit = state.categoryBudgetLimits[catId];
-          const spent = state.budgetTransactions
-            .filter(t => t.category === catId && t.date.startsWith(monthKey))
-            .reduce((s,t) => s + t.amount, 0);
-          return spent <= limit;
-        });
-      };
-      const thisMonth = today.slice(0,7);
-      if(monthWithinLimits(thisMonth)) budgetToday += POINTS.budgetDay;
-      const pastMonths = Array.from(new Set(state.budgetTransactions.map(t => t.date.slice(0,7))))
-        .filter(m => m < thisMonth);
-      pastMonths.forEach(m => { if(monthWithinLimits(m)) budgetAll += POINTS.budgetMonth; });
+    if(state.dailyGoals.length){
+      const done = state.dailyGoals.filter(g => isDailyGoalDone(g.id, dateStr)).length;
+      parts.push(done / state.dailyGoals.length * 100);
     }
 
+    const dueThatDay = state.tasks.filter(t => t.dueDate === dateStr);
+    if(dueThatDay.length){
+      const done = dueThatDay.filter(t => t.done).length;
+      parts.push(Math.min(100, done / dueThatDay.length * 100));
+    }
+
+    if(state.weeklyGoals.length){
+      const weekStart = toDateStr(startOfWeek(dateFromStr(dateStr)));
+      const met = state.weeklyGoals.filter(g => getWeeklyGoalCount(g, weekStart) >= g.target).length;
+      parts.push(met / state.weeklyGoals.length * 100);
+    }
+
+    if(!parts.length) return null;
+    return parts.reduce((s,v) => s + v, 0) / parts.length;
+  }
+
+  // Fitness: 100 if that day's split called for a workout and one was
+  // logged, 0 if it called for one and nothing was logged. Rest days (and
+  // days before any split existed) don't apply and are excluded.
+  function fitnessDayScore(dateStr){
+    const dayAbbr = dayAbbrFromDateStr(dateStr);
+    const plan = state.fitnessSplit && state.fitnessSplit.days ? state.fitnessSplit.days[dayAbbr] : null;
+    if(!plan || !plan.exercises || !plan.exercises.length) return null;
+    const log = state.workoutLogs[dateStr];
+    const hasRealSet = !!(log && Object.values(log.exercises || {}).some(sets => sets.some(s => s.reps)));
+    return hasRealSet ? 100 : 0;
+  }
+
+  // Journal: every day is eligible, so this one's never excluded.
+  function journalDayScore(dateStr){
+    const entry = state.journalEntries[dateStr];
+    return (entry && entry.text && entry.text.trim()) ? 100 : 0;
+  }
+
+  // Budget: 100 if every category with a limit was within it, based on
+  // spend booked by that date within its month; 0 if any was over. Not
+  // applicable (null) unless opted in and at least one limit is set.
+  function budgetDayScore(dateStr, limitedCats){
+    if(!limitedCats.length) return null;
+    const monthKey = dateStr.slice(0,7);
+    const within = limitedCats.every(catId => {
+      const limit = state.categoryBudgetLimits[catId];
+      const spent = state.budgetTransactions
+        .filter(t => t.category === catId && t.date.startsWith(monthKey) && t.date <= dateStr)
+        .reduce((s,t) => s + t.amount, 0);
+      return spent <= limit;
+    });
+    return within ? 100 : 0;
+  }
+
+  function computeScores(){
+    const dates = scoreWindowDates();
+    const budgetOptedIn = !!(state.scoreOptIn && state.scoreOptIn.budget);
+    const limitedCats = budgetOptedIn ? Object.keys(state.categoryBudgetLimits) : [];
+
+    const core    = averageOrNull(dates.map(coreDayScore));
+    const fitness = averageOrNull(dates.map(fitnessDayScore));
+    const journal = averageOrNull(dates.map(journalDayScore));
+    const budget  = budgetOptedIn ? averageOrNull(dates.map(d => budgetDayScore(d, limitedCats))) : null;
+
+    const overall = averageOrNull([core, fitness, journal, budget]);
+
     return {
-      core:    { today: coreToday,    allTime: coreAll },
-      fitness: { today: fitToday,     allTime: fitAll },
-      journal: { today: journalToday, allTime: journalAll },
-      budget:  { today: budgetToday,  allTime: budgetAll, optedIn: budgetOptedIn },
+      overall: { score: overall },
+      core:    { score: core },
+      fitness: { score: fitness },
+      journal: { score: journal },
+      budget:  { score: budget, optedIn: budgetOptedIn },
     };
   }
 
@@ -5025,11 +5040,23 @@
     heading.textContent = 'Scores';
     wrap.appendChild(heading);
 
+    const overallCard = document.createElement('div');
+    overallCard.className = 'score-card';
+    overallCard.style.setProperty('--accent-color', '#FFFFFF');
+    overallCard.innerHTML = `
+      <div class="score-card-title">Overall</div>
+      <div class="score-card-nums">
+        <div class="score-num-block"><div class="n">${scores.overall.score === null ? '–' : scores.overall.score}</div><div class="l">/ 100</div></div>
+      </div>
+      <div class="score-card-note">Average of the categories below, last 7 days.</div>
+    `;
+    wrap.appendChild(overallCard);
+
     const cards = [
-      { key:'core',    accent:'#5B8DEF', title:'Core productivity', note:'Tasks completed, habits checked off, weekly goals hit.' },
-      { key:'fitness', accent:'#3CBF8C', title:'Fitness', note:'Days with a real workout logged.' },
-      { key:'journal', accent:'#B18CF2', title:'Journal', note:'Days with a journal entry written.' },
-      { key:'budget',  accent:'#F2A93B', title:'Budget', note:'Staying within your category limits.' },
+      { key:'core',    accent:'#5B8DEF', title:'Core productivity', note:'Habits checked off, tasks done vs. due, weekly goals hit — last 7 days.' },
+      { key:'fitness', accent:'#3CBF8C', title:'Fitness', note:'Split workout days with real reps logged — last 7 days, rest days excluded.' },
+      { key:'journal', accent:'#B18CF2', title:'Journal', note:'Days with a journal entry written — last 7 days.' },
+      { key:'budget',  accent:'#F2A93B', title:'Budget', note:'Days within your category limits so far this month — last 7 days.' },
     ];
 
     cards.forEach(c => {
@@ -5052,8 +5079,7 @@
       card.innerHTML = `
         <div class="score-card-title">${escapeHtml(c.title)}</div>
         <div class="score-card-nums">
-          <div class="score-num-block"><div class="n">${s.today}</div><div class="l">Today</div></div>
-          <div class="score-num-block"><div class="n">${s.allTime}</div><div class="l">All-time</div></div>
+          <div class="score-num-block"><div class="n">${s.score === null ? '–' : s.score}</div><div class="l">/ 100</div></div>
         </div>
         <div class="score-card-note">${escapeHtml(c.note)}</div>
       `;
