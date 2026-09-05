@@ -3450,19 +3450,28 @@
     const prevWeekStart = toDateStr(prevDates[0]);
     const prevWeekEnd = toDateStr(prevDates[6]);
 
-    const weekTasks = state.tasks.filter(t => t.dueDate >= weekStart && t.dueDate <= weekEnd);
+    const weekTasks = state.tasks.filter(t => t.dueDate >= weekStart && t.dueDate <= weekEnd)
+      .sort((a,b) => a.dueDate.localeCompare(b.dueDate));
     const doneCount = weekTasks.filter(t => t.done).length;
     const pendingCount = weekTasks.length - doneCount;
     const overdueCount = state.tasks.filter(t => !t.done && t.dueDate < today).length;
-    const atRisk = weekTasks.filter(t => !t.done && !t.scheduled && t.dueDate >= today);
     const prevTaskStats = getWeekTaskStats(prevWeekStart, prevWeekEnd);
 
-    const atRiskHtml = atRisk.length ? atRisk.map(t => `
-      <div class="upcoming-item">
-        <div class="day">${fmtDate(t.dueDate)}</div>
-        <div style="flex:1"><div class="txt">${escapeHtml(t.text)}</div></div>
-      </div>
-    `).join('') : '<div class="upcoming-empty">Nothing at risk — everything pending has a slot.</div>';
+    const dueThisWeekHtml = weekTasks.length ? weekTasks.map(t => {
+      const cat = catById[t.category] || CATEGORIES[0];
+      const overdue = !t.done && t.dueDate < today;
+      const dueLabel = overdue ? 'was due ' + fmtDate(t.dueDate) : (t.dueDate === today ? 'due today' : 'due ' + fmtDate(t.dueDate));
+      const meta = cat.label + (t.subcategory ? ' · ' + t.subcategory : '') + ' · ' + dueLabel;
+      return `
+        <div class="task-item due-week-item${t.done ? ' done' : ''}" style="--accent-color:${cat.color}" data-task-id="${t.id}">
+          <button class="task-check">✓</button>
+          <div class="task-body">
+            <div class="task-txt">${escapeHtml(t.text)}</div>
+            <div class="task-meta${overdue ? ' overdue' : ''}">${escapeHtml(meta)}</div>
+          </div>
+        </div>
+      `;
+    }).join('') : '<div class="upcoming-empty">Nothing due this week.</div>';
 
     const dailyGoalsHtml = state.dailyGoals.map(g => {
       const stats = weekStatsForDailyGoal(g.id, dates);
@@ -3510,8 +3519,8 @@
       </div>
       <div class="trend-row" style="margin:-10px 0 14px; text-align:center;">Tasks done: ${trendBadge(doneCount, prevTaskStats.done)}</div>
 
-      <div class="upcoming-section-title">At risk — no slot scheduled</div>
-      <div class="upcoming-list">${atRiskHtml}</div>
+      <div class="upcoming-section-title">Due this week</div>
+      <div class="task-list">${dueThisWeekHtml}</div>
 
       ${state.dailyGoals.length ? '<div class="upcoming-section-title" style="margin-top:16px">Daily habits</div>' + dailyGoalsHtml : ''}
       ${state.weeklyGoals.length ? '<div class="upcoming-section-title" style="margin-top:16px">Weekly habits</div>' + weeklyGoalsHtml : ''}
@@ -3520,6 +3529,17 @@
         <button class="cancel" id="reviewClose" style="flex:1">Close</button>
       </div>
     `;
+    content.querySelectorAll('.due-week-item .task-check').forEach(btn => {
+      btn.onclick = () => {
+        const id = btn.closest('.due-week-item').dataset.taskId;
+        const t = state.tasks.find(x => x.id === id);
+        if(!t) return;
+        setTaskDone(t, !t.done);
+        save();
+        renderAll();
+        openWeeklyReviewModal();
+      };
+    });
     overlay.classList.remove('hidden');
     document.getElementById('reviewClose').onclick = closeModal;
   }
