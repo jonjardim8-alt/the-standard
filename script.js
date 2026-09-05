@@ -1299,6 +1299,8 @@
   let taskSubView = 'today'; // 'today' | 'upcoming'
   let expandedGroups = new Set(); // tracks which groups are open — everything starts closed
   let needsAttentionExpanded = false; // Dashboard's Needs Attention section — starts closed
+  let reviewPendingExpanded = false; // Week Review's Pending tasks — starts closed
+  let reviewDoneExpanded = false;    // Week Review's Done tasks — starts closed
   let calendarViewMonth = null;
 
   function startOfWeek(d){
@@ -3457,7 +3459,7 @@
     const overdueCount = state.tasks.filter(t => !t.done && t.dueDate < today).length;
     const prevTaskStats = getWeekTaskStats(prevWeekStart, prevWeekEnd);
 
-    const dueThisWeekHtml = weekTasks.length ? weekTasks.map(t => {
+    const dueWeekRowHtml = (t) => {
       const cat = catById[t.category] || CATEGORIES[0];
       const overdue = !t.done && t.dueDate < today;
       const dueLabel = overdue ? 'was due ' + fmtDate(t.dueDate) : (t.dueDate === today ? 'due today' : 'due ' + fmtDate(t.dueDate));
@@ -3471,7 +3473,18 @@
           </div>
         </div>
       `;
-    }).join('') : '<div class="upcoming-empty">Nothing due this week.</div>';
+    };
+    const pendingTasks = weekTasks.filter(t => !t.done);
+    const doneTasks = weekTasks.filter(t => t.done);
+    // Collapsible Pending/Done sections, both starting closed — click the
+    // header to expand. A completed task simply stops showing up in
+    // Pending and appears in Done on the next render.
+    const dueWeekSectionHtml = (id, label, tasks, expanded, emptyText) => `
+      <div class="dash-section-header due-week-toggle" data-toggle="${id}">
+        <span class="dash-header-title"><span class="chev${expanded ? '' : ' collapsed'}">▾</span> ${label} (${tasks.length})</span>
+      </div>
+      ${expanded ? '<div class="task-list" style="margin-bottom:10px">' + (tasks.length ? tasks.map(dueWeekRowHtml).join('') : '<div class="upcoming-empty">' + emptyText + '</div>') + '</div>' : ''}
+    `;
 
     const dailyGoalsHtml = state.dailyGoals.map(g => {
       const stats = weekStatsForDailyGoal(g.id, dates);
@@ -3520,7 +3533,8 @@
       <div class="trend-row" style="margin:-10px 0 14px; text-align:center;">Tasks done: ${trendBadge(doneCount, prevTaskStats.done)}</div>
 
       <div class="upcoming-section-title">Due this week</div>
-      <div class="task-list">${dueThisWeekHtml}</div>
+      ${dueWeekSectionHtml('pending', 'Pending', pendingTasks, reviewPendingExpanded, 'Nothing pending this week.')}
+      ${dueWeekSectionHtml('done', 'Done', doneTasks, reviewDoneExpanded, 'Nothing done yet this week.')}
 
       ${state.dailyGoals.length ? '<div class="upcoming-section-title" style="margin-top:16px">Daily habits</div>' + dailyGoalsHtml : ''}
       ${state.weeklyGoals.length ? '<div class="upcoming-section-title" style="margin-top:16px">Weekly habits</div>' + weeklyGoalsHtml : ''}
@@ -3529,8 +3543,16 @@
         <button class="cancel" id="reviewClose" style="flex:1">Close</button>
       </div>
     `;
+    content.querySelectorAll('.due-week-toggle').forEach(header => {
+      header.onclick = () => {
+        if(header.dataset.toggle === 'pending') reviewPendingExpanded = !reviewPendingExpanded;
+        else reviewDoneExpanded = !reviewDoneExpanded;
+        openWeeklyReviewModal();
+      };
+    });
     content.querySelectorAll('.due-week-item .task-check').forEach(btn => {
-      btn.onclick = () => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
         const id = btn.closest('.due-week-item').dataset.taskId;
         const t = state.tasks.find(x => x.id === id);
         if(!t) return;
