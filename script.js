@@ -2354,23 +2354,36 @@
     wrap.appendChild(scoresTitle);
 
     const scores = computeScores();
-    const scoreTiles = [
-      { key:'overall', accent:'#FFFFFF', label:'Overall' },
+    // Corners fill in DOM order: top-left, top-right, bottom-left,
+    // bottom-right. If Budget is off there are only 3, so bottom-right
+    // is simply left empty rather than the layout reflowing.
+    const corners = [
       { key:'core',    accent:'#5B8DEF', label:'Core' },
       { key:'fitness', accent:'#3CBF8C', label:'Fitness' },
       { key:'journal', accent:'#B18CF2', label:'Journal' },
     ];
-    if(scores.budget.optedIn) scoreTiles.push({ key:'budget', accent:'#F2A93B', label:'Budget' });
-    const scoreRow = document.createElement('div');
-    scoreRow.className = 'dash-score-row';
-    scoreRow.innerHTML = scoreTiles.map(t => `
-      <div class="dash-score-tile" style="--accent-color:${t.accent}">
-        <div class="n">${scores[t.key].score === null ? '–' : scores[t.key].score}</div>
-        <div class="l">${escapeHtml(t.label)}</div>
+    if(scores.budget.optedIn) corners.push({ key:'budget', accent:'#F2A93B', label:'Budget' });
+
+    const scoreWrap = document.createElement('div');
+    scoreWrap.className = 'dash-score-diamond';
+    scoreWrap.innerHTML = `
+      <div class="dash-score-inner">
+        <div class="dash-score-corners">
+          ${corners.map(t => `
+            <div class="dash-score-corner" style="--accent-color:${t.accent}">
+              <div class="n">${scores[t.key].score === null ? '–' : scores[t.key].score}</div>
+              <div class="l">${escapeHtml(t.label)}</div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="dash-score-overall" style="--accent-color:#FFFFFF">
+          <div class="n">${scores.overall.score === null ? '–' : scores.overall.score}</div>
+          <div class="l">Overall</div>
+        </div>
       </div>
-    `).join('');
-    scoreRow.onclick = () => switchSection('scores');
-    wrap.appendChild(scoreRow);
+    `;
+    scoreWrap.onclick = () => switchSection('scores');
+    wrap.appendChild(scoreWrap);
   }
 
   function makeDashTile(opts){
