@@ -1168,6 +1168,8 @@
         { id:'ex-cable-y-raise',     name:'Cable Y-Raise',        type:'accessory',   sets:3, repMin:15, repMax:15 },
         { id:'ex-cable-crunch',      name:'Cable Crunch Machine', type:'accessory',   sets:3, repMin:12, repMax:15 },
         { id:'ex-hanging-leg-raise', name:'Hanging Leg Raise',    type:'accessory',   sets:3, repMin:12, repMax:15 },
+        { id:'ex-db-shoulder-press', name:'DB Shoulder Press',    type:'accessory',   sets:3, repMin:10, repMax:12 },
+        { id:'ex-wrist-curl',        name:'Wrist Curls',          type:'accessory',   sets:2, repMin:15, repMax:15 },
       ]},
       Sat: { focus:'Rest', exercises:[] },
       Sun: { focus:'Rest', exercises:[] },
@@ -1182,72 +1184,73 @@
   }
   seedFitnessSplit();
 
-  // Pulls in the full split from Notion (previously only had the 3 main
-  // lifts stubbed in) plus the Week 1 Monday Chest session that was
-  // already logged there, so nothing gets lost or re-typed.
-  function importFallSplitFromNotion(){
-    if(!state.seedFlags) state.seedFlags = {};
-    if(state.seedFlags.fallSplitImported) return;
-    if(state.fitnessSplit){
-      state.fitnessSplit.days = JSON.parse(JSON.stringify(DEFAULT_FITNESS_SPLIT.days));
-    }
-    if(!state.workoutLogs['2026-08-31']) state.workoutLogs['2026-08-31'] = { exercises: {} };
-    state.workoutLogs['2026-08-31'].exercises = Object.assign(state.workoutLogs['2026-08-31'].exercises || {}, {
+  // Fall Split sessions pulled in from Notion as they get logged. Each
+  // entry is applied once and tracked by date in
+  // state.seedFlags.fallSplitImportedDates so re-running this on a later
+  // load only picks up newly-added entries.
+  const FALL_SPLIT_SESSIONS = [
+    { date: '2026-08-31', exercises: {
       'ex-db-bench':           [{weight:90,reps:6},{weight:90,reps:6},{weight:90,reps:6},{weight:90,reps:6}],
       'ex-cable-press-around': [{weight:65,reps:15},{weight:65,reps:15},{weight:65,reps:15}],
       'ex-incline-db-press':   [{weight:75,reps:9},{weight:75,reps:8},{weight:75,reps:8}],
       'ex-pec-deck':           [{weight:100,reps:12},{weight:100,reps:12},{weight:100,reps:12}],
       'ex-cable-lat-raise':    [{weight:40,reps:15},{weight:40,reps:14},{weight:40,reps:''}],
-    });
-    state.workoutLogs['2026-08-31'].coachNotes = "DB press was difficult but I hit the top range of each. Could tell my chest was tired during incline DB at the end of those sets. Pec deck felt solid at 100 lbs — could've maybe done 110 but probably wouldn't have swept 12s, so I didn't want to push it first week.";
-    state.seedFlags.fallSplitImported = true;
-    save();
-  }
-  importFallSplitFromNotion();
+    }, coachNotes: "DB press was difficult but I hit the top range of each. Could tell my chest was tired during incline DB at the end of those sets. Pec deck felt solid at 100 lbs — could've maybe done 110 but probably wouldn't have swept 12s, so I didn't want to push it first week." },
 
-  // Rest of Week 1, logged in Notion after the Monday Chest session —
-  // Tuesday Back, Wednesday Legs, Thursday Arms.
-  function importFallSplitWeek1Remaining(){
-    if(!state.seedFlags) state.seedFlags = {};
-    if(state.seedFlags.fallSplitWeek1RemainingImported) return;
-
-    if(!state.workoutLogs['2026-09-01']) state.workoutLogs['2026-09-01'] = { exercises: {} };
-    state.workoutLogs['2026-09-01'].exercises = Object.assign(state.workoutLogs['2026-09-01'].exercises || {}, {
+    { date: '2026-09-01', exercises: {
       'ex-bb-row':          [{weight:135,reps:6},{weight:135,reps:6},{weight:145,reps:6},{weight:145,reps:6}],
       'ex-sa-lat-pulldown': [{weight:155,reps:10},{weight:155,reps:10},{weight:155,reps:9}],
       'ex-low-row-machine': [{weight:200,reps:12},{weight:200,reps:11},{weight:200,reps:10}],
       'ex-cable-row':       [{weight:140,reps:12},{weight:140,reps:12},{weight:140,reps:11}],
       'ex-face-pull':       [{weight:95,reps:15},{weight:95,reps:15},{weight:95,reps:15}],
       'ex-rear-delt-fly':   [{weight:95,reps:20},{weight:95,reps:18},{weight:95,reps:15}],
-    });
-    state.workoutLogs['2026-09-01'].coachNotes = "First two sets of barbell rows were with 135 lbs and the last two sets were with 145 lbs. I can definitely do 155 lbs next week. Did two sets of cable rows before low rows because someone was on the machine. Cable rows feel very good mind muscle connection wise.\n\nCoach: Strong Fall Split debut. Barbell row is a natural fit — bumping mid-session was the right call and 155 is confirmed for Week 2. Cable row mind-muscle connection is a great sign for long-term lat development. SA lat pulldown and rear delt fly both one rep short on the last set — that's the target to chase next week. Face pulls swept clean at 95, moving to 100. Full session completed, all 6 exercises logged. This is the standard.";
+    }, coachNotes: "First two sets of barbell rows were with 135 lbs and the last two sets were with 145 lbs. I can definitely do 155 lbs next week. Did two sets of cable rows before low rows because someone was on the machine. Cable rows feel very good mind muscle connection wise.\n\nCoach: Strong Fall Split debut. Barbell row is a natural fit — bumping mid-session was the right call and 155 is confirmed for Week 2. Cable row mind-muscle connection is a great sign for long-term lat development. SA lat pulldown and rear delt fly both one rep short on the last set — that's the target to chase next week. Face pulls swept clean at 95, moving to 100. Full session completed, all 6 exercises logged. This is the standard." },
 
-    if(!state.workoutLogs['2026-09-02']) state.workoutLogs['2026-09-02'] = { exercises: {} };
-    state.workoutLogs['2026-09-02'].exercises = Object.assign(state.workoutLogs['2026-09-02'].exercises || {}, {
+    { date: '2026-09-02', exercises: {
       'ex-pendulum-squat':  [{weight:185,reps:6},{weight:185,reps:6},{weight:185,reps:6},{weight:185,reps:6}],
       'ex-bulgarian-split': [{weight:60,reps:8},{weight:60,reps:8},{weight:60,reps:8}],
       'ex-rdl':             [{weight:170,reps:10},{weight:170,reps:10},{weight:170,reps:9}],
       'ex-ham-curl':        [{weight:140,reps:12},{weight:140,reps:12},{weight:140,reps:10}],
       'ex-leg-extension':   [{weight:165,reps:15},{weight:165,reps:15},{weight:165,reps:13}],
       'ex-calf-raise':      [{weight:170,reps:15},{weight:170,reps:15},{weight:170,reps:15}],
-    });
-    state.workoutLogs['2026-09-02'].coachNotes = "5 minute warmup on the bike. Can definitely move up to 195 lbs next with pendulum squats. Leaning more forward with bulgarians for this split to target glutes more.\n\nCoach: Best legs opening session of any block. Pendulum squat is a natural fit — smart bump to 185 and sweeping it clean confirms 195 for Week 2. Glute-focused BSS lean is a smart adjustment, keep it consistent. RDL one rep short on the last set — that's the target next week. Hamstring curl and leg extension both dropped on the last set at new/held weights — expected, just chase the full sweep. Calf raise swept clean, moving to 180. Bike warmup is a great habit, keep it every session. 9.5/10.";
+    }, coachNotes: "5 minute warmup on the bike. Can definitely move up to 195 lbs next with pendulum squats. Leaning more forward with bulgarians for this split to target glutes more.\n\nCoach: Best legs opening session of any block. Pendulum squat is a natural fit — smart bump to 185 and sweeping it clean confirms 195 for Week 2. Glute-focused BSS lean is a smart adjustment, keep it consistent. RDL one rep short on the last set — that's the target next week. Hamstring curl and leg extension both dropped on the last set at new/held weights — expected, just chase the full sweep. Calf raise swept clean, moving to 180. Bike warmup is a great habit, keep it every session. 9.5/10." },
 
-    if(!state.workoutLogs['2026-09-03']) state.workoutLogs['2026-09-03'] = { exercises: {} };
-    state.workoutLogs['2026-09-03'].exercises = Object.assign(state.workoutLogs['2026-09-03'].exercises || {}, {
+    { date: '2026-09-03', exercises: {
       'ex-oh-tricep-ext':  [{weight:110,reps:12},{weight:110,reps:12},{weight:110,reps:10}],
       'ex-cable-pushdown': [{weight:90,reps:12},{weight:90,reps:12},{weight:90,reps:10}],
       'ex-cable-kickback': [{weight:20,reps:15},{weight:20,reps:14},{weight:20,reps:13}],
       'ex-ez-curl':        [{weight:60,reps:10},{weight:60,reps:10},{weight:60,reps:10}],
       'ex-hammer-curl':    [{weight:35,reps:10},{weight:35,reps:10},{weight:35,reps:9}],
       'ex-cable-curl':     [{weight:50,reps:15},{weight:60,reps:15},{weight:70,reps:''}],
-    });
-    state.workoutLogs['2026-09-03'].coachNotes = "I did cable overhead extensions because I'm working out at a different gym than usual today.";
+    }, coachNotes: "I did cable overhead extensions because I'm working out at a different gym than usual today." },
 
-    state.seedFlags.fallSplitWeek1RemainingImported = true;
-    save();
+    { date: '2026-09-04', exercises: {
+      'ex-db-shoulder-press': [{weight:60,reps:12},{weight:60,reps:12},{weight:60,reps:12}],
+      'ex-cable-y-raise':     [{weight:15,reps:15},{weight:15,reps:15},{weight:15,reps:13}],
+      'ex-cable-crunch':      [{weight:70,reps:15},{weight:70,reps:15},{weight:70,reps:15}],
+      'ex-hanging-leg-raise': [{weight:0,reps:15},{weight:0,reps:15},{weight:0,reps:15}],
+      'ex-wrist-curl':        [{weight:15,reps:15},{weight:15,reps:1}],
+    }, coachNotes: "Had to do DB shoulder press because i went to my neighborhood gym because my regular gym was closed. Kept legs bent on leg raises because i dont have a strong enough core yet.\n\nCoach: Solid Fall Split accessory debut. DB shoulder press swept clean at 60 lbs — good neighborhood gym substitute, machine press at 100 lbs when back at regular gym. Cable Y-raise held at 15, chase 15/15/15 next week. Cable crunch started conservatively at 70 — smart, bumping to 80. Hanging leg raises swept with bent knees — correct approach, straight legs will come as core strengthens. Wrist curls swept clean at 15. Mobility completed. Full session done — this is the standard. 9/10." },
+  ];
+  function importFallSplitSessions(){
+    if(!state.seedFlags) state.seedFlags = {};
+    if(!state.seedFlags.fallSplitImportedDates) state.seedFlags.fallSplitImportedDates = {};
+    if(!state.seedFlags.fallSplitDaysReset && state.fitnessSplit){
+      state.fitnessSplit.days = JSON.parse(JSON.stringify(DEFAULT_FITNESS_SPLIT.days));
+      state.seedFlags.fallSplitDaysReset = true;
+    }
+    let changed = false;
+    FALL_SPLIT_SESSIONS.forEach(session => {
+      if(state.seedFlags.fallSplitImportedDates[session.date]) return;
+      if(!state.workoutLogs[session.date]) state.workoutLogs[session.date] = { exercises: {} };
+      state.workoutLogs[session.date].exercises = Object.assign(state.workoutLogs[session.date].exercises || {}, session.exercises);
+      state.workoutLogs[session.date].coachNotes = session.coachNotes;
+      state.seedFlags.fallSplitImportedDates[session.date] = true;
+      changed = true;
+    });
+    if(changed) save();
   }
-  importFallSplitWeek1Remaining();
+  importFallSplitSessions();
 
   function markSaturdayRest(){
     if(!state.seedFlags) state.seedFlags = {};
