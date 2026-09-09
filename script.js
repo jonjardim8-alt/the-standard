@@ -1492,6 +1492,14 @@
       'ex-hanging-leg-raise': [{weight:0,reps:15},{weight:0,reps:15},{weight:0,reps:15}],
       'ex-wrist-curl':        [{weight:15,reps:15},{weight:15,reps:1}],
     }, coachNotes: "Had to do DB shoulder press because i went to my neighborhood gym because my regular gym was closed. Kept legs bent on leg raises because i dont have a strong enough core yet.\n\nCoach: Solid Fall Split accessory debut. DB shoulder press swept clean at 60 lbs — good neighborhood gym substitute, machine press at 100 lbs when back at regular gym. Cable Y-raise held at 15, chase 15/15/15 next week. Cable crunch started conservatively at 70 — smart, bumping to 80. Hanging leg raises swept with bent knees — correct approach, straight legs will come as core strengthens. Wrist curls swept clean at 15. Mobility completed. Full session done — this is the standard. 9/10." },
+
+    { date: '2026-09-07', exercises: {
+      'ex-db-bench':           [{weight:90,reps:6},{weight:90,reps:6},{weight:90,reps:6},{weight:90,reps:6}],
+      'ex-cable-press-around': [{weight:70,reps:15},{weight:70,reps:15},{weight:70,reps:13}],
+      'ex-incline-db-press':   [{weight:75,reps:10},{weight:75,reps:10},{weight:75,reps:8}],
+      'ex-pec-deck':           [{weight:110,reps:12},{weight:110,reps:12},{weight:110,reps:10}],
+      'ex-cable-lat-raise':    [{weight:40,reps:15},{weight:40,reps:15},{weight:40,reps:15}],
+    }, coachNotes: "My chest felt fried by the end of incline db press. Surprised i was able to do pec deck as well as i did." },
   ];
   function importFallSplitSessions(){
     if(!state.seedFlags) state.seedFlags = {};
