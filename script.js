@@ -695,6 +695,35 @@
     save();
   }
 
+  // September 2026 category budget limits — based on the Jun-Aug spending
+  // average per category, with Dining Out deliberately cut well below its
+  // ~$390/mo average. Car Maintenance, Misc, Tithes, and Vacation are left
+  // unset on purpose: too irregular/one-off (Misc, Car Maintenance,
+  // Vacation) or not a spending category to cap (Tithes). Only fills in a
+  // category that doesn't already have a limit, so it won't clobber
+  // anything set by hand in the app since.
+  const SEPTEMBER_BUDGET_LIMITS = {
+    'dining-out': 250,
+    'gas': 160,
+    'groceries': 150,
+    'hygiene': 85,
+    'clothing': 75,
+    'coffee-drinks': 55,
+    'subscriptions': 55,
+    'golf': 50,
+  };
+  function seedSeptemberBudgetLimits(){
+    if(!state.seedFlags) state.seedFlags = {};
+    if(state.seedFlags.septemberBudgetLimitsSeeded) return;
+    Object.keys(SEPTEMBER_BUDGET_LIMITS).forEach(catId => {
+      if(state.categoryBudgetLimits[catId] === undefined){
+        state.categoryBudgetLimits[catId] = SEPTEMBER_BUDGET_LIMITS[catId];
+      }
+    });
+    state.seedFlags.septemberBudgetLimitsSeeded = true;
+    save();
+  }
+
   // One-time seed data pulled from uploaded Statistics course assignments.
   // Only inserted once (tracked via state.seedFlags) so re-opening the app
   // doesn't duplicate them if you've since edited or deleted any.
@@ -1497,6 +1526,7 @@
 
   seedBudgetTransactions();
   importHistoricalBudgetTransactions();
+  seedSeptemberBudgetLimits();
 
   // "The Standard" — this app itself, as a project. Also migrates the
   // pre-existing "Work on backend" task so it appears grouped under this
