@@ -3338,6 +3338,14 @@
       const cat = catById[project.category] || CATEGORIES[0];
       const collapsed = collapsedProjects.has(project.id);
       const progress = getProjectProgress(project);
+      // Declared here (not inside the `if(!collapsed)` block below) so
+      // they're still in scope for the wireCustomSelect/wireCustomDate
+      // calls after wrap.appendChild(card) — those calls are harmless
+      // no-ops when collapsed, since the elements they'd wire don't exist.
+      const goalLinkId = 'goalLink-' + project.id;
+      const msDateId = 'msDate-' + project.id;
+      const goalOptionsHtml = '<option value="">None</option>'
+        + state.longTermGoals.map(g => '<option value="' + g.id + '">' + escapeHtml(g.name) + ' (' + g.timeframe + ')</option>').join('');
 
       const card = document.createElement('div');
       card.className = 'proj-card';
@@ -3448,7 +3456,6 @@
           card.appendChild(row);
         });
 
-        const msDateId = 'msDate-' + project.id;
         const msAddRow = document.createElement('div');
         msAddRow.className = 'proj-add-row';
         msAddRow.innerHTML = '<input type="text" placeholder="Add a milestone…" maxlength="60">' + customDateHtml(msDateId, '', 'Date') + '<button>Add</button>';
@@ -3468,9 +3475,6 @@
 
         // Goal link — wired up below, after this card is actually appended
         // to the document (getElementById can't find it before then).
-        const goalLinkId = 'goalLink-' + project.id;
-        const goalOptionsHtml = '<option value="">None</option>'
-          + state.longTermGoals.map(g => '<option value="' + g.id + '">' + escapeHtml(g.name) + ' (' + g.timeframe + ')</option>').join('');
         const goalBox = document.createElement('div');
         goalBox.className = 'proj-goal-link';
         goalBox.innerHTML = '<div class="proj-section-label">Linked goal</div>' + customSelectHtml(goalLinkId, goalOptionsHtml, project.goalId || '', 'None');
