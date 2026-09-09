@@ -436,6 +436,64 @@
   .picker-row.selected{ color: var(--accent); font-weight:600; }
   .picker-check{ color: var(--accent); font-size:14px; }
 
+  /* Custom date — same trigger-button-opens-pickerOverlay pattern as
+     custom select, but the sheet shows a month calendar grid instead of
+     an option list. Replaces native <input type=date>. */
+  .cal-picker-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom: 14px;
+  }
+  .cal-picker-month{
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--text);
+  }
+  .cal-picker-nav{
+    background:none;
+    border:none;
+    color: var(--text-soft);
+    font-size: 18px;
+    padding: 4px 12px;
+    cursor:pointer;
+  }
+  .cal-picker-nav:active{ color: var(--accent); }
+  .cal-picker-weekdays{
+    display:grid;
+    grid-template-columns: repeat(7, 1fr);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-faint);
+    text-align:center;
+    margin-bottom: 6px;
+  }
+  .cal-picker-grid{
+    display:grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+  }
+  .cal-picker-cell{
+    aspect-ratio: 1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:none;
+    border:none;
+    border-radius: 50%;
+    font-family: var(--font-body);
+    font-size: 13px;
+    color: var(--text);
+    cursor:pointer;
+  }
+  .cal-picker-cell.empty{ visibility:hidden; cursor:default; }
+  .cal-picker-cell:active{ background: var(--card-hover); }
+  .cal-picker-cell.today{ color: var(--accent); font-weight:700; }
+  .cal-picker-cell.selected{ background: var(--accent); color:#fff; font-weight:700; }
+
   .modal-actions{ display:flex; gap:8px; margin-top:18px; }
   .modal-actions button{
     flex:1;
@@ -1338,7 +1396,7 @@
     background: var(--bg-elevated);
     color: var(--text);
   }
-  .proj-add-row input[type=date]{ flex:0 0 auto; width:120px; font-family: var(--font-mono); font-size:11px; color-scheme:dark; }
+  .proj-add-row .custom-select{ flex:0 0 auto; width:120px; font-family: var(--font-mono); font-size:11px; padding:7px 9px; }
   .proj-add-row button{
     font-family: var(--font-mono);
     font-size: 10.5px;

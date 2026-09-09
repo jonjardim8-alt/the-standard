@@ -2389,7 +2389,7 @@
       <input type="text" id="lgName" placeholder="e.g. Read 12 books" maxlength="60">
       <div id="lgCustomDateField" style="display:none">
         <label>Target date</label>
-        <input type="date" id="lgTargetDate" value="${todayStr()}">
+        ${customDateHtml('lgTargetDate', todayStr())}
       </div>
       <div class="modal-actions">
         <button class="cancel" id="lgCancel">Cancel</button>
@@ -2397,6 +2397,7 @@
       </div>
     `;
     overlay.classList.remove('hidden');
+    wireCustomDate('lgTargetDate', {});
 
     const setTf = (tf, btnId) => {
       timeframe = tf;
@@ -3258,7 +3259,7 @@
       <div class="modal-handle"></div>
       <div class="modal-title">Add transaction</div>
       <label>Date</label>
-      <input type="date" id="txnDate" value="${todayStr()}">
+      ${customDateHtml('txnDate', todayStr())}
       <label>Description</label>
       <input type="text" id="txnDesc" placeholder="e.g. Publix" maxlength="60">
       <label>Amount</label>
@@ -3271,6 +3272,7 @@
       </div>
     `;
     overlay.classList.remove('hidden');
+    wireCustomDate('txnDate', {});
     wireCustomSelect('txnCategory', catOptionsHtml, 'Category');
 
     document.getElementById('txnCancel').onclick = closeModal;
@@ -3446,11 +3448,12 @@
           card.appendChild(row);
         });
 
+        const msDateId = 'msDate-' + project.id;
         const msAddRow = document.createElement('div');
         msAddRow.className = 'proj-add-row';
-        msAddRow.innerHTML = '<input type="text" placeholder="Add a milestone…" maxlength="60"><input type="date"><button>Add</button>';
+        msAddRow.innerHTML = '<input type="text" placeholder="Add a milestone…" maxlength="60">' + customDateHtml(msDateId, '', 'Date') + '<button>Add</button>';
         const msTextInput = msAddRow.querySelector('input[type=text]');
-        const msDateInput = msAddRow.querySelector('input[type=date]');
+        const msDateInput = msAddRow.querySelector('#' + msDateId);
         const addMilestone = () => {
           const name = msTextInput.value.trim();
           if(!name) return;
@@ -3503,6 +3506,7 @@
         project.goalId = newValue || null;
         save();
       });
+      wireCustomDate(msDateId, { allowClear:true, placeholder:'Date' });
     });
   }
 
@@ -3522,13 +3526,14 @@
       <label>Description (optional)</label>
       <textarea id="projDesc" placeholder="What is this project?" rows="2"></textarea>
       <label>Due date (optional)</label>
-      <input type="date" id="projDue">
+      ${customDateHtml('projDue', '', 'None')}
       <div class="modal-actions">
         <button class="cancel" id="projCancel">Cancel</button>
         <button class="save" id="projSave">Save</button>
       </div>
     `;
     overlay.classList.remove('hidden');
+    wireCustomDate('projDue', { allowClear:true, placeholder:'None' });
     renderCategoryPickerInline('projCatPicker', selectedCat, (c) => { selectedCat = c; });
 
     document.getElementById('projCancel').onclick = closeModal;
@@ -4330,6 +4335,97 @@
     if(e.target.id === 'pickerOverlay') closePickerSheet();
   });
 
+  /* ---------------- Custom date (replaces native <input type=date>) ----------------
+     Same trigger-button-plus-pickerOverlay pattern as the custom select
+     above (and shares the same #pickerOverlay/#pickerContent, since a
+     select and a date picker are never open at once) — a month calendar
+     grid instead of an option list. */
+  function calendarCellsHtml(year, month, selectedDateStr){
+    const startWeekday = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const today = todayStr();
+    let html = '';
+    for(let i = 0; i < startWeekday; i++) html += '<div class="cal-picker-cell empty"></div>';
+    for(let d = 1; d <= daysInMonth; d++){
+      const ds = year + '-' + pad2(month + 1) + '-' + pad2(d);
+      const cls = (ds === today ? ' today' : '') + (ds === selectedDateStr ? ' selected' : '');
+      html += `<button type="button" class="cal-picker-cell${cls}" data-date="${ds}">${d}</button>`;
+    }
+    return html;
+  }
+
+  // Emits the same hidden-input-plus-trigger-button shape as
+  // customSelectHtml(), so it can share wireCustomDate/openDatePicker.
+  function customDateHtml(id, currentValue, placeholder){
+    const label = currentValue ? fmtDate(currentValue) : (placeholder || 'Select date');
+    return `
+      <input type="hidden" id="${id}" value="${escapeHtml(currentValue || '')}">
+      <button type="button" class="custom-select" id="${id}Trigger">
+        <span class="custom-select-label${currentValue ? '' : ' placeholder'}">${escapeHtml(label)}</span>
+        <span class="custom-select-chev">▾</span>
+      </button>
+    `;
+  }
+
+  // opts: { allowClear, placeholder }. onChange (optional) fires immediately
+  // on pick, same as wireCustomSelect's onChange.
+  function wireCustomDate(id, opts, onChange){
+    const trigger = document.getElementById(id + 'Trigger');
+    if(!trigger) return;
+    trigger._dateOpts = opts || {};
+    trigger._onChange = onChange;
+    trigger.onclick = () => openDatePicker(id, trigger._onChange, trigger._dateOpts);
+  }
+
+  function openDatePicker(id, onChange, opts){
+    opts = opts || {};
+    const hiddenInput = document.getElementById(id);
+    if(!hiddenInput) return;
+    const startDate = hiddenInput.value ? dateFromStr(hiddenInput.value) : new Date();
+    let viewYear = startDate.getFullYear();
+    let viewMonth = startDate.getMonth();
+
+    const selectDate = (ds) => {
+      hiddenInput.value = ds;
+      const trigger = document.getElementById(id + 'Trigger');
+      if(trigger){
+        const labelEl = trigger.querySelector('.custom-select-label');
+        labelEl.textContent = ds ? fmtDate(ds) : (opts.placeholder || 'Select date');
+        labelEl.classList.toggle('placeholder', !ds);
+      }
+      closePickerSheet();
+      if(onChange) onChange(ds);
+    };
+
+    const render = () => {
+      const monthLabel = new Date(viewYear, viewMonth, 1).toLocaleDateString('en-US', { month:'long', year:'numeric' });
+      const pickerContent = document.getElementById('pickerContent');
+      pickerContent.innerHTML = `
+        <div class="modal-handle"></div>
+        <div class="cal-picker-header">
+          <button type="button" class="cal-picker-nav" id="calPickerPrev">‹</button>
+          <div class="cal-picker-month">${monthLabel}</div>
+          <button type="button" class="cal-picker-nav" id="calPickerNext">›</button>
+        </div>
+        <div class="cal-picker-weekdays">${DAYS.map(d => '<div>' + d[0] + '</div>').join('')}</div>
+        <div class="cal-picker-grid">${calendarCellsHtml(viewYear, viewMonth, hiddenInput.value)}</div>
+        <div class="modal-actions">
+          ${opts.allowClear ? '<button class="cancel" id="calPickerClear">Clear</button>' : ''}
+          <button class="save" id="calPickerToday">Today</button>
+        </div>
+      `;
+      document.getElementById('pickerOverlay').classList.remove('hidden');
+      document.getElementById('calPickerPrev').onclick = () => { viewMonth--; if(viewMonth < 0){ viewMonth = 11; viewYear--; } render(); };
+      document.getElementById('calPickerNext').onclick = () => { viewMonth++; if(viewMonth > 11){ viewMonth = 0; viewYear++; } render(); };
+      pickerContent.querySelectorAll('.cal-picker-cell:not(.empty)').forEach(cell => {
+        cell.onclick = () => selectDate(cell.dataset.date);
+      });
+      if(opts.allowClear) document.getElementById('calPickerClear').onclick = () => selectDate('');
+      document.getElementById('calPickerToday').onclick = () => selectDate(todayStr());
+    };
+    render();
+  }
+
   function fullDayName(abbr){
     const map = { Sun:'Sunday', Mon:'Monday', Tue:'Tuesday', Wed:'Wednesday', Thu:'Thursday', Fri:'Friday', Sat:'Saturday' };
     return map[abbr];
@@ -4424,9 +4520,9 @@
 
       <div id="evAllDayFields" style="display:none">
         <label>Start date</label>
-        <input type="date" id="evStartDate" value="${activeDateStr}">
+        ${customDateHtml('evStartDate', activeDateStr)}
         <label>End date</label>
-        <input type="date" id="evEndDate" value="${activeDateStr}">
+        ${customDateHtml('evEndDate', activeDateStr)}
       </div>
 
       <label>What is it?</label>
@@ -4440,6 +4536,8 @@
     `;
     overlay.classList.remove('hidden');
     wireCustomSelect('evDay', dayOptions, 'Day');
+    wireCustomDate('evStartDate', {});
+    wireCustomDate('evEndDate', {});
 
     function updatePresetShortcut(){
       const box = document.getElementById('evPresetShortcut');
@@ -4590,7 +4688,7 @@
       <label>Project (optional)</label>
       ${customSelectHtml('taskProject', projectOptionsHtml(selectedCat), '', 'None')}
       <label>Due date</label>
-      <input type="date" id="taskDue" value="${todayStr()}">
+      ${customDateHtml('taskDue', todayStr())}
       <label>What is it?</label>
       <input type="text" id="taskText" placeholder="e.g. Chapter 4 reading response" maxlength="80">
       <label>Points (optional)</label>
@@ -4606,6 +4704,7 @@
     `;
     overlay.classList.remove('hidden');
     wireCustomSelect('taskProject', projectOptionsHtml(selectedCat), 'Project');
+    wireCustomDate('taskDue', {});
     let modalPriority = 'normal';
     renderPriorityPicker('taskPriorityPicker', modalPriority, (p) => { modalPriority = p; });
 
