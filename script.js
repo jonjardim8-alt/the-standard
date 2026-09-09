@@ -2241,23 +2241,24 @@
       });
     });
 
+    const listLinkOptionsHtml = '<option value="">None</option>'
+      + (taskOptions ? '<optgroup label="Tasks">' + taskOptions + '</optgroup>' : '')
+      + (eventOptions ? '<optgroup label="Events (this week)">' + eventOptions + '</optgroup>' : '');
+
     content.innerHTML = `
       <div class="modal-handle"></div>
       <div class="modal-title">New list</div>
       <label>Name</label>
       <input type="text" id="listName" placeholder="e.g. Grocery List" maxlength="60">
       <label>Link to (optional)</label>
-      <select id="listLink">
-        <option value="">None</option>
-        ${taskOptions ? '<optgroup label="Tasks">' + taskOptions + '</optgroup>' : ''}
-        ${eventOptions ? '<optgroup label="Events (this week)">' + eventOptions + '</optgroup>' : ''}
-      </select>
+      ${customSelectHtml('listLink', listLinkOptionsHtml, '', 'None')}
       <div class="modal-actions">
         <button class="cancel" id="listCancel">Cancel</button>
         <button class="save" id="listSave">Save</button>
       </div>
     `;
     overlay.classList.remove('hidden');
+    wireCustomSelect('listLink', listLinkOptionsHtml, 'Link to');
 
     document.getElementById('listCancel').onclick = closeModal;
     document.getElementById('listSave').onclick = () => {
@@ -3255,13 +3256,14 @@
       <label>Amount</label>
       <input type="number" id="txnAmount" min="0" step="0.01" placeholder="0.00">
       <label>Category</label>
-      <select id="txnCategory">${catOptionsHtml}</select>
+      ${customSelectHtml('txnCategory', catOptionsHtml, selectedBudgetCat, 'Category')}
       <div class="modal-actions">
         <button class="cancel" id="txnCancel">Cancel</button>
         <button class="save" id="txnSave">Save</button>
       </div>
     `;
     overlay.classList.remove('hidden');
+    wireCustomSelect('txnCategory', catOptionsHtml, 'Category');
 
     document.getElementById('txnCancel').onclick = closeModal;
     document.getElementById('txnSave').onclick = () => {
@@ -3453,16 +3455,14 @@
         msTextInput.addEventListener('keydown', e => { if(e.key === 'Enter') addMilestone(); });
         card.appendChild(msAddRow);
 
-        // Goal link
+        // Goal link — wired up below, after this card is actually appended
+        // to the document (getElementById can't find it before then).
+        const goalLinkId = 'goalLink-' + project.id;
+        const goalOptionsHtml = '<option value="">None</option>'
+          + state.longTermGoals.map(g => '<option value="' + g.id + '">' + escapeHtml(g.name) + ' (' + g.timeframe + ')</option>').join('');
         const goalBox = document.createElement('div');
         goalBox.className = 'proj-goal-link';
-        goalBox.innerHTML = '<div class="proj-section-label">Linked goal</div><select><option value="">None</option>'
-          + state.longTermGoals.map(g => '<option value="' + g.id + '"' + (project.goalId === g.id ? ' selected' : '') + '>' + escapeHtml(g.name) + ' (' + g.timeframe + ')</option>').join('')
-          + '</select>';
-        goalBox.querySelector('select').onchange = (e) => {
-          project.goalId = e.target.value || null;
-          save();
-        };
+        goalBox.innerHTML = '<div class="proj-section-label">Linked goal</div>' + customSelectHtml(goalLinkId, goalOptionsHtml, project.goalId || '', 'None');
         card.appendChild(goalBox);
 
         // Notes
@@ -3491,6 +3491,10 @@
       }
 
       wrap.appendChild(card);
+      wireCustomSelect(goalLinkId, goalOptionsHtml, 'Linked goal', (newValue) => {
+        project.goalId = newValue || null;
+        save();
+      });
     });
   }
 
@@ -4189,6 +4193,135 @@
     if(e.target.id === 'modalOverlay') closeModal();
   });
 
+  /* ---------------- Custom select (replaces native <select>) ----------------
+     iOS renders <select> and its dropdown entirely outside the webview, so
+     no CSS can restyle it. These build the same trigger-button-plus-sheet
+     pattern the rest of the app already uses for modals: customSelectHtml()
+     emits a hidden <input> (so existing `.value` reads at Save time keep
+     working unchanged) paired with a button that opens pickerOverlay
+     instead of the OS picker. Options are still authored as plain
+     '<option>'/'<optgroup>' HTML strings elsewhere in the file — parseOptionsHtml
+     reads them via a detached <select> rather than a hand-rolled parser, so
+     browser-standard HTML parsing/unescaping is used instead of regex. */
+  function parseOptionsHtml(optionsHtml){
+    const tempSelect = document.createElement('select');
+    tempSelect.innerHTML = optionsHtml;
+    const sections = [];
+    let ungrouped = [];
+    Array.from(tempSelect.children).forEach(child => {
+      if(child.tagName === 'OPTGROUP'){
+        if(ungrouped.length){ sections.push({ label:null, options:ungrouped }); ungrouped = []; }
+        sections.push({ label: child.label, options: Array.from(child.children).map(o => ({ value:o.value, label:o.textContent })) });
+      } else if(child.tagName === 'OPTION'){
+        ungrouped.push({ value: child.value, label: child.textContent });
+      }
+    });
+    if(ungrouped.length) sections.push({ label:null, options:ungrouped });
+    return sections;
+  }
+
+  function labelForValue(optionsHtml, value){
+    const sections = parseOptionsHtml(optionsHtml);
+    for(const sec of sections){
+      const match = sec.options.find(o => o.value === (value ?? ''));
+      if(match) return match.label;
+    }
+    return '';
+  }
+
+  // Emits a hidden input (id = `id`, so existing `.value` reads elsewhere
+  // in the file need no changes) plus the visible trigger button.
+  function customSelectHtml(id, optionsHtml, currentValue, placeholder){
+    const label = labelForValue(optionsHtml, currentValue);
+    return `
+      <input type="hidden" id="${id}" value="${escapeHtml(currentValue ?? '')}">
+      <button type="button" class="custom-select" id="${id}Trigger">
+        <span class="custom-select-label${label ? '' : ' placeholder'}">${escapeHtml(label || placeholder || 'Select')}</span>
+        <span class="custom-select-chev">▾</span>
+      </button>
+    `;
+  }
+
+  // Call once right after the HTML from customSelectHtml() is in the DOM.
+  // onChange (optional) fires immediately on pick, for the handful of
+  // selects that aren't behind a Save button (e.g. the Projects goal link).
+  function wireCustomSelect(id, optionsHtml, title, onChange){
+    const trigger = document.getElementById(id + 'Trigger');
+    if(!trigger) return;
+    trigger._optionsHtml = optionsHtml;
+    trigger._onChange = onChange;
+    trigger.onclick = () => openCustomSelectPicker(id, trigger._optionsHtml, title, trigger._onChange);
+  }
+
+  // For selects whose options depend on other in-modal state (only
+  // taskProject today, which depends on the chosen category) — updates the
+  // options a picker will show next time it's opened, and resets the
+  // current value/label since the old value may no longer be valid.
+  function updateCustomSelectOptions(id, optionsHtml, newValue, placeholder){
+    const hiddenInput = document.getElementById(id);
+    const trigger = document.getElementById(id + 'Trigger');
+    if(!hiddenInput || !trigger) return;
+    hiddenInput.value = newValue ?? '';
+    trigger._optionsHtml = optionsHtml;
+    const label = labelForValue(optionsHtml, hiddenInput.value);
+    const labelEl = trigger.querySelector('.custom-select-label');
+    labelEl.textContent = label || placeholder || 'Select';
+    labelEl.classList.toggle('placeholder', !label);
+  }
+
+  function openCustomSelectPicker(id, optionsHtml, title, onChange){
+    const hiddenInput = document.getElementById(id);
+    if(!hiddenInput) return;
+    const currentValue = hiddenInput.value;
+    const sections = parseOptionsHtml(optionsHtml);
+    const flatOptions = [];
+    sections.forEach(sec => sec.options.forEach(o => flatOptions.push(o)));
+
+    const pickerContent = document.getElementById('pickerContent');
+    const rowsHtml = sections.map(sec => `
+      ${sec.label ? '<div class="picker-group-label">' + escapeHtml(sec.label) + '</div>' : ''}
+      ${sec.options.map(o => `
+        <button type="button" class="picker-row${o.value === currentValue ? ' selected' : ''}">
+          <span>${escapeHtml(o.label)}</span>
+          ${o.value === currentValue ? '<span class="picker-check">✓</span>' : ''}
+        </button>
+      `).join('')}
+    `).join('');
+    pickerContent.innerHTML = `
+      <div class="modal-handle"></div>
+      ${title ? '<div class="modal-title">' + escapeHtml(title) + '</div>' : ''}
+      <div class="picker-list">${rowsHtml || '<div class="empty-note">No options.</div>'}</div>
+    `;
+    document.getElementById('pickerOverlay').classList.remove('hidden');
+    pickerContent.querySelectorAll('.picker-row').forEach((row, i) => {
+      row.onclick = () => {
+        const chosen = flatOptions[i];
+        hiddenInput.value = chosen.value;
+        const trigger = document.getElementById(id + 'Trigger');
+        if(trigger){
+          const labelEl = trigger.querySelector('.custom-select-label');
+          labelEl.textContent = chosen.label;
+          labelEl.classList.remove('placeholder');
+        }
+        closePickerSheet();
+        if(onChange) onChange(chosen.value);
+      };
+    });
+  }
+
+  function closePickerSheet(){
+    const overlay = document.getElementById('pickerOverlay');
+    overlay.classList.add('hidden');
+    setTimeout(() => {
+      if(overlay.classList.contains('hidden')){
+        document.getElementById('pickerContent').innerHTML = '';
+      }
+    }, 300);
+  }
+  document.getElementById('pickerOverlay').addEventListener('click', (e) => {
+    if(e.target.id === 'pickerOverlay') closePickerSheet();
+  });
+
   function fullDayName(abbr){
     const map = { Sun:'Sunday', Mon:'Monday', Tue:'Tuesday', Wed:'Wednesday', Thu:'Thursday', Fri:'Friday', Sat:'Saturday' };
     return map[abbr];
@@ -4275,7 +4408,7 @@
 
       <div id="evTimedFields">
         <label>Day</label>
-        <select id="evDay">${dayOptions}</select>
+        ${customSelectHtml('evDay', dayOptions, DAYS[activeDay], 'Day')}
         <label>Time</label>
         <input type="time" id="evTime" value="09:00">
         <div id="evEnergyWarn" class="energy-warn" style="display:none">⚡ This is one of your low-energy hours</div>
@@ -4298,6 +4431,7 @@
       </div>
     `;
     overlay.classList.remove('hidden');
+    wireCustomSelect('evDay', dayOptions, 'Day');
 
     function updatePresetShortcut(){
       const box = document.getElementById('evPresetShortcut');
@@ -4446,7 +4580,7 @@
         <input type="text" id="taskClass" list="classSuggestions" placeholder="e.g. Biology 101">
       </div>
       <label>Project (optional)</label>
-      <select id="taskProject">${projectOptionsHtml(selectedCat)}</select>
+      ${customSelectHtml('taskProject', projectOptionsHtml(selectedCat), '', 'None')}
       <label>Due date</label>
       <input type="date" id="taskDue" value="${todayStr()}">
       <label>What is it?</label>
@@ -4463,6 +4597,7 @@
       </div>
     `;
     overlay.classList.remove('hidden');
+    wireCustomSelect('taskProject', projectOptionsHtml(selectedCat), 'Project');
     let modalPriority = 'normal';
     renderPriorityPicker('taskPriorityPicker', modalPriority, (p) => { modalPriority = p; });
 
@@ -4471,7 +4606,7 @@
         selectedCat = c;
         content.style.setProperty('--chip-color', catById[c].color);
         document.getElementById('taskClassField').style.display = c === 'school' ? 'block' : 'none';
-        document.getElementById('taskProject').innerHTML = projectOptionsHtml(c);
+        updateCustomSelectOptions('taskProject', projectOptionsHtml(c), '', 'None');
       });
     }
 

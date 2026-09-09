@@ -142,6 +142,13 @@
   <div class="modal" id="modalContent"></div>
 </div>
 
+<!-- Custom select picker sheet — stacks above modalOverlay so it can open
+     from inside an already-open modal (e.g. picking a category while
+     adding a transaction) without closing it. -->
+<div class="modal-overlay picker-overlay hidden" id="pickerOverlay">
+  <div class="modal" id="pickerContent"></div>
+</div>
+
 <script src="script.js"></script>
 <script>
   if ('serviceWorker' in navigator) {
