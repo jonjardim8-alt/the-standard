@@ -4529,6 +4529,9 @@
         <label>Time</label>
         <input type="time" id="evTime" value="09:00">
         <div id="evEnergyWarn" class="energy-warn" style="display:none">⚡ This is one of your low-energy hours</div>
+        <label class="allday-toggle-row">
+          <input type="checkbox" id="evRepeatWeekly"> Repeats weekly (same day, every week)
+        </label>
       </div>
 
       <div id="evAllDayFields" style="display:none">
@@ -4612,7 +4615,17 @@
       } else {
         const day = document.getElementById('evDay').value;
         const time = document.getElementById('evTime').value || '09:00';
-        state.items[day].push({ id: Date.now() + '-' + Math.random().toString(36).slice(2,7), time, text, category: selectedCat, notes });
+        const repeatsWeekly = document.getElementById('evRepeatWeekly').checked;
+        if(repeatsWeekly){
+          state.items[day].push({ id: Date.now() + '-' + Math.random().toString(36).slice(2,7), time, text, category: selectedCat, notes });
+        } else {
+          // One-time by default — placed on this specific date (the
+          // selected weekday within the currently-viewed week), not every
+          // week's occurrence of that day.
+          const dateStr = toDateStr(weekDates()[DAYS.indexOf(day)]);
+          if(!state.datedEvents[dateStr]) state.datedEvents[dateStr] = [];
+          state.datedEvents[dateStr].push({ id: Date.now() + '-' + Math.random().toString(36).slice(2,7), time, text, category: selectedCat, notes });
+        }
       }
       save();
       closeModal();
