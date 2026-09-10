@@ -1500,6 +1500,15 @@
       'ex-pec-deck':           [{weight:110,reps:12},{weight:110,reps:12},{weight:110,reps:10}],
       'ex-cable-lat-raise':    [{weight:40,reps:15},{weight:40,reps:15},{weight:40,reps:15}],
     }, coachNotes: "My chest felt fried by the end of incline db press. Surprised i was able to do pec deck as well as i did." },
+
+    { date: '2026-09-08', exercises: {
+      'ex-bb-row':          [{weight:155,reps:6},{weight:155,reps:6},{weight:155,reps:6},{weight:155,reps:6}],
+      'ex-sa-lat-pulldown': [{weight:155,reps:10},{weight:155,reps:10},{weight:155,reps:9}],
+      'ex-low-row-machine': [{weight:200,reps:12},{weight:200,reps:12},{weight:200,reps:11}],
+      'ex-cable-row':       [{weight:150,reps:12},{weight:150,reps:12},{weight:150,reps:11}],
+      'ex-face-pull':       [{weight:100,reps:15},{weight:100,reps:15},{weight:100,reps:15}],
+      'ex-rear-delt-fly':   [{weight:95,reps:20},{weight:95,reps:18},{weight:95,reps:16}],
+    }, coachNotes: "Coach: Elite session. Barbell row swept 155 clean — biggest strength jump of the block so far, moving to 165. SA lat pulldown, low row, and cable row all one rep short on the last set — that's the theme to fix in Week 3. Face pull swept 100 clean, moving to 105. Rear delt fly completed all three sets within range — hold at 95 and tighten the last set. Full session, all 6 exercises logged. 9.5/10." },
   ];
   function importFallSplitSessions(){
     if(!state.seedFlags) state.seedFlags = {};
