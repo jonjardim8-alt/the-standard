@@ -1509,6 +1509,15 @@
       'ex-face-pull':       [{weight:100,reps:15},{weight:100,reps:15},{weight:100,reps:15}],
       'ex-rear-delt-fly':   [{weight:95,reps:20},{weight:95,reps:18},{weight:95,reps:16}],
     }, coachNotes: "Coach: Elite session. Barbell row swept 155 clean — biggest strength jump of the block so far, moving to 165. SA lat pulldown, low row, and cable row all one rep short on the last set — that's the theme to fix in Week 3. Face pull swept 100 clean, moving to 105. Rear delt fly completed all three sets within range — hold at 95 and tighten the last set. Full session, all 6 exercises logged. 9.5/10." },
+
+    { date: '2026-09-09', exercises: {
+      'ex-pendulum-squat':  [{weight:195,reps:6},{weight:195,reps:6},{weight:195,reps:6},{weight:195,reps:6}],
+      'ex-bulgarian-split': [{weight:65,reps:8},{weight:65,reps:8},{weight:65,reps:8}],
+      'ex-rdl':             [{weight:170,reps:10},{weight:170,reps:10},{weight:170,reps:10}],
+      'ex-ham-curl':        [{weight:140,reps:12},{weight:140,reps:12},{weight:140,reps:10}],
+      'ex-leg-extension':   [{weight:165,reps:15},{weight:165,reps:15},{weight:165,reps:14}],
+      'ex-calf-raise':      [{weight:180,reps:15},{weight:180,reps:15},{weight:180,reps:13}],
+    }, coachNotes: "Can definitely move up on pendulum. Struggled on split squats. Did one set of leg extensions before leg curls because someone was on the machine.\n\nCoach: One of the best legs sessions of any block. Pendulum squat swept 195 clean for the second week in a row — moving to 205, the strength scheme is delivering. BSS swept despite struggling — that's mental toughness, moving to 70. RDL finally hit 10/10/10 — best performance of any block, moving to 175. Hamstring curl dropped on last set again — same pattern, hold at 140 and fix that third set. Leg extension one rep short — hold at 165. Calf raise held up well at a big new weight — hold at 180, tighten the last set. Smart adaptation on leg extension when machine was taken. 9.5/10." },
   ];
   function importFallSplitSessions(){
     if(!state.seedFlags) state.seedFlags = {};
