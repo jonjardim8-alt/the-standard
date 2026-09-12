@@ -2985,6 +2985,9 @@
   let budgetViewMode = 'month'; // 'month' | 'quarter' | 'ytd'
   let budgetSelectedQuarter = { year: new Date().getFullYear(), q: Math.floor(new Date().getMonth()/3) + 1 };
   let budgetSelectedYear = new Date().getFullYear();
+  // Transactions list's collapsible groups — start open (same visibility
+  // as before this was split up), collapsible per-group from there.
+  let budgetTxnGroupsExpanded = { income: true, expense: true, neutral: true };
 
   function budgetMonthLabel(monthKeyStr){
     const [y,m] = monthKeyStr.split('-').map(Number);
@@ -3143,6 +3146,57 @@
     document.getElementById('cbClose').onclick = () => { closeModal(); renderAll(); };
   }
 
+  // One collapsible group (Income / Expenses / Savings & Transfers) within
+  // the month view's Transactions list. Income and Expenses always show
+  // their header even with nothing in them that month; Savings & Transfers
+  // only appears once something's actually been logged under it, so it
+  // doesn't clutter the view for people who never use those categories.
+  function renderBudgetTxnGroup(wrap, monthTxns, type, label){
+    const groupTxns = monthTxns.filter(t => (budgetCatById[t.category]?.type || 'expense') === type);
+    if(!groupTxns.length && type === 'neutral') return;
+
+    const expanded = budgetTxnGroupsExpanded[type];
+    const header = document.createElement('div');
+    header.className = 'dash-section-header';
+    header.style.marginTop = '14px';
+    header.innerHTML = `<span class="dash-header-title"><span class="chev${expanded ? '' : ' collapsed'}">▾</span> ${escapeHtml(label)} (${groupTxns.length})</span>`;
+    header.querySelector('.dash-header-title').onclick = () => {
+      budgetTxnGroupsExpanded[type] = !budgetTxnGroupsExpanded[type];
+      renderBudgetSection();
+    };
+    wrap.appendChild(header);
+    if(!expanded) return;
+
+    if(!groupTxns.length){
+      const empty = document.createElement('div');
+      empty.className = 'empty-note';
+      empty.textContent = 'Nothing here for ' + budgetMonthLabel(budgetSelectedMonth) + '.';
+      wrap.appendChild(empty);
+      return;
+    }
+
+    groupTxns.slice().sort((a,b) => b.date.localeCompare(a.date)).forEach(t => {
+      const cat = budgetCatById[t.category];
+      const row = document.createElement('div');
+      row.className = 'budget-txn-row';
+      row.style.setProperty('--accent-color', BUDGET_TYPE_COLORS[cat?.type || 'expense']);
+      row.innerHTML = `
+        <div style="flex:1">
+          <div class="budget-txn-desc">${escapeHtml(t.description || cat?.label || 'Transaction')}</div>
+          <div class="budget-txn-meta">${fmtDate(t.date)} · ${escapeHtml(cat?.label || t.category)}</div>
+        </div>
+        <div class="budget-txn-amt ${cat?.type || 'expense'}">${cat?.type === 'income' ? '+' : cat?.type === 'expense' ? '−' : ''}$${t.amount.toFixed(2)}</div>
+        <button class="budget-txn-del">×</button>
+      `;
+      row.querySelector('.budget-txn-del').onclick = () => {
+        state.budgetTransactions = state.budgetTransactions.filter(x => x.id !== t.id);
+        save();
+        renderBudgetSection();
+      };
+      wrap.appendChild(row);
+    });
+  }
+
   function renderBudgetSection(){
     const wrap = document.getElementById('budgetContent');
     wrap.innerHTML = '';
@@ -3200,26 +3254,9 @@
         empty.textContent = 'Nothing logged for ' + budgetMonthLabel(budgetSelectedMonth) + ' yet — tap + to add one.';
         wrap.appendChild(empty);
       } else {
-        monthTxns.slice().sort((a,b) => b.date.localeCompare(a.date)).forEach(t => {
-          const cat = budgetCatById[t.category];
-          const row = document.createElement('div');
-          row.className = 'budget-txn-row';
-          row.style.setProperty('--accent-color', BUDGET_TYPE_COLORS[cat?.type || 'expense']);
-          row.innerHTML = `
-            <div style="flex:1">
-              <div class="budget-txn-desc">${escapeHtml(t.description || cat?.label || 'Transaction')}</div>
-              <div class="budget-txn-meta">${fmtDate(t.date)} · ${escapeHtml(cat?.label || t.category)}</div>
-            </div>
-            <div class="budget-txn-amt ${cat?.type || 'expense'}">${cat?.type === 'income' ? '+' : cat?.type === 'expense' ? '−' : ''}$${t.amount.toFixed(2)}</div>
-            <button class="budget-txn-del">×</button>
-          `;
-          row.querySelector('.budget-txn-del').onclick = () => {
-            state.budgetTransactions = state.budgetTransactions.filter(x => x.id !== t.id);
-            save();
-            renderBudgetSection();
-          };
-          wrap.appendChild(row);
-        });
+        renderBudgetTxnGroup(wrap, monthTxns, 'expense', 'Expenses');
+        renderBudgetTxnGroup(wrap, monthTxns, 'income', 'Income');
+        renderBudgetTxnGroup(wrap, monthTxns, 'neutral', 'Savings & Transfers');
       }
     }
 
