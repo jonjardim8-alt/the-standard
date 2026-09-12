@@ -4528,12 +4528,14 @@
 
     const dayOptions = DAYS.map((d, i) => '<option value="'+d+'"'+(i===activeDay?' selected':'')+'>'+fullDayName(d)+'</option>').join('');
     const activeDateStr = toDateStr(weekDates()[activeDay]);
+    const activeDateObj = dateFromStr(activeDateStr);
     const catPickerHtml = catId ? '' : '<label>Category</label><div class="cat-picker" id="evCatPicker"></div>';
     const titleDotHtml = catId ? '<span class="sw" style="background:'+cat.color+'"></span>' : '';
+    const bdayMonthOptions = MONTH_NAMES.map((m, i) => '<option value="' + (i + 1) + '">' + m + '</option>').join('');
 
     content.innerHTML = `
       <div class="modal-handle"></div>
-      <div class="modal-title">${titleDotHtml}Add event</div>
+      <div class="modal-title" id="evModalTitle">${titleDotHtml}Add event</div>
       <div class="modal-subtitle" id="evSubtitle">Scheduled at a specific time</div>
 
       ${catPickerHtml}
@@ -4541,6 +4543,9 @@
 
       <label class="allday-toggle-row">
         <input type="checkbox" id="evAllDay"> All day / multi-day (e.g. vacation)
+      </label>
+      <label class="allday-toggle-row">
+        <input type="checkbox" id="evBirthday"> Birthday (repeats every year)
       </label>
 
       <div id="evTimedFields">
@@ -4561,10 +4566,19 @@
         ${customDateHtml('evEndDate', activeDateStr)}
       </div>
 
-      <label>What is it?</label>
+      <div id="evBirthdayFields" style="display:none">
+        <label>Month</label>
+        ${customSelectHtml('evBdayMonth', bdayMonthOptions, String(activeDateObj.getMonth() + 1), 'Month')}
+        <label>Day</label>
+        <input type="number" id="evBdayDay" min="1" max="31" value="${activeDateObj.getDate()}">
+      </div>
+
+      <label id="evTextLabel">What is it?</label>
       <input type="text" id="evText" placeholder="e.g. Doctor appointment" maxlength="80">
-      <label>Notes (optional)</label>
-      <textarea id="evNotes" placeholder="Any extra detail…" rows="2"></textarea>
+      <div id="evNotesField">
+        <label>Notes (optional)</label>
+        <textarea id="evNotes" placeholder="Any extra detail…" rows="2"></textarea>
+      </div>
       <div class="modal-actions">
         <button class="cancel" id="evCancel">Cancel</button>
         <button class="save" id="evSave">Save</button>
@@ -4574,6 +4588,7 @@
     wireCustomSelect('evDay', dayOptions, 'Day');
     wireCustomDate('evStartDate', {});
     wireCustomDate('evEndDate', {});
+    wireCustomSelect('evBdayMonth', bdayMonthOptions, 'Month');
 
     function updatePresetShortcut(){
       const box = document.getElementById('evPresetShortcut');
@@ -4611,22 +4626,52 @@
       });
     }
 
-    document.getElementById('evAllDay').onchange = (e) => {
-      const isAllDay = e.target.checked;
-      document.getElementById('evTimedFields').style.display = isAllDay ? 'none' : 'block';
+    // Three mutually-exclusive modes — checking one unchecks the other and
+    // swaps which field group + label set shows.
+    function updateEventMode(){
+      const isAllDay = document.getElementById('evAllDay').checked;
+      const isBirthday = document.getElementById('evBirthday').checked;
+      document.getElementById('evTimedFields').style.display = (!isAllDay && !isBirthday) ? 'block' : 'none';
       document.getElementById('evAllDayFields').style.display = isAllDay ? 'block' : 'none';
-      document.getElementById('evSubtitle').textContent = isAllDay
-        ? "No specific time — shown as a banner, doesn't tint the schedule"
-        : 'Scheduled at a specific time';
+      document.getElementById('evBirthdayFields').style.display = isBirthday ? 'block' : 'none';
+      document.getElementById('evNotesField').style.display = isBirthday ? 'none' : 'block';
+      document.getElementById('evModalTitle').innerHTML = isBirthday ? 'Add birthday' : titleDotHtml + 'Add event';
+      document.getElementById('evTextLabel').textContent = isBirthday ? "Whose birthday?" : 'What is it?';
+      document.getElementById('evText').placeholder = isBirthday ? 'e.g. Mom' : 'e.g. Doctor appointment';
+      document.getElementById('evSubtitle').textContent = isBirthday
+        ? 'Repeats every year on this date — no need to re-add it'
+        : isAllDay
+          ? "No specific time — shown as a banner, doesn't tint the schedule"
+          : 'Scheduled at a specific time';
+    }
+    document.getElementById('evAllDay').onchange = (e) => {
+      if(e.target.checked) document.getElementById('evBirthday').checked = false;
+      updateEventMode();
+    };
+    document.getElementById('evBirthday').onchange = (e) => {
+      if(e.target.checked) document.getElementById('evAllDay').checked = false;
+      updateEventMode();
     };
 
     document.getElementById('evCancel').onclick = closeModal;
     document.getElementById('evSave').onclick = () => {
       const isAllDay = document.getElementById('evAllDay').checked;
+      const isBirthday = document.getElementById('evBirthday').checked;
       const text = document.getElementById('evText').value.trim();
       if(!text) return;
-      const notes = document.getElementById('evNotes').value.trim();
 
+      if(isBirthday){
+        const month = Number(document.getElementById('evBdayMonth').value);
+        const day = Math.max(1, Math.min(31, Number(document.getElementById('evBdayDay').value) || 0));
+        if(!day) return;
+        state.birthdays.push({ id: Date.now() + '-' + Math.random().toString(36).slice(2,7), name: text, month, day });
+        save();
+        closeModal();
+        renderAll();
+        return;
+      }
+
+      const notes = document.getElementById('evNotes').value.trim();
       if(isAllDay){
         let startDate = document.getElementById('evStartDate').value || activeDateStr;
         let endDate = document.getElementById('evEndDate').value || startDate;
