@@ -1670,6 +1670,7 @@
           if(!parsed.energyLevels) parsed.energyLevels = {};
           if(!parsed.scoreOptIn) parsed.scoreOptIn = { budget: false };
           if(!parsed.blockedSenders) parsed.blockedSenders = [];
+          if(!parsed.birthdays) parsed.birthdays = [];
           return parsed;
         }
       }
@@ -1684,7 +1685,8 @@
       fitnessSplit: null, workoutLogs: {}, budgetTransactions: [], categoryBudgetLimits: {},
       projects: [], journalEntries: {}, energyLevels: {},
       scoreOptIn: { budget: false },
-      blockedSenders: []
+      blockedSenders: [],
+      birthdays: []
     };
   }
   function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
@@ -4964,10 +4966,41 @@
     return state.allDayEvents.filter(e => dateStr >= e.startDate && dateStr <= e.endDate);
   }
 
+  // Matched on month+day only — no year stored — so the same birthday
+  // resurfaces every year without needing to re-add it.
+  const BIRTHDAY_COLOR = '#F2A93B';
+  const MONTH_NAMES = Array.from({ length:12 }, (_, i) => new Date(2000, i, 1).toLocaleDateString('en-US', { month:'short' }));
+  function birthdaysForDate(dateStr){
+    const [, m, d] = dateStr.split('-').map(Number);
+    return state.birthdays.filter(b => b.month === m && b.day === d);
+  }
+
   function renderAllDayBanners(){
     const wrap = document.getElementById('allDayBanners');
     wrap.innerHTML = '';
     const dateStr = toDateStr(weekDates()[activeDay]);
+
+    birthdaysForDate(dateStr).forEach(b => {
+      const chip = document.createElement('div');
+      chip.className = 'allday-chip';
+      chip.style.setProperty('--accent-color', BIRTHDAY_COLOR);
+      chip.innerHTML = `
+        <div class="allday-left">
+          <span class="allday-badge">🎂 Birthday</span>
+          <div>
+            <div class="allday-text">${escapeHtml(b.name)}</div>
+          </div>
+        </div>
+        <button class="allday-del">×</button>
+      `;
+      chip.querySelector('.allday-del').onclick = () => {
+        state.birthdays = state.birthdays.filter(x => x.id !== b.id);
+        save();
+        renderAll();
+      };
+      wrap.appendChild(chip);
+    });
+
     const events = allDayEventsForDate(dateStr).filter(e => filterCats.has(e.category));
 
     events.forEach(e => {
@@ -5778,6 +5811,67 @@
       });
     }
     wrap.appendChild(chipWrap);
+
+    const bdaySub = document.createElement('div');
+    bdaySub.className = 'section-label';
+    bdaySub.style.marginTop = '18px';
+    bdaySub.textContent = 'Birthdays';
+    wrap.appendChild(bdaySub);
+
+    const bdayNote = document.createElement('div');
+    bdayNote.className = 'settings-row-sub';
+    bdayNote.style.margin = '0 0 10px';
+    bdayNote.textContent = 'Shows as a banner on the calendar every year on this date.';
+    wrap.appendChild(bdayNote);
+
+    const monthOptionsHtml = MONTH_NAMES.map((m, i) => '<option value="' + (i + 1) + '">' + m + '</option>').join('');
+    const bdayAddRow = document.createElement('div');
+    bdayAddRow.className = 'blocklist-add-row';
+    bdayAddRow.innerHTML = `
+      <input type="text" id="bdayNameInput" placeholder="Name">
+      ${customSelectHtml('bdayMonthInput', monthOptionsHtml, '1', 'Month')}
+      <input type="number" id="bdayDayInput" min="1" max="31" placeholder="Day">
+      <button id="bdayAdd">Add</button>
+    `;
+    wrap.appendChild(bdayAddRow);
+    wireCustomSelect('bdayMonthInput', monthOptionsHtml, 'Month');
+    const commitBirthday = () => {
+      const nameInput = document.getElementById('bdayNameInput');
+      const dayInput = document.getElementById('bdayDayInput');
+      const name = nameInput.value.trim();
+      const month = Number(document.getElementById('bdayMonthInput').value);
+      const day = Math.max(1, Math.min(31, Number(dayInput.value) || 0));
+      if(!name || !day) return;
+      state.birthdays.push({ id: Date.now() + '-' + Math.random().toString(36).slice(2,7), name, month, day });
+      nameInput.value = '';
+      dayInput.value = '';
+      save();
+      renderAll();
+    };
+    bdayAddRow.querySelector('#bdayAdd').onclick = commitBirthday;
+    bdayAddRow.querySelector('#bdayDayInput').addEventListener('keydown', (e) => {
+      if(e.key === 'Enter') commitBirthday();
+    });
+
+    const bdayChipWrap = document.createElement('div');
+    bdayChipWrap.className = 'blocklist-chips';
+    if(!state.birthdays.length){
+      bdayChipWrap.innerHTML = '<div class="empty-note">No birthdays added yet.</div>';
+    } else {
+      state.birthdays.slice().sort((a,b) => a.month - b.month || a.day - b.day).forEach(b => {
+        const chip = document.createElement('div');
+        chip.className = 'blocklist-chip';
+        chip.innerHTML = `<span></span><button aria-label="Remove">×</button>`;
+        chip.querySelector('span').textContent = b.name + ' — ' + MONTH_NAMES[b.month - 1] + ' ' + b.day;
+        chip.querySelector('button').onclick = () => {
+          state.birthdays = state.birthdays.filter(x => x.id !== b.id);
+          save();
+          renderAll();
+        };
+        bdayChipWrap.appendChild(chip);
+      });
+    }
+    wrap.appendChild(bdayChipWrap);
   }
 
   /* ---------------- Email (Gmail, read-only, client-side OAuth) ----------------

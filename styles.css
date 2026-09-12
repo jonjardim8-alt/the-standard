@@ -821,6 +821,22 @@
     background: var(--card);
     color: var(--text);
   }
+  .blocklist-add-row .custom-select{
+    flex:0 0 auto;
+    width: 84px;
+    font-size: 13px;
+  }
+  .blocklist-add-row input[type=number]{
+    flex:0 0 auto;
+    width: 54px;
+    font-family: var(--font-body);
+    font-size: 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 8px;
+    background: var(--card);
+    color: var(--text);
+  }
   .blocklist-add-row button{
     font-family: var(--font-mono);
     font-size: 12px;
