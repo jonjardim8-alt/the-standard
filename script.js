@@ -1518,6 +1518,15 @@
       'ex-leg-extension':   [{weight:165,reps:15},{weight:165,reps:15},{weight:165,reps:14}],
       'ex-calf-raise':      [{weight:180,reps:15},{weight:180,reps:15},{weight:180,reps:13}],
     }, coachNotes: "Can definitely move up on pendulum. Struggled on split squats. Did one set of leg extensions before leg curls because someone was on the machine.\n\nCoach: One of the best legs sessions of any block. Pendulum squat swept 195 clean for the second week in a row — moving to 205, the strength scheme is delivering. BSS swept despite struggling — that's mental toughness, moving to 70. RDL finally hit 10/10/10 — best performance of any block, moving to 175. Hamstring curl dropped on last set again — same pattern, hold at 140 and fix that third set. Leg extension one rep short — hold at 165. Calf raise held up well at a big new weight — hold at 180, tighten the last set. Smart adaptation on leg extension when machine was taken. 9.5/10." },
+
+    { date: '2026-09-10', exercises: {
+      'ex-oh-tricep-ext':  [{weight:165,reps:12},{weight:165,reps:12},{weight:165,reps:12}],
+      'ex-cable-pushdown': [{weight:90,reps:12},{weight:90,reps:12},{weight:90,reps:11}],
+      'ex-cable-kickback': [{weight:25,reps:15},{weight:25,reps:15},{weight:25,reps:15}],
+      'ex-ez-curl':        [{weight:60,reps:10},{weight:60,reps:10},{weight:60,reps:10}],
+      'ex-hammer-curl':    [{weight:35,reps:12},{weight:35,reps:12},{weight:35,reps:11}],
+      'ex-cable-curl':     [{weight:65,reps:15},{weight:65,reps:15},{weight:65,reps:13}],
+    }, coachNotes: "Coach: Best arms session of the Fall Split. Back at home gym and it showed — overhead extension swept 165 clean, moving to 170. Cable pushdown one rep short on last set — hold at 90, fix the form first. Cable kickback swept clean, moving to 30. EZ bar curl swept clean for the second week — moving to 65. Hammer curls and cable curl both one rep short on last set — hold both, chase the full sweep. Full session completed, all 6 exercises logged. 9.5/10." },
   ];
   function importFallSplitSessions(){
     if(!state.seedFlags) state.seedFlags = {};
