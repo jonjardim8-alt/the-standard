@@ -1527,6 +1527,14 @@
       'ex-hammer-curl':    [{weight:35,reps:12},{weight:35,reps:12},{weight:35,reps:11}],
       'ex-cable-curl':     [{weight:65,reps:15},{weight:65,reps:15},{weight:65,reps:13}],
     }, coachNotes: "Coach: Best arms session of the Fall Split. Back at home gym and it showed — overhead extension swept 165 clean, moving to 170. Cable pushdown one rep short on last set — hold at 90, fix the form first. Cable kickback swept clean, moving to 30. EZ bar curl swept clean for the second week — moving to 65. Hammer curls and cable curl both one rep short on last set — hold both, chase the full sweep. Full session completed, all 6 exercises logged. 9.5/10." },
+
+    { date: '2026-09-11', exercises: {
+      'ex-machine-shoulder':  [{weight:80,reps:12},{weight:80,reps:12},{weight:80,reps:12}],
+      'ex-cable-y-raise':     [{weight:15,reps:15},{weight:15,reps:15},{weight:15,reps:15}],
+      'ex-cable-crunch':      [{weight:80,reps:15},{weight:80,reps:15},{weight:80,reps:15}],
+      'ex-hanging-leg-raise': [{weight:0,reps:15},{weight:0,reps:15},{weight:0,reps:15}],
+      'ex-wrist-curl':        [{weight:15,reps:15},{weight:15,reps:15},{weight:15,reps:15}],
+    }, coachNotes: "Can go up 10 lbs on crunches.\n\nCoach: First perfect 10 of the Fall Split. Every exercise swept clean, mobility completed, full session logged. Machine shoulder press swept at 80 — moving to 90. Cable Y-raise swept, moving to 20. Cable crunch machine maxed the rep range — moving to 90 as you called. Hanging leg raises swept — try to straighten the legs next week. Wrist curls swept clean, moving to 20. This is the standard for accessory day. 10/10." },
   ];
   function importFallSplitSessions(){
     if(!state.seedFlags) state.seedFlags = {};
