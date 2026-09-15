@@ -1535,6 +1535,14 @@
       'ex-hanging-leg-raise': [{weight:0,reps:15},{weight:0,reps:15},{weight:0,reps:15}],
       'ex-wrist-curl':        [{weight:15,reps:15},{weight:15,reps:15},{weight:15,reps:15}],
     }, coachNotes: "Can go up 10 lbs on crunches.\n\nCoach: First perfect 10 of the Fall Split. Every exercise swept clean, mobility completed, full session logged. Machine shoulder press swept at 80 — moving to 90. Cable Y-raise swept, moving to 20. Cable crunch machine maxed the rep range — moving to 90 as you called. Hanging leg raises swept — try to straighten the legs next week. Wrist curls swept clean, moving to 20. This is the standard for accessory day. 10/10." },
+
+    { date: '2026-09-14', exercises: {
+      'ex-db-bench':           [{weight:95,reps:6},{weight:95,reps:6},{weight:95,reps:6},{weight:95,reps:6}],
+      'ex-cable-press-around': [{weight:70,reps:15},{weight:70,reps:15},{weight:70,reps:15}],
+      'ex-incline-db-press':   [{weight:75,reps:10},{weight:75,reps:10},{weight:75,reps:10}],
+      'ex-pec-deck':           [{weight:110,reps:12},{weight:110,reps:12},{weight:110,reps:12}],
+      'ex-cable-lat-raise':    [{weight:45,reps:15},{weight:45,reps:15},{weight:45,reps:''}],
+    }, coachNotes: "Maybe one more week with 95 lbs for flat db press as it was my first week. Still felt really good though. Can probably jump 10-15 lbs on pec deck." },
   ];
   function importFallSplitSessions(){
     if(!state.seedFlags) state.seedFlags = {};
