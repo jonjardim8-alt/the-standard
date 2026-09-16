@@ -1543,6 +1543,15 @@
       'ex-pec-deck':           [{weight:110,reps:12},{weight:110,reps:12},{weight:110,reps:12}],
       'ex-cable-lat-raise':    [{weight:45,reps:15},{weight:45,reps:15},{weight:45,reps:''}],
     }, coachNotes: "Maybe one more week with 95 lbs for flat db press as it was my first week. Still felt really good though. Can probably jump 10-15 lbs on pec deck." },
+
+    { date: '2026-09-15', exercises: {
+      'ex-bb-row':          [{weight:165,reps:6},{weight:165,reps:6},{weight:165,reps:6},{weight:165,reps:6}],
+      'ex-sa-lat-pulldown': [{weight:155,reps:10},{weight:155,reps:10},{weight:155,reps:9}],
+      'ex-low-row-machine': [{weight:200,reps:12},{weight:200,reps:12},{weight:200,reps:12}],
+      'ex-cable-row':       [{weight:150,reps:12},{weight:150,reps:12},{weight:150,reps:12}],
+      'ex-face-pull':       [{weight:105,reps:15},{weight:105,reps:15},{weight:105,reps:15}],
+      'ex-rear-delt-fly':   [{weight:95,reps:20},{weight:95,reps:20},{weight:95,reps:''}],
+    }, coachNotes: "Last 2 reps of last set of barbell rows were slightly cheated by some extra body motion. Nothing too crazy though still solid overall form. Did one set of cable rows before low row machine because someone was on it." },
   ];
   function importFallSplitSessions(){
     if(!state.seedFlags) state.seedFlags = {};
