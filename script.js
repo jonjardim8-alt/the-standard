@@ -2608,6 +2608,42 @@
     heading.textContent = new Date().toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' });
     wrap.appendChild(heading);
 
+    // Today's Plan — the time-blocked plan set the night before via the
+    // Tomorrow tab, now that "tomorrow" has become today. Leads the
+    // dashboard since it's the actual game plan for the day; tap through
+    // to the Tomorrow tab to edit it.
+    const planTitle = document.createElement('div');
+    planTitle.className = 'task-section-title';
+    planTitle.innerHTML = "<span>Today's plan</span>";
+    planTitle.onclick = () => switchSection('tomorrow');
+    wrap.appendChild(planTitle);
+
+    const todaysBlocks = (state.tomorrowPlans[today] || []).slice().sort((a,b) => timeToMin(a.startTime) - timeToMin(b.startTime));
+    if(!todaysBlocks.length){
+      const empty = document.createElement('div');
+      empty.className = 'empty-note';
+      empty.textContent = 'No plan set for today — add it the night before from the Tomorrow tab.';
+      wrap.appendChild(empty);
+    } else {
+      const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+      const planList = document.createElement('div');
+      planList.className = 'task-list';
+      planList.style.marginBottom = '18px';
+      todaysBlocks.forEach(b => {
+        const startMin = timeToMin(b.startTime);
+        const isNow = b.endTime && nowMin >= startMin && nowMin < timeToMin(b.endTime);
+        const row = document.createElement('div');
+        row.className = 'tomorrow-block-row' + (isNow ? ' now' : '');
+        row.innerHTML = `
+          <div class="tomorrow-block-time">${fmtTime(b.startTime)}${b.endTime ? '–' + fmtTime(b.endTime) : ''}</div>
+          <div class="tomorrow-block-text"></div>
+        `;
+        row.querySelector('.tomorrow-block-text').textContent = b.text;
+        planList.appendChild(row);
+      });
+      wrap.appendChild(planList);
+    }
+
     // Next up
     const nextTitle = document.createElement('div');
     nextTitle.className = 'task-section-title';

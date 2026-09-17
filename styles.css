@@ -1338,6 +1338,12 @@
     background:none; border:none; color: var(--text-faint);
     font-size:15px; cursor:pointer; padding:0 2px; flex:0 0 auto;
   }
+  .tomorrow-block-row.now{
+    border-left-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 16%, var(--card));
+  }
+  .tomorrow-block-row.now .tomorrow-block-time{ color: var(--accent); }
+  .tomorrow-block-row.now .tomorrow-block-text{ font-weight:600; }
   .budget-txn-amt.neutral{ color: #5B8DEF; }
   .budget-txn-del{ background:none; border:none; color:var(--text-faint); font-size:14px; cursor:pointer; flex:0 0 auto; }
   .budget-limit-box{
