@@ -4271,6 +4271,33 @@
 
   /* ---------------- Modals ---------------- */
 
+  // The app's whole layout scrolls via <body> (no fixed viewport with
+  // per-tab inner scroll regions), so with a modal open a touch-scroll
+  // gesture would otherwise happily scroll the page behind it instead of
+  // the modal's own content — plain `overflow:hidden` on body doesn't
+  // reliably stop that on iOS, so this locks it with `position:fixed` +
+  // saved scroll offset instead, restoring the exact scroll position on
+  // close. Driven by a MutationObserver on both overlays' `hidden` class
+  // rather than touching every individual open*Modal()/closeModal() call.
+  let bodyScrollLockY = 0;
+  function updateBodyScrollLock(){
+    const modalOpen = !document.getElementById('modalOverlay').classList.contains('hidden');
+    const pickerOpen = !document.getElementById('pickerOverlay').classList.contains('hidden');
+    const shouldLock = modalOpen || pickerOpen;
+    const isLocked = document.body.classList.contains('scroll-locked');
+    if(shouldLock && !isLocked){
+      bodyScrollLockY = window.scrollY;
+      document.body.style.top = -bodyScrollLockY + 'px';
+      document.body.classList.add('scroll-locked');
+    } else if(!shouldLock && isLocked){
+      document.body.classList.remove('scroll-locked');
+      document.body.style.top = '';
+      window.scrollTo(0, bodyScrollLockY);
+    }
+  }
+  new MutationObserver(updateBodyScrollLock).observe(document.getElementById('modalOverlay'), { attributes: true, attributeFilter: ['class'] });
+  new MutationObserver(updateBodyScrollLock).observe(document.getElementById('pickerOverlay'), { attributes: true, attributeFilter: ['class'] });
+
   function closeModal(){
     const overlay = document.getElementById('modalOverlay');
     overlay.classList.add('hidden');
