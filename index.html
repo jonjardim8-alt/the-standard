@@ -137,16 +137,18 @@
   <button id="catMenuUpcoming"><span class="ic">›</span> View upcoming</button>
 </div>
 
-<!-- Shared modal overlay -->
+<!-- Shared modal overlay. The slide animation lives on .modal-slide,
+     separate from #modalContent's own overflow-y:auto — see the CSS
+     comment on .modal-slide for why they can't be the same element. -->
 <div class="modal-overlay hidden" id="modalOverlay">
-  <div class="modal" id="modalContent"></div>
+  <div class="modal-slide"><div class="modal" id="modalContent"></div></div>
 </div>
 
 <!-- Custom select picker sheet — stacks above modalOverlay so it can open
      from inside an already-open modal (e.g. picking a category while
      adding a transaction) without closing it. -->
 <div class="modal-overlay picker-overlay hidden" id="pickerOverlay">
-  <div class="modal" id="pickerContent"></div>
+  <div class="modal-slide"><div class="modal" id="pickerContent"></div></div>
 </div>
 
 <script src="script.js"></script>

@@ -297,12 +297,22 @@
     opacity: 0;
     pointer-events: none;
   }
-  .modal-overlay.hidden .modal{
+  .modal-overlay.hidden .modal-slide{
     transform: translateY(100%);
+  }
+  /* Slide animation lives on this wrapper, separate from .modal's own
+     overflow-y:auto — a single element with both `transform` and
+     `overflow-y:auto` is a known iOS Safari bug where touch-scrolling
+     inside it silently does nothing, since the transform promotes it to
+     its own compositing layer that doesn't forward scroll gestures. */
+  .modal-slide{
+    width:100%;
+    max-width: 480px;
+    transform: translateY(0);
+    transition: transform 300ms cubic-bezier(0.22, 0.61, 0.36, 1);
   }
   .modal{
     width:100%;
-    max-width: 480px;
     background: var(--bg-elevated);
     border: 1px solid var(--border);
     border-bottom: none;
@@ -312,8 +322,6 @@
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    transform: translateY(0);
-    transition: transform 300ms cubic-bezier(0.22, 0.61, 0.36, 1);
   }
   .modal-handle{
     width: 36px; height:4px; border-radius:3px;
