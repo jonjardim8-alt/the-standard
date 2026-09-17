@@ -1625,8 +1625,6 @@
   let taskSubView = 'today'; // 'today' | 'upcoming'
   let expandedGroups = new Set(); // tracks which groups are open — everything starts closed
   let needsAttentionExpanded = false; // Dashboard's Needs Attention section — starts closed
-  let reviewPendingExpanded = false; // Week Review's Pending tasks — starts closed
-  let reviewDoneExpanded = false;    // Week Review's Done tasks — starts closed
   let calendarViewMonth = null;
 
   function startOfWeek(d){
@@ -1696,6 +1694,7 @@
           if(!parsed.scoreOptIn) parsed.scoreOptIn = { budget: false };
           if(!parsed.blockedSenders) parsed.blockedSenders = [];
           if(!parsed.birthdays) parsed.birthdays = [];
+          if(!parsed.tomorrowPlans) parsed.tomorrowPlans = {};
           return parsed;
         }
       }
@@ -1711,7 +1710,8 @@
       projects: [], journalEntries: {}, energyLevels: {},
       scoreOptIn: { budget: false },
       blockedSenders: [],
-      birthdays: []
+      birthdays: [],
+      tomorrowPlans: {}
     };
   }
   function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
@@ -2188,6 +2188,96 @@
       }
     }
     return null;
+  }
+
+  /* ---------------- Tomorrow (time-blocked plan for the next day) ----------------
+     Deliberately not tied to the regular weekly calendar — a flat, flexible
+     list of {text, startTime, endTime} blocks keyed by date in
+     state.tomorrowPlans, so it always reflects whatever's actually the next
+     calendar day rather than needing manual navigation. */
+  function tomorrowDateStr(){
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return toDateStr(d);
+  }
+
+  function renderTomorrowSection(){
+    const wrap = document.getElementById('tomorrowContent');
+    wrap.innerHTML = '';
+    const dateStr = tomorrowDateStr();
+    if(!state.tomorrowPlans[dateStr]) state.tomorrowPlans[dateStr] = [];
+    const blocks = state.tomorrowPlans[dateStr];
+
+    const heading = document.createElement('div');
+    heading.className = 'section-label';
+    heading.style.marginBottom = '14px';
+    heading.textContent = 'Tomorrow — ' + dateFromStr(dateStr).toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' });
+    wrap.appendChild(heading);
+
+    if(!blocks.length){
+      const empty = document.createElement('div');
+      empty.className = 'empty-note';
+      empty.textContent = 'Nothing planned yet — tap + to time-block tomorrow.';
+      wrap.appendChild(empty);
+      return;
+    }
+
+    const list = document.createElement('div');
+    list.className = 'task-list';
+    blocks.slice().sort((a,b) => timeToMin(a.startTime) - timeToMin(b.startTime)).forEach(b => {
+      const row = document.createElement('div');
+      row.className = 'tomorrow-block-row';
+      row.innerHTML = `
+        <div class="tomorrow-block-time">${fmtTime(b.startTime)}${b.endTime ? '–' + fmtTime(b.endTime) : ''}</div>
+        <div class="tomorrow-block-text"></div>
+        <button class="tomorrow-block-del">×</button>
+      `;
+      row.querySelector('.tomorrow-block-text').textContent = b.text;
+      row.querySelector('.tomorrow-block-del').onclick = () => {
+        state.tomorrowPlans[dateStr] = state.tomorrowPlans[dateStr].filter(x => x.id !== b.id);
+        save();
+        renderTomorrowSection();
+      };
+      list.appendChild(row);
+    });
+    wrap.appendChild(list);
+  }
+
+  function openAddTomorrowBlockModal(){
+    const overlay = document.getElementById('modalOverlay');
+    const content = document.getElementById('modalContent');
+    content.style.removeProperty('--chip-color');
+    const dateStr = tomorrowDateStr();
+
+    content.innerHTML = `
+      <div class="modal-handle"></div>
+      <div class="modal-title">Add to tomorrow's plan</div>
+      <div class="modal-subtitle">${dateFromStr(dateStr).toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' })}</div>
+      <label>What is it?</label>
+      <input type="text" id="tbText" placeholder="e.g. Wake up, Breakfast, Gym" maxlength="80">
+      <label>Start time</label>
+      <input type="time" id="tbStart" value="09:00">
+      <label>End time (optional)</label>
+      <input type="time" id="tbEnd">
+      <div class="modal-actions">
+        <button class="cancel" id="tbCancel">Cancel</button>
+        <button class="save" id="tbSave">Save</button>
+      </div>
+    `;
+    overlay.classList.remove('hidden');
+    document.getElementById('tbCancel').onclick = closeModal;
+    document.getElementById('tbSave').onclick = () => {
+      const text = document.getElementById('tbText').value.trim();
+      if(!text) return;
+      const startTime = document.getElementById('tbStart').value || '09:00';
+      const endTime = document.getElementById('tbEnd').value || null;
+      if(!state.tomorrowPlans[dateStr]) state.tomorrowPlans[dateStr] = [];
+      state.tomorrowPlans[dateStr].push({ id: Date.now() + '-' + Math.random().toString(36).slice(2,7), text, startTime, endTime });
+      save();
+      closeModal();
+      renderAll();
+    };
+    setTimeout(() => document.getElementById('tbText').focus(), 50);
   }
 
   function renderListsSection(){
@@ -3799,149 +3889,6 @@
     }
     state.seedFlags.journalHabitAdded = true;
     save();
-  }
-
-  // Small ▲/▼/– indicator comparing this week's number to last week's.
-  function trendBadge(current, previous){
-    if(previous === current) return '<span class="trend-flat">– same as last wk</span>';
-    const up = current > previous;
-    const diff = Math.abs(current - previous);
-    return '<span class="' + (up ? 'trend-up' : 'trend-down') + '">' + (up ? '▲' : '▼') + diff + ' vs last wk</span>';
-  }
-
-  function getWeekTaskStats(weekStart, weekEnd){
-    const weekTasks = state.tasks.filter(t => t.dueDate >= weekStart && t.dueDate <= weekEnd);
-    return { total: weekTasks.length, done: weekTasks.filter(t => t.done).length };
-  }
-
-  function openWeeklyReviewModal(){
-    const overlay = document.getElementById('modalOverlay');
-    const content = document.getElementById('modalContent');
-    content.style.removeProperty('--chip-color');
-
-    const dates = weekDates();
-    const weekStart = toDateStr(dates[0]);
-    const weekEnd = toDateStr(dates[6]);
-    const today = todayStr();
-
-    const prevWeekStartDate = new Date(dates[0]);
-    prevWeekStartDate.setDate(prevWeekStartDate.getDate() - 7);
-    const prevDates = datesForWeekStart(toDateStr(prevWeekStartDate));
-    const prevWeekStart = toDateStr(prevDates[0]);
-    const prevWeekEnd = toDateStr(prevDates[6]);
-
-    const weekTasks = state.tasks.filter(t => t.dueDate >= weekStart && t.dueDate <= weekEnd)
-      .sort((a,b) => a.dueDate.localeCompare(b.dueDate));
-    const doneCount = weekTasks.filter(t => t.done).length;
-    const pendingCount = weekTasks.length - doneCount;
-    const overdueCount = state.tasks.filter(t => !t.done && t.dueDate < today).length;
-    const prevTaskStats = getWeekTaskStats(prevWeekStart, prevWeekEnd);
-
-    const dueWeekRowHtml = (t) => {
-      const cat = catById[t.category] || CATEGORIES[0];
-      const overdue = !t.done && t.dueDate < today;
-      const dueLabel = overdue ? 'was due ' + fmtDate(t.dueDate) : (t.dueDate === today ? 'due today' : 'due ' + fmtDate(t.dueDate));
-      const meta = cat.label + (t.subcategory ? ' · ' + t.subcategory : '') + ' · ' + dueLabel;
-      return `
-        <div class="task-item due-week-item${t.done ? ' done' : ''}" style="--accent-color:${cat.color}" data-task-id="${t.id}">
-          <button class="task-check">✓</button>
-          <div class="task-body">
-            <div class="task-txt">${escapeHtml(t.text)}</div>
-            <div class="task-meta${overdue ? ' overdue' : ''}">${escapeHtml(meta)}</div>
-          </div>
-        </div>
-      `;
-    };
-    const pendingTasks = weekTasks.filter(t => !t.done);
-    const doneTasks = weekTasks.filter(t => t.done);
-    // Collapsible Pending/Done sections, both starting closed — click the
-    // header to expand. A completed task simply stops showing up in
-    // Pending and appears in Done on the next render.
-    const dueWeekSectionHtml = (id, label, tasks, expanded, emptyText) => `
-      <div class="dash-section-header due-week-toggle" data-toggle="${id}">
-        <span class="dash-header-title"><span class="chev${expanded ? '' : ' collapsed'}">▾</span> ${label} (${tasks.length})</span>
-      </div>
-      ${expanded ? '<div class="task-list" style="margin-bottom:10px">' + (tasks.length ? tasks.map(dueWeekRowHtml).join('') : '<div class="upcoming-empty">' + emptyText + '</div>') + '</div>' : ''}
-    `;
-
-    const dailyGoalsHtml = state.dailyGoals.map(g => {
-      const stats = weekStatsForDailyGoal(g.id, dates);
-      const prevStats = weekStatsForDailyGoal(g.id, prevDates);
-      const streak = computeDailyGoalStreak(g.id);
-      const pct = stats.total ? Math.round((stats.done / stats.total) * 100) : 0;
-      return `
-        <div class="review-health-row">
-          <div class="review-health-top">
-            <span class="review-health-label">${escapeHtml(g.name)}</span>
-            <span class="review-health-stat">${stats.done}/${stats.total} · ${streak}-day streak</span>
-          </div>
-          <div class="progress-bar-outer"><div class="progress-bar-inner" style="width:${pct}%"></div></div>
-          <div class="trend-row">${trendBadge(stats.done, prevStats.done)}</div>
-        </div>
-      `;
-    }).join('');
-
-    const weeklyGoalsHtml = state.weeklyGoals.map(g => {
-      const count = getWeeklyGoalCount(g, weekStart);
-      const prevCount = getWeeklyGoalCount(g, prevWeekStart);
-      const pct = Math.min(100, Math.round((count / g.target) * 100));
-      return `
-        <div class="review-health-row">
-          <div class="review-health-top">
-            <span class="review-health-label">${escapeHtml(g.name)}</span>
-            <span class="review-health-stat">${count}/${g.target}${g.auto ? ' · auto' : ''}</span>
-          </div>
-          <div class="progress-bar-outer"><div class="progress-bar-inner" style="width:${pct}%"></div></div>
-          <div class="trend-row">${trendBadge(count, prevCount)}</div>
-        </div>
-      `;
-    }).join('');
-
-    content.innerHTML = `
-      <div class="modal-handle"></div>
-      <div class="modal-title">Week Review</div>
-      <div class="modal-subtitle">${dates[0].toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${dates[6].toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
-
-      <div class="review-stats-row">
-        <div class="review-stat"><div class="review-stat-num">${weekTasks.length}</div><div class="review-stat-label">Due this week</div></div>
-        <div class="review-stat"><div class="review-stat-num">${doneCount}</div><div class="review-stat-label">Done</div></div>
-        <div class="review-stat"><div class="review-stat-num">${pendingCount}</div><div class="review-stat-label">Pending</div></div>
-        <div class="review-stat"><div class="review-stat-num" style="color:${overdueCount ? '#F2617A' : 'inherit'}">${overdueCount}</div><div class="review-stat-label">Overdue</div></div>
-      </div>
-      <div class="trend-row" style="margin:-10px 0 14px; text-align:center;">Tasks done: ${trendBadge(doneCount, prevTaskStats.done)}</div>
-
-      <div class="upcoming-section-title">Due this week</div>
-      ${dueWeekSectionHtml('pending', 'Pending', pendingTasks, reviewPendingExpanded, 'Nothing pending this week.')}
-      ${dueWeekSectionHtml('done', 'Done', doneTasks, reviewDoneExpanded, 'Nothing done yet this week.')}
-
-      ${state.dailyGoals.length ? '<div class="upcoming-section-title" style="margin-top:16px">Daily habits</div>' + dailyGoalsHtml : ''}
-      ${state.weeklyGoals.length ? '<div class="upcoming-section-title" style="margin-top:16px">Weekly habits</div>' + weeklyGoalsHtml : ''}
-
-      <div class="modal-actions">
-        <button class="cancel" id="reviewClose" style="flex:1">Close</button>
-      </div>
-    `;
-    content.querySelectorAll('.due-week-toggle').forEach(header => {
-      header.onclick = () => {
-        if(header.dataset.toggle === 'pending') reviewPendingExpanded = !reviewPendingExpanded;
-        else reviewDoneExpanded = !reviewDoneExpanded;
-        openWeeklyReviewModal();
-      };
-    });
-    content.querySelectorAll('.due-week-item .task-check').forEach(btn => {
-      btn.onclick = (e) => {
-        e.stopPropagation();
-        const id = btn.closest('.due-week-item').dataset.taskId;
-        const t = state.tasks.find(x => x.id === id);
-        if(!t) return;
-        setTaskDone(t, !t.done);
-        save();
-        renderAll();
-        openWeeklyReviewModal();
-      };
-    });
-    overlay.classList.remove('hidden');
-    document.getElementById('reviewClose').onclick = closeModal;
   }
 
   function autoScheduleTasks(){
@@ -5650,6 +5597,7 @@
   }
 
   const OVERFLOW_SECTIONS = [
+    { id:'tomorrow',  icon:'⏰', label:'Tomorrow' },
     { id:'lists',     icon:'☰', label:'Lists' },
     { id:'longgoals', icon:'✦', label:'Goals' },
     { id:'fitness',   icon:'⚡', label:'Fitness' },
@@ -6218,6 +6166,7 @@
     currentSection = section;
     const isPrimary = PRIMARY_SECTIONS.indexOf(section) !== -1;
     document.getElementById('tabViewport').style.display = isPrimary ? 'block' : 'none';
+    document.getElementById('tomorrowSection').style.display = section === 'tomorrow' ? 'block' : 'none';
     document.getElementById('listsSection').style.display = section === 'lists' ? 'block' : 'none';
     document.getElementById('longGoalsSection').style.display = section === 'longgoals' ? 'block' : 'none';
     document.getElementById('fitnessSection').style.display = section === 'fitness' ? 'block' : 'none';
@@ -6258,6 +6207,7 @@
     renderListView();
     renderTodayView();
     renderHabitsSection();
+    renderTomorrowSection();
     renderListsSection();
     renderLongGoalsSection();
     renderFitnessSection();
@@ -6280,7 +6230,6 @@
     renderAll();
   };
   document.getElementById('calendarBtn').onclick = openCalendarModal;
-  document.getElementById('reviewBtn').onclick = openWeeklyReviewModal;
   document.getElementById('btnToday').onclick = () => switchView('today');
   document.getElementById('btnBlock').onclick = () => switchView('block');
   document.getElementById('btnList').onclick = () => switchView('list');
@@ -6292,6 +6241,7 @@
   document.getElementById('fabBtn').onclick = () => {
     if(currentSection === 'calendar') openAddEventModal(null);
     else if(currentSection === 'tasks') openAddTaskModal(null);
+    else if(currentSection === 'tomorrow') openAddTomorrowBlockModal();
     else if(currentSection === 'lists') openAddListModal();
     else if(currentSection === 'habits') openAddHabitModal();
     else if(currentSection === 'longgoals') openAddLongGoalModal();

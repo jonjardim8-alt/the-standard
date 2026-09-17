@@ -1317,6 +1317,27 @@
   .budget-txn-amt{ font-family: var(--font-mono); font-size: 13.5px; font-weight:600; margin-left:auto; flex:0 0 auto; }
   .budget-txn-amt.expense{ color: #F2617A; }
   .budget-txn-amt.income{ color: #3CBF8C; }
+
+  .tomorrow-block-row{
+    display:flex; align-items:center; gap:10px;
+    padding: 10px 12px;
+    background: var(--card);
+    border-radius: 10px;
+    margin-bottom: 6px;
+    border-left: 3px solid var(--accent);
+  }
+  .tomorrow-block-time{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-soft);
+    flex:0 0 auto;
+    width: 108px;
+  }
+  .tomorrow-block-text{ flex:1; font-size: 14px; color: var(--text); }
+  .tomorrow-block-del{
+    background:none; border:none; color: var(--text-faint);
+    font-size:15px; cursor:pointer; padding:0 2px; flex:0 0 auto;
+  }
   .budget-txn-amt.neutral{ color: #5B8DEF; }
   .budget-txn-del{ background:none; border:none; color:var(--text-faint); font-size:14px; cursor:pointer; flex:0 0 auto; }
   .budget-limit-box{
@@ -1540,7 +1561,7 @@
     color: var(--text);
   }
 
-  main, #calendarSection, #tasksSection, #habitsSection, #listsSection, #longGoalsSection, #dashboardSection, #fitnessSection, #budgetSection, #projectsSection, #journalSection, #scoresSection, #settingsSection, #emailSection{ padding: 16px 18px 0; position:relative; z-index:1; }
+  main, #calendarSection, #tasksSection, #habitsSection, #tomorrowSection, #listsSection, #longGoalsSection, #dashboardSection, #fitnessSection, #budgetSection, #projectsSection, #journalSection, #scoresSection, #settingsSection, #emailSection{ padding: 16px 18px 0; position:relative; z-index:1; }
 
   #tabViewport{
     overflow-x: hidden;
