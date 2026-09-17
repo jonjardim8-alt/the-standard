@@ -1567,7 +1567,7 @@
     color: var(--text);
   }
 
-  main, #calendarSection, #tasksSection, #habitsSection, #tomorrowSection, #listsSection, #longGoalsSection, #dashboardSection, #fitnessSection, #budgetSection, #projectsSection, #journalSection, #scoresSection, #settingsSection, #emailSection{ padding: 16px 18px 0; position:relative; z-index:1; }
+  main, #calendarSection, #tasksSection, #habitsSection, #listsSection, #longGoalsSection, #dashboardSection, #fitnessSection, #budgetSection, #projectsSection, #journalSection, #scoresSection, #settingsSection, #emailSection{ padding: 16px 18px 0; position:relative; z-index:1; }
 
   #tabViewport{
     overflow-x: hidden;

@@ -2201,46 +2201,47 @@
     return toDateStr(d);
   }
 
-  function renderTomorrowSection(){
-    const wrap = document.getElementById('tomorrowContent');
-    wrap.innerHTML = '';
+  // Opened from the header button (same spot Weekly Review used to live),
+  // not a tab — a modal, same pattern as the old Week Review.
+  function openTomorrowModal(){
+    const overlay = document.getElementById('modalOverlay');
+    const content = document.getElementById('modalContent');
+    content.style.removeProperty('--chip-color');
     const dateStr = tomorrowDateStr();
     if(!state.tomorrowPlans[dateStr]) state.tomorrowPlans[dateStr] = [];
-    const blocks = state.tomorrowPlans[dateStr];
+    const blocks = state.tomorrowPlans[dateStr].slice().sort((a,b) => timeToMin(a.startTime) - timeToMin(b.startTime));
 
-    const heading = document.createElement('div');
-    heading.className = 'section-label';
-    heading.style.marginBottom = '14px';
-    heading.textContent = 'Tomorrow — ' + dateFromStr(dateStr).toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' });
-    wrap.appendChild(heading);
+    const listHtml = blocks.length
+      ? blocks.map(b => `
+          <div class="tomorrow-block-row" data-block-id="${b.id}">
+            <div class="tomorrow-block-time">${fmtTime(b.startTime)}${b.endTime ? '–' + fmtTime(b.endTime) : ''}</div>
+            <div class="tomorrow-block-text">${escapeHtml(b.text)}</div>
+            <button class="tomorrow-block-del">×</button>
+          </div>
+        `).join('')
+      : '<div class="empty-note">Nothing planned yet — tap + Add below.</div>';
 
-    if(!blocks.length){
-      const empty = document.createElement('div');
-      empty.className = 'empty-note';
-      empty.textContent = 'Nothing planned yet — tap + to time-block tomorrow.';
-      wrap.appendChild(empty);
-      return;
-    }
-
-    const list = document.createElement('div');
-    list.className = 'task-list';
-    blocks.slice().sort((a,b) => timeToMin(a.startTime) - timeToMin(b.startTime)).forEach(b => {
-      const row = document.createElement('div');
-      row.className = 'tomorrow-block-row';
-      row.innerHTML = `
-        <div class="tomorrow-block-time">${fmtTime(b.startTime)}${b.endTime ? '–' + fmtTime(b.endTime) : ''}</div>
-        <div class="tomorrow-block-text"></div>
-        <button class="tomorrow-block-del">×</button>
-      `;
-      row.querySelector('.tomorrow-block-text').textContent = b.text;
-      row.querySelector('.tomorrow-block-del').onclick = () => {
-        state.tomorrowPlans[dateStr] = state.tomorrowPlans[dateStr].filter(x => x.id !== b.id);
+    content.innerHTML = `
+      <div class="modal-handle"></div>
+      <div class="modal-title">Tomorrow</div>
+      <div class="modal-subtitle">${dateFromStr(dateStr).toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' })}</div>
+      <div class="task-list">${listHtml}</div>
+      <div class="modal-actions">
+        <button class="cancel" id="tomorrowAddBtn" style="flex:1">+ Add</button>
+        <button class="save" id="tomorrowClose" style="flex:1">Done</button>
+      </div>
+    `;
+    overlay.classList.remove('hidden');
+    content.querySelectorAll('.tomorrow-block-del').forEach(btn => {
+      btn.onclick = () => {
+        const id = btn.closest('.tomorrow-block-row').dataset.blockId;
+        state.tomorrowPlans[dateStr] = state.tomorrowPlans[dateStr].filter(x => x.id !== id);
         save();
-        renderTomorrowSection();
+        openTomorrowModal();
       };
-      list.appendChild(row);
     });
-    wrap.appendChild(list);
+    document.getElementById('tomorrowAddBtn').onclick = openAddTomorrowBlockModal;
+    document.getElementById('tomorrowClose').onclick = () => { closeModal(); renderAll(); };
   }
 
   function openAddTomorrowBlockModal(){
@@ -2265,7 +2266,7 @@
       </div>
     `;
     overlay.classList.remove('hidden');
-    document.getElementById('tbCancel').onclick = closeModal;
+    document.getElementById('tbCancel').onclick = openTomorrowModal;
     document.getElementById('tbSave').onclick = () => {
       const text = document.getElementById('tbText').value.trim();
       if(!text) return;
@@ -2274,8 +2275,7 @@
       if(!state.tomorrowPlans[dateStr]) state.tomorrowPlans[dateStr] = [];
       state.tomorrowPlans[dateStr].push({ id: Date.now() + '-' + Math.random().toString(36).slice(2,7), text, startTime, endTime });
       save();
-      closeModal();
-      renderAll();
+      openTomorrowModal();
     };
     setTimeout(() => document.getElementById('tbText').focus(), 50);
   }
@@ -2615,7 +2615,7 @@
     const planTitle = document.createElement('div');
     planTitle.className = 'task-section-title';
     planTitle.innerHTML = "<span>Today's plan</span>";
-    planTitle.onclick = () => switchSection('tomorrow');
+    planTitle.onclick = openTomorrowModal;
     wrap.appendChild(planTitle);
 
     const todaysBlocks = (state.tomorrowPlans[today] || []).slice().sort((a,b) => timeToMin(a.startTime) - timeToMin(b.startTime));
@@ -5633,7 +5633,6 @@
   }
 
   const OVERFLOW_SECTIONS = [
-    { id:'tomorrow',  icon:'⏰', label:'Tomorrow' },
     { id:'lists',     icon:'☰', label:'Lists' },
     { id:'longgoals', icon:'✦', label:'Goals' },
     { id:'fitness',   icon:'⚡', label:'Fitness' },
@@ -6202,7 +6201,6 @@
     currentSection = section;
     const isPrimary = PRIMARY_SECTIONS.indexOf(section) !== -1;
     document.getElementById('tabViewport').style.display = isPrimary ? 'block' : 'none';
-    document.getElementById('tomorrowSection').style.display = section === 'tomorrow' ? 'block' : 'none';
     document.getElementById('listsSection').style.display = section === 'lists' ? 'block' : 'none';
     document.getElementById('longGoalsSection').style.display = section === 'longgoals' ? 'block' : 'none';
     document.getElementById('fitnessSection').style.display = section === 'fitness' ? 'block' : 'none';
@@ -6243,7 +6241,6 @@
     renderListView();
     renderTodayView();
     renderHabitsSection();
-    renderTomorrowSection();
     renderListsSection();
     renderLongGoalsSection();
     renderFitnessSection();
@@ -6266,6 +6263,7 @@
     renderAll();
   };
   document.getElementById('calendarBtn').onclick = openCalendarModal;
+  document.getElementById('tomorrowBtn').onclick = openTomorrowModal;
   document.getElementById('btnToday').onclick = () => switchView('today');
   document.getElementById('btnBlock').onclick = () => switchView('block');
   document.getElementById('btnList').onclick = () => switchView('list');
@@ -6277,7 +6275,6 @@
   document.getElementById('fabBtn').onclick = () => {
     if(currentSection === 'calendar') openAddEventModal(null);
     else if(currentSection === 'tasks') openAddTaskModal(null);
-    else if(currentSection === 'tomorrow') openAddTomorrowBlockModal();
     else if(currentSection === 'lists') openAddListModal();
     else if(currentSection === 'habits') openAddHabitModal();
     else if(currentSection === 'longgoals') openAddLongGoalModal();
