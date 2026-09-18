@@ -1967,20 +1967,45 @@
     save();
   }
 
-  // Consecutive days (walking back from today) a daily goal was checked off.
-  // Today not yet checked doesn't break the streak — the day isn't over.
+  // Consecutive days (walking back from today) a daily goal was checked
+  // off — with one grace day: a single isolated miss doesn't reset the
+  // streak to zero (all-or-nothing streak resets are the top reason habit
+  // trackers get abandoned after one bad day), but two misses in a row
+  // still ends it. The count itself only reflects real completions — a
+  // forgiven miss doesn't inflate it. Today not yet checked doesn't count
+  // as a miss either way — the day isn't over.
   function computeDailyGoalStreak(goalId){
     let streak = 0;
+    let missStreak = 0;
     const habitToday = habitDayStr();
     const cur = dateFromStr(habitToday);
     for(let i = 0; i < 90; i++){
       const ds = toDateStr(cur);
-      if(isDailyGoalDone(goalId, ds)){ streak++; }
-      else if(ds === habitToday){ /* not logged yet today — don't break */ }
-      else { break; }
+      if(isDailyGoalDone(goalId, ds)){
+        streak++;
+        missStreak = 0;
+      } else if(ds === habitToday){
+        /* not logged yet today — don't break, doesn't count as a miss */
+      } else {
+        missStreak++;
+        if(missStreak >= 2) break;
+        /* first miss in a row — forgiven, keep walking back */
+      }
       cur.setDate(cur.getDate() - 1);
     }
     return streak;
+  }
+
+  // Lifetime total, never resets — shown alongside the streak so one bad
+  // day doesn't feel like starting over from nothing.
+  function totalDailyGoalCompletions(goalId){
+    if(goalId === 'journal-habit' || (state.dailyGoals.find(g => g.id === goalId) || {}).auto === 'Journal'){
+      return Object.keys(state.journalEntries).filter(d => {
+        const e = state.journalEntries[d];
+        return e && e.text && e.text.trim();
+      }).length;
+    }
+    return Object.keys(state.dailyGoalLog).filter(k => k.startsWith(goalId + '_') && state.dailyGoalLog[k]).length;
   }
 
   // Fraction of days done within a given week's dates (only counts days up
@@ -2052,11 +2077,14 @@
       state.dailyGoals.forEach(g => {
         const done = isDailyGoalDone(g.id, dateStr);
         const streak = computeDailyGoalStreak(g.id);
+        const total = totalDailyGoalCompletions(g.id);
         const row = document.createElement('div');
         row.className = 'goal-daily-row' + (done ? ' done' : '');
         row.innerHTML = '<button class="goal-check">✓</button><span class="goal-name"></span><span class="goal-streak"></span><button class="goal-del">×</button>';
         row.querySelector('.goal-name').textContent = g.name;
-        row.querySelector('.goal-streak').textContent = streak ? streak + '🔥' : '';
+        // Streak (with one grace day built in) plus a lifetime total that
+        // never resets, so one missed day never reads as "back to zero."
+        row.querySelector('.goal-streak').textContent = total ? (streak ? streak + '🔥 ' : '') + total + '✓' : '';
         row.querySelector('.goal-check').onclick = () => {
           if(g.auto === 'Journal'){ switchSection('journal'); return; }
           toggleDailyGoal(g.id, dateStr);
@@ -3977,10 +4005,11 @@
     const journalHabit = state.dailyGoals.find(g => g.auto === 'Journal');
     if(journalHabit){
       const streak = computeDailyGoalStreak(journalHabit.id);
-      if(streak){
+      const total = totalDailyGoalCompletions(journalHabit.id);
+      if(total){
         const streakLine = document.createElement('div');
         streakLine.className = 'fit-week-label';
-        streakLine.textContent = streak + '-day streak 🔥';
+        streakLine.textContent = (streak ? streak + '-day streak 🔥 · ' : '') + total + ' entries total';
         wrap.appendChild(streakLine);
       }
     }
