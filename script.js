@@ -1695,6 +1695,7 @@
           if(!parsed.blockedSenders) parsed.blockedSenders = [];
           if(!parsed.birthdays) parsed.birthdays = [];
           if(!parsed.tomorrowPlans) parsed.tomorrowPlans = {};
+          if(!parsed.recurringTransactions) parsed.recurringTransactions = [];
           return parsed;
         }
       }
@@ -1711,7 +1712,8 @@
       scoreOptIn: { budget: false },
       blockedSenders: [],
       birthdays: [],
-      tomorrowPlans: {}
+      tomorrowPlans: {},
+      recurringTransactions: []
     };
   }
   function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
@@ -3348,7 +3350,123 @@
     });
   }
 
+  /* ---------------- Recurring transactions ----------------
+     A template (description/amount/category/day-of-month) that
+     auto-generates one real transaction per month, tagged with
+     recurringId so it's never duplicated if generated again — lets
+     genuinely recurring bills (rent, subscriptions) get entered once
+     instead of re-typed every month. */
+  let budgetRecurringExpanded = false; // starts closed — setup, not daily-use
+
+  function daysInMonth(monthKey){
+    const [y, m] = monthKey.split('-').map(Number);
+    return new Date(y, m, 0).getDate();
+  }
+
+  function generateRecurringTransactionsForCurrentMonth(){
+    if(!state.recurringTransactions.length) return;
+    const monthKey = budgetMonthKey(new Date());
+    let added = false;
+    state.recurringTransactions.filter(r => r.active).forEach(r => {
+      const already = state.budgetTransactions.some(t => t.recurringId === r.id && t.date.startsWith(monthKey));
+      if(already) return;
+      const day = Math.min(r.dayOfMonth, daysInMonth(monthKey));
+      state.budgetTransactions.push({
+        id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
+        date: monthKey + '-' + pad2(day),
+        description: r.description, amount: r.amount, category: r.category,
+        recurringId: r.id
+      });
+      added = true;
+    });
+    if(added) save();
+  }
+
+  function renderRecurringSection(wrap){
+    const header = document.createElement('div');
+    header.className = 'dash-section-header';
+    header.style.marginTop = '14px';
+    header.innerHTML = `<span class="dash-header-title"><span class="chev${budgetRecurringExpanded ? '' : ' collapsed'}">▾</span> Recurring (${state.recurringTransactions.length})</span>`;
+    header.querySelector('.dash-header-title').onclick = () => {
+      budgetRecurringExpanded = !budgetRecurringExpanded;
+      renderBudgetSection();
+    };
+    wrap.appendChild(header);
+    if(!budgetRecurringExpanded) return;
+
+    const note = document.createElement('div');
+    note.className = 'settings-row-sub';
+    note.style.margin = '0 0 10px';
+    note.textContent = 'Auto-adds one transaction each month on the day you pick — turn one off instead of deleting it to pause without losing the setup.';
+    wrap.appendChild(note);
+
+    if(state.recurringTransactions.length){
+      const list = document.createElement('div');
+      list.className = 'task-list';
+      list.style.marginBottom = '10px';
+      state.recurringTransactions.forEach(r => {
+        const cat = budgetCatById[r.category];
+        const row = document.createElement('div');
+        row.className = 'budget-txn-row';
+        row.style.setProperty('--accent-color', BUDGET_TYPE_COLORS[cat?.type || 'expense']);
+        row.innerHTML = `
+          <div style="flex:1">
+            <div class="budget-txn-desc">${escapeHtml(r.description)}</div>
+            <div class="budget-txn-meta">Day ${r.dayOfMonth} · ${escapeHtml(cat?.label || r.category)}</div>
+          </div>
+          <div class="budget-txn-amt ${cat?.type || 'expense'}">$${r.amount.toFixed(2)}</div>
+          <button class="toggle-switch${r.active ? ' on' : ''}" style="margin-left:8px"></button>
+          <button class="budget-txn-del">×</button>
+        `;
+        row.querySelector('.toggle-switch').onclick = () => {
+          r.active = !r.active;
+          save();
+          renderBudgetSection();
+        };
+        row.querySelector('.budget-txn-del').onclick = () => {
+          state.recurringTransactions = state.recurringTransactions.filter(x => x.id !== r.id);
+          save();
+          renderBudgetSection();
+        };
+        list.appendChild(row);
+      });
+      wrap.appendChild(list);
+    }
+
+    const catOptionsHtml = ['expense','neutral','income'].map(type => {
+      const opts = BUDGET_CATEGORIES.filter(c => c.type === type)
+        .map(c => '<option value="' + c.id + '">' + escapeHtml(c.label) + '</option>').join('');
+      const groupLabel = type === 'expense' ? 'Expense' : type === 'neutral' ? 'Savings / Transfer' : 'Income';
+      return '<optgroup label="' + groupLabel + '">' + opts + '</optgroup>';
+    }).join('');
+
+    const addRow = document.createElement('div');
+    addRow.className = 'blocklist-add-row';
+    addRow.style.flexWrap = 'wrap';
+    addRow.innerHTML = `
+      <input type="text" id="recDesc" placeholder="e.g. Rent" style="flex:1 1 100%">
+      <input type="number" id="recAmount" min="0" step="0.01" placeholder="0.00" style="width:80px">
+      ${customSelectHtml('recCategory', catOptionsHtml, 'misc', 'Category')}
+      <input type="number" id="recDay" min="1" max="31" placeholder="Day" style="width:56px">
+      <button id="recAdd">Add</button>
+    `;
+    wrap.appendChild(addRow);
+    wireCustomSelect('recCategory', catOptionsHtml, 'Category');
+    addRow.querySelector('#recAdd').onclick = () => {
+      const description = document.getElementById('recDesc').value.trim();
+      const amount = Math.max(0, parseFloat(document.getElementById('recAmount').value) || 0);
+      const category = document.getElementById('recCategory').value;
+      const dayOfMonth = Math.max(1, Math.min(31, parseInt(document.getElementById('recDay').value, 10) || 0));
+      if(!description || !amount || !dayOfMonth) return;
+      state.recurringTransactions.push({ id: Date.now() + '-' + Math.random().toString(36).slice(2,7), description, amount, category, dayOfMonth, active: true });
+      generateRecurringTransactionsForCurrentMonth();
+      save();
+      renderBudgetSection();
+    };
+  }
+
   function renderBudgetSection(){
+    generateRecurringTransactionsForCurrentMonth();
     const wrap = document.getElementById('budgetContent');
     wrap.innerHTML = '';
 
@@ -3391,6 +3509,7 @@
       const monthTxns = state.budgetTransactions.filter(t => t.date.startsWith(budgetSelectedMonth));
       renderBudgetStatsAndCategories(wrap, monthTxns, true);
       renderCategoryBudgetsBar(wrap, monthTxns);
+      renderRecurringSection(wrap);
 
       const txnTitle = document.createElement('div');
       txnTitle.className = 'task-section-title';
