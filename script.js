@@ -1624,7 +1624,7 @@
   let menuOpenForCat = null;
   let taskSubView = 'today'; // 'today' | 'upcoming'
   let expandedGroups = new Set(); // tracks which groups are open — everything starts closed
-  let needsAttentionExpanded = false; // Dashboard's Needs Attention section — starts closed
+  let todayTimelineExpanded = true; // Dashboard's unified Today section — starts open
   let calendarViewMonth = null;
 
   function startOfWeek(d){
@@ -2692,83 +2692,98 @@
       wrap.appendChild(planList);
     }
 
-    // Next up
-    const nextTitle = document.createElement('div');
-    nextTitle.className = 'task-section-title';
-    nextTitle.style.cursor = 'default';
-    nextTitle.innerHTML = '<span>Next up</span>';
-    wrap.appendChild(nextTitle);
-
-    const next = findNextEvent();
-    if(next){
-      const cat = catById[next.event.category] || CATEGORIES[0];
-      const dayLabel = next.dayIndex === 0 ? 'Today' : next.dayIndex === 1 ? 'Tomorrow' : fmtDate(next.dateStr);
-      const card = document.createElement('div');
-      card.className = 'dash-next-card';
-      card.style.setProperty('--accent-color', cat.color);
-      card.innerHTML = `
-        <div class="dash-next-time">${fmtTime(next.event.time)}${next.event.endTime ? '–' + fmtTime(next.event.endTime) : ''}</div>
-        <div class="dash-next-text">${escapeHtml(next.event.text)}</div>
-        <div class="dash-next-meta">${escapeHtml(dayLabel)} · ${cat.label}</div>
-      `;
-      wrap.appendChild(card);
-    } else {
-      const empty = document.createElement('div');
-      empty.className = 'empty-note';
-      empty.textContent = 'Nothing on the calendar in the next two weeks.';
-      wrap.appendChild(empty);
-    }
-
-    // Upcoming — everything pending due within the next 7 days (including
-    // anything already overdue), checkable right here. Covers today's tasks
-    // too, so a separate "Due today" section would just duplicate this.
-    const weekOut = new Date(); weekOut.setDate(weekOut.getDate() + 7);
-    const weekOutStr = toDateStr(weekOut);
-    const attnTasks = state.tasks.filter(t => !t.done && t.dueDate <= weekOutStr)
-      .sort((a,b) => a.dueDate.localeCompare(b.dueDate));
-
-    const attnHeader = document.createElement('div');
-    attnHeader.className = 'dash-section-header';
-    attnHeader.innerHTML = `
-      <span class="dash-header-title"><span class="chev${needsAttentionExpanded ? '' : ' collapsed'}">▾</span> Upcoming (${attnTasks.length})</span>
-      <span class="dash-header-arrow" id="attnGoTasks">Tasks →</span>
-    `;
-    attnHeader.querySelector('.dash-header-title').onclick = () => {
-      needsAttentionExpanded = !needsAttentionExpanded;
+    // Today — a true unified view: habits, tasks due today, and today's
+    // calendar events (fixed blocks + recurring + one-off) woven into one
+    // list instead of separate side-by-side widgets. Falls back to
+    // findNextEvent() only when today itself is completely empty, so
+    // there's still some forward visibility rather than a dead end.
+    const todayHeader = document.createElement('div');
+    todayHeader.className = 'dash-section-header';
+    todayHeader.innerHTML = `<span class="dash-header-title"><span class="chev${todayTimelineExpanded ? '' : ' collapsed'}">▾</span> Today</span>`;
+    todayHeader.querySelector('.dash-header-title').onclick = () => {
+      todayTimelineExpanded = !todayTimelineExpanded;
       renderDashboardSection();
     };
-    attnHeader.querySelector('#attnGoTasks').onclick = (e) => {
-      e.stopPropagation();
-      taskSubView = 'upcoming';
-      switchSection('tasks');
-    };
-    wrap.appendChild(attnHeader);
+    wrap.appendChild(todayHeader);
 
-    if(needsAttentionExpanded){
-    if(!attnTasks.length){
-      const empty = document.createElement('div');
-      empty.className = 'empty-note';
-      empty.textContent = 'Nothing due in the next 7 days.';
-      wrap.appendChild(empty);
-    } else {
-      const list = document.createElement('div');
-      list.className = 'task-list';
-      attnTasks.forEach(t => {
-        const cat = catById[t.category] || CATEGORIES[0];
-        const overdue = t.dueDate < today;
-        const row = document.createElement('div');
-        row.className = 'task-item';
-        row.style.setProperty('--accent-color', cat.color);
-        row.innerHTML = '<button class="task-check">✓</button><div class="task-body"><div class="task-txt"></div><div class="task-meta"></div></div>';
-        row.querySelector('.task-txt').textContent = t.text;
-        const meta = row.querySelector('.task-meta');
-        meta.textContent = cat.label + (t.subcategory ? ' · ' + t.subcategory : '') + ' · ' + (overdue ? 'was due ' + fmtDate(t.dueDate) : (t.dueDate === today ? 'due today' : 'due ' + fmtDate(t.dueDate)));
-        if(overdue) meta.classList.add('overdue');
-        row.querySelector('.task-check').onclick = () => { setTaskDone(t, true); save(); renderAll(); };
-        list.appendChild(row);
+    if(todayTimelineExpanded){
+      const habitDate = habitDayStr();
+      const todayDayAbbr = DAYS[new Date().getDay()];
+      const tasksToday = state.tasks.filter(t => !t.done && t.dueDate === today);
+
+      const eventsToday = [];
+      blocksForDate(todayDayAbbr, today).forEach(b => {
+        if(!state.workOff[b.id + '_' + today]) eventsToday.push({ time:b.start, endTime:b.end, text:b.label, category:b.category });
       });
-      wrap.appendChild(list);
-    }
+      (state.items[todayDayAbbr] || []).forEach(it => eventsToday.push(it));
+      (state.datedEvents[today] || []).forEach(it => eventsToday.push(it));
+      eventsToday.sort((a,b) => timeToMin(a.time) - timeToMin(b.time));
+
+      const hasAnything = state.dailyGoals.length || tasksToday.length || eventsToday.length;
+      if(!hasAnything){
+        const next = findNextEvent();
+        if(next){
+          const cat = catById[next.event.category] || CATEGORIES[0];
+          const dayLabel = next.dayIndex === 1 ? 'Tomorrow' : fmtDate(next.dateStr);
+          const card = document.createElement('div');
+          card.className = 'dash-next-card';
+          card.style.setProperty('--accent-color', cat.color);
+          card.innerHTML = `
+            <div class="dash-next-time">${fmtTime(next.event.time)}${next.event.endTime ? '–' + fmtTime(next.event.endTime) : ''}</div>
+            <div class="dash-next-text">${escapeHtml(next.event.text)}</div>
+            <div class="dash-next-meta">Nothing today · next up ${escapeHtml(dayLabel)} · ${cat.label}</div>
+          `;
+          wrap.appendChild(card);
+        } else {
+          const empty = document.createElement('div');
+          empty.className = 'empty-note';
+          empty.textContent = 'Nothing on your plate today.';
+          wrap.appendChild(empty);
+        }
+      } else {
+        const list = document.createElement('div');
+        list.className = 'task-list';
+
+        state.dailyGoals.forEach(g => {
+          const done = isDailyGoalDone(g.id, habitDate);
+          const row = document.createElement('div');
+          row.className = 'task-item' + (done ? ' done' : '');
+          row.style.setProperty('--accent-color', '#3CBF8C');
+          row.innerHTML = '<button class="task-check">✓</button><div class="task-body"><div class="task-txt"></div><div class="task-meta">Habit</div></div>';
+          row.querySelector('.task-txt').textContent = g.name;
+          row.querySelector('.task-check').onclick = () => {
+            if(g.auto === 'Journal'){ switchSection('journal'); return; }
+            toggleDailyGoal(g.id, habitDate);
+            renderAll();
+          };
+          list.appendChild(row);
+        });
+
+        tasksToday.forEach(t => {
+          const cat = catById[t.category] || CATEGORIES[0];
+          const row = document.createElement('div');
+          row.className = 'task-item';
+          row.style.setProperty('--accent-color', cat.color);
+          row.innerHTML = '<button class="task-check">✓</button><div class="task-body"><div class="task-txt"></div><div class="task-meta"></div></div>';
+          row.querySelector('.task-txt').textContent = t.text;
+          row.querySelector('.task-meta').textContent = cat.label + (t.subcategory ? ' · ' + t.subcategory : '') + ' · due today';
+          row.querySelector('.task-check').onclick = () => { setTaskDone(t, true); save(); renderAll(); };
+          list.appendChild(row);
+        });
+
+        eventsToday.forEach(it => {
+          const cat = catById[it.category] || CATEGORIES[0];
+          const row = document.createElement('div');
+          row.className = 'task-item';
+          row.style.setProperty('--accent-color', cat.color);
+          row.innerHTML = '<div class="task-body"><div class="task-txt"></div><div class="task-meta"></div></div>';
+          row.querySelector('.task-txt').textContent = it.text;
+          row.querySelector('.task-meta').textContent = fmtTime(it.time) + (it.endTime ? '–' + fmtTime(it.endTime) : '') + ' · ' + cat.label;
+          list.appendChild(row);
+        });
+
+        wrap.appendChild(list);
+      }
     }
 
     // Quick-nav grid — glanceable stats for everything else, tap to jump in
