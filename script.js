@@ -1996,8 +1996,9 @@
     return streak;
   }
 
-  // Lifetime total, never resets — shown alongside the streak so one bad
-  // day doesn't feel like starting over from nothing.
+  // Lifetime total, never resets. Tracked for later but not shown in the
+  // UI right now — dailyGoalCompletionsThisMonth() below is what's
+  // actually displayed alongside the streak.
   function totalDailyGoalCompletions(goalId){
     if(goalId === 'journal-habit' || (state.dailyGoals.find(g => g.id === goalId) || {}).auto === 'Journal'){
       return Object.keys(state.journalEntries).filter(d => {
@@ -2006,6 +2007,23 @@
       }).length;
     }
     return Object.keys(state.dailyGoalLog).filter(k => k.startsWith(goalId + '_') && state.dailyGoalLog[k]).length;
+  }
+
+  // Completions in the current calendar month — this is the number shown
+  // alongside the streak, so one bad day never reads as "back to zero"
+  // but the number still resets to a fresh, achievable count each month.
+  function dailyGoalCompletionsThisMonth(goalId){
+    const monthKey = todayStr().slice(0, 7);
+    if(goalId === 'journal-habit' || (state.dailyGoals.find(g => g.id === goalId) || {}).auto === 'Journal'){
+      return Object.keys(state.journalEntries).filter(d => {
+        const e = state.journalEntries[d];
+        return d.startsWith(monthKey) && e && e.text && e.text.trim();
+      }).length;
+    }
+    return Object.keys(state.dailyGoalLog).filter(k => {
+      if(!k.startsWith(goalId + '_') || !state.dailyGoalLog[k]) return false;
+      return k.slice(goalId.length + 1).startsWith(monthKey);
+    }).length;
   }
 
   // Fraction of days done within a given week's dates (only counts days up
@@ -2077,14 +2095,14 @@
       state.dailyGoals.forEach(g => {
         const done = isDailyGoalDone(g.id, dateStr);
         const streak = computeDailyGoalStreak(g.id);
-        const total = totalDailyGoalCompletions(g.id);
+        const monthTotal = dailyGoalCompletionsThisMonth(g.id);
         const row = document.createElement('div');
         row.className = 'goal-daily-row' + (done ? ' done' : '');
         row.innerHTML = '<button class="goal-check">✓</button><span class="goal-name"></span><span class="goal-streak"></span><button class="goal-del">×</button>';
         row.querySelector('.goal-name').textContent = g.name;
-        // Streak (with one grace day built in) plus a lifetime total that
-        // never resets, so one missed day never reads as "back to zero."
-        row.querySelector('.goal-streak').textContent = total ? (streak ? streak + '🔥 ' : '') + total + '✓' : '';
+        // Streak (with one grace day built in) plus this month's count, so
+        // one missed day never reads as "back to zero."
+        row.querySelector('.goal-streak').textContent = monthTotal ? (streak ? streak + '🔥 ' : '') + monthTotal + '✓' : '';
         row.querySelector('.goal-check').onclick = () => {
           if(g.auto === 'Journal'){ switchSection('journal'); return; }
           toggleDailyGoal(g.id, dateStr);
@@ -4005,11 +4023,11 @@
     const journalHabit = state.dailyGoals.find(g => g.auto === 'Journal');
     if(journalHabit){
       const streak = computeDailyGoalStreak(journalHabit.id);
-      const total = totalDailyGoalCompletions(journalHabit.id);
-      if(total){
+      const monthTotal = dailyGoalCompletionsThisMonth(journalHabit.id);
+      if(monthTotal){
         const streakLine = document.createElement('div');
         streakLine.className = 'fit-week-label';
-        streakLine.textContent = (streak ? streak + '-day streak 🔥 · ' : '') + total + ' entries total';
+        streakLine.textContent = (streak ? streak + '-day streak 🔥 · ' : '') + monthTotal + ' entries this month';
         wrap.appendChild(streakLine);
       }
     }
