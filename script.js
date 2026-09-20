@@ -2358,9 +2358,25 @@
     { action:'add_task',           re:/^(?:add (?:a )?task|task|todo|to-do)\s*:?\s*/i },
   ];
 
+  // Goals need a captured timeframe (daily/weekly/monthly/quarterly/
+  // yearly, or custom when a date is mentioned), so this is checked ahead
+  // of the fixed-action GOLDIE_LEAD_PATTERNS loop rather than living in it.
+  function goldieParseGoal(text){
+    const m = text.match(/^(?:(daily|weekly|monthly|quarterly|yearly)\s+goal|goal)\s*:?\s*/i);
+    if(!m) return null;
+    const remainder = text.replace(m[0], '').trim();
+    if(!remainder) return { action:'unknown', reason:"That's just the keyword — add a goal name after it." };
+    const { dueDate, cleaned } = goldieParseDate(remainder);
+    if(dueDate) return { action:'add_goal', name: cleaned || remainder, timeframe:'custom', targetDate: dueDate };
+    return { action:'add_goal', name: remainder, timeframe: (m[1] || 'monthly').toLowerCase(), targetDate: null };
+  }
+
   function parseGoldieCommand(raw){
     const text = (raw || '').trim();
     if(!text) return { action:'unknown', reason:'Type something first.' };
+
+    const goal = goldieParseGoal(text);
+    if(goal) return goal;
 
     let action = 'add_task'; // no recognized prefix -> assume a plain task
     let remainder = text;
@@ -2429,6 +2445,16 @@
       save();
       return { ok:true, message:'Added to tomorrow: ' + text + ' at ' + fmtTime(action.startTime) };
     }
+    if(action.action === 'add_goal'){
+      const name = (action.name || '').toString().trim();
+      if(!name) return { ok:false, message:'No goal name there.' };
+      const validTf = ['daily','weekly','monthly','quarterly','yearly','custom'];
+      const timeframe = validTf.includes(action.timeframe) ? action.timeframe : 'monthly';
+      const targetDate = timeframe === 'custom' ? action.targetDate : null;
+      state.longTermGoals.push({ id:newId(), name, timeframe, targetDate, weeklyNotes:{}, dailyNotes:{} });
+      save();
+      return { ok:true, message:'Added ' + timeframe + ' goal: ' + name };
+    }
     return { ok:false, message:"Didn't recognize that." };
   }
 
@@ -2443,7 +2469,7 @@
       <div class="modal-subtitle">Free local quick-add — start with a keyword, no AI needed</div>
       <input type="text" id="gdText" placeholder="e.g. task: call dentist tomorrow">
       <div class="proj-desc" style="margin-top:8px">
-        Try: <b>task:</b> call dentist tomorrow · <b>habit:</b> drink water · <b>weekly habit:</b> gym 3x · <b>tomorrow:</b> workout at 6pm
+        Try: <b>task:</b> call dentist tomorrow · <b>habit:</b> drink water · <b>weekly habit:</b> gym 3x · <b>goal:</b> read 12 books · <b>tomorrow:</b> workout at 6pm
       </div>
       <div class="empty-note" id="gdStatus" style="display:none"></div>
       <div class="modal-actions">
