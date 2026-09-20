@@ -2071,6 +2071,59 @@
   // week/day navigation — it always reflects the real "today" and the real
   // current week, so it reads the same regardless of what you're browsing
   // to in Calendar.
+  // Shared by the Habits tab and the Goals tab's Active view — same
+  // underlying state.dailyGoals list, so editing/checking off from either
+  // place affects the other.
+  function buildDailyGoalRow(g, dateStr){
+    const done = isDailyGoalDone(g.id, dateStr);
+    const streak = computeDailyGoalStreak(g.id);
+    const monthTotal = dailyGoalCompletionsThisMonth(g.id);
+    const row = document.createElement('div');
+    row.className = 'goal-daily-row' + (done ? ' done' : '');
+    row.innerHTML = '<button class="goal-check">✓</button><span class="goal-name"></span><span class="goal-streak"></span><button class="goal-del">×</button>';
+    row.querySelector('.goal-name').textContent = g.name;
+    // Streak (with one grace day built in) plus this month's count, so
+    // one missed day never reads as "back to zero."
+    row.querySelector('.goal-streak').textContent = monthTotal ? (streak ? streak + '🔥 ' : '') + monthTotal + '✓' : '';
+    row.querySelector('.goal-check').onclick = () => {
+      if(g.auto === 'Journal'){ switchSection('journal'); return; }
+      toggleDailyGoal(g.id, dateStr);
+      renderAll();
+    };
+    row.querySelector('.goal-del').onclick = () => {
+      state.dailyGoals = state.dailyGoals.filter(x => x.id !== g.id);
+      save();
+      renderAll();
+    };
+    return row;
+  }
+
+  function buildWeeklyGoalRow(g, weekStart){
+    const count = getWeeklyGoalCount(g, weekStart);
+    const pct = Math.min(100, Math.round((count / g.target) * 100));
+    const row = document.createElement('div');
+    row.className = 'goal-weekly-row';
+    row.innerHTML = `
+      <div class="goal-weekly-top">
+        <span class="goal-name">${escapeHtml(g.name)}</span>
+        <span class="goal-weekly-count">${count}/${g.target}${g.auto ? ' · auto' : ''}</span>
+        <button class="goal-del">×</button>
+      </div>
+      <div class="progress-bar-outer"><div class="progress-bar-inner" style="width:${pct}%"></div></div>
+      ${g.auto ? '' : '<div class="goal-weekly-btns"><button class="goal-adj minus">−</button><button class="goal-adj plus">+</button></div>'}
+    `;
+    if(!g.auto){
+      row.querySelector('.minus').onclick = () => { adjustWeeklyGoal(g, -1); renderAll(); };
+      row.querySelector('.plus').onclick = () => { adjustWeeklyGoal(g, 1); renderAll(); };
+    }
+    row.querySelector('.goal-del').onclick = () => {
+      state.weeklyGoals = state.weeklyGoals.filter(x => x.id !== g.id);
+      save();
+      renderAll();
+    };
+    return row;
+  }
+
   function renderHabitsSection(){
     const wrap = document.getElementById('habitsContent');
     wrap.innerHTML = '';
@@ -2094,29 +2147,7 @@
 
       const goalsBox = document.createElement('div');
       goalsBox.className = 'goals-box';
-      state.dailyGoals.forEach(g => {
-        const done = isDailyGoalDone(g.id, dateStr);
-        const streak = computeDailyGoalStreak(g.id);
-        const monthTotal = dailyGoalCompletionsThisMonth(g.id);
-        const row = document.createElement('div');
-        row.className = 'goal-daily-row' + (done ? ' done' : '');
-        row.innerHTML = '<button class="goal-check">✓</button><span class="goal-name"></span><span class="goal-streak"></span><button class="goal-del">×</button>';
-        row.querySelector('.goal-name').textContent = g.name;
-        // Streak (with one grace day built in) plus this month's count, so
-        // one missed day never reads as "back to zero."
-        row.querySelector('.goal-streak').textContent = monthTotal ? (streak ? streak + '🔥 ' : '') + monthTotal + '✓' : '';
-        row.querySelector('.goal-check').onclick = () => {
-          if(g.auto === 'Journal'){ switchSection('journal'); return; }
-          toggleDailyGoal(g.id, dateStr);
-          renderAll();
-        };
-        row.querySelector('.goal-del').onclick = () => {
-          state.dailyGoals = state.dailyGoals.filter(x => x.id !== g.id);
-          save();
-          renderAll();
-        };
-        goalsBox.appendChild(row);
-      });
+      state.dailyGoals.forEach(g => goalsBox.appendChild(buildDailyGoalRow(g, dateStr)));
       wrap.appendChild(goalsBox);
     }
 
@@ -2130,31 +2161,7 @@
 
       const goalsBox = document.createElement('div');
       goalsBox.className = 'goals-box';
-      state.weeklyGoals.forEach(g => {
-        const count = getWeeklyGoalCount(g, weekStart);
-        const pct = Math.min(100, Math.round((count / g.target) * 100));
-        const row = document.createElement('div');
-        row.className = 'goal-weekly-row';
-        row.innerHTML = `
-          <div class="goal-weekly-top">
-            <span class="goal-name">${escapeHtml(g.name)}</span>
-            <span class="goal-weekly-count">${count}/${g.target}${g.auto ? ' · auto' : ''}</span>
-            <button class="goal-del">×</button>
-          </div>
-          <div class="progress-bar-outer"><div class="progress-bar-inner" style="width:${pct}%"></div></div>
-          ${g.auto ? '' : '<div class="goal-weekly-btns"><button class="goal-adj minus">−</button><button class="goal-adj plus">+</button></div>'}
-        `;
-        if(!g.auto){
-          row.querySelector('.minus').onclick = () => { adjustWeeklyGoal(g, -1); renderAll(); };
-          row.querySelector('.plus').onclick = () => { adjustWeeklyGoal(g, 1); renderAll(); };
-        }
-        row.querySelector('.goal-del').onclick = () => {
-          state.weeklyGoals = state.weeklyGoals.filter(x => x.id !== g.id);
-          save();
-          renderAll();
-        };
-        goalsBox.appendChild(row);
-      });
+      state.weeklyGoals.forEach(g => goalsBox.appendChild(buildWeeklyGoalRow(g, weekStart)));
       wrap.appendChild(goalsBox);
     }
   }
@@ -2495,6 +2502,11 @@
     { id:'custom',    label:'Custom Date' },
   ];
 
+  // 'active' = curated Daily/Weekly/Monthly/Yearly split (Daily & Weekly
+  // pulled from the Habits-style dailyGoals/weeklyGoals); 'all' = every
+  // long-term goal grouped by its own timeframe, as before.
+  let goalsViewMode = 'active';
+
   // Has the person written anything in ANY long-term goal's weekly
   // reflection box this week? Feeds the auto-tracked "Weekly Goal
   // Reflection" habit.
@@ -2505,11 +2517,96 @@
     });
   }
 
-  function renderLongGoalsSection(){
-    const wrap = document.getElementById('longGoalsContent');
-    wrap.innerHTML = '';
-    const weekStart = realCurrentWeekStart();
+  // One long-term-goal card (Monthly/Quarterly/Yearly/Custom) with its
+  // weekly-progress textarea — shared by the Active and All views.
+  function buildLongGoalCard(g, tf, weekStart){
+    const card = document.createElement('div');
+    card.className = 'lg-card';
+    const dateLine = (tf === 'custom' && g.targetDate) ? '<div class="proj-desc">Due ' + fmtDate(g.targetDate) + '</div>' : '';
+    card.innerHTML = `
+      <div class="lg-card-top">
+        <div>
+          <div class="lg-card-name">${escapeHtml(g.name)}</div>
+          ${dateLine}
+        </div>
+        <button class="lg-card-del">×</button>
+      </div>
+      <label>This week's progress</label>
+      <textarea placeholder="What did you do this week toward this goal?" rows="2"></textarea>
+      <div class="lg-saved-tag">Saved</div>
+    `;
+    const textarea = card.querySelector('textarea');
+    textarea.value = (g.weeklyNotes && g.weeklyNotes[weekStart]) || '';
+    const savedTag = card.querySelector('.lg-saved-tag');
+    textarea.addEventListener('blur', () => {
+      if(!g.weeklyNotes) g.weeklyNotes = {};
+      g.weeklyNotes[weekStart] = textarea.value.trim();
+      save();
+      savedTag.classList.add('show');
+      setTimeout(() => savedTag.classList.remove('show'), 1500);
+      renderHabitsSection(); // the auto-tracked reflection habit may have just changed
+    });
+    card.querySelector('.lg-card-del').onclick = () => {
+      state.longTermGoals = state.longTermGoals.filter(x => x.id !== g.id);
+      save();
+      renderAll();
+    };
+    return card;
+  }
 
+  // Curated view: Daily/Weekly (from the Habits-style dailyGoals/
+  // weeklyGoals) plus Monthly/Yearly long-term goals, each in its own
+  // section — every goal at every horizon shown, none singled out.
+  function renderActiveGoalsView(wrap, weekStart){
+    const dateStr = habitDayStr();
+    const monthlyGoals = state.longTermGoals.filter(g => g.timeframe === 'monthly');
+    const yearlyGoals = state.longTermGoals.filter(g => g.timeframe === 'yearly');
+
+    if(!state.dailyGoals.length && !state.weeklyGoals.length && !monthlyGoals.length && !yearlyGoals.length){
+      const empty = document.createElement('div');
+      empty.className = 'empty-note';
+      empty.textContent = 'Nothing active yet — add a habit from the Habits tab, or tap + here for a monthly or yearly goal.';
+      wrap.appendChild(empty);
+      return;
+    }
+
+    const addSection = (label, buildRows) => {
+      const title = document.createElement('div');
+      title.className = 'lg-timeframe-title';
+      title.textContent = label;
+      wrap.appendChild(title);
+      const box = document.createElement('div');
+      buildRows(box);
+      wrap.appendChild(box);
+    };
+
+    if(state.dailyGoals.length){
+      addSection('Daily', box => {
+        box.className = 'goals-box';
+        state.dailyGoals.forEach(g => box.appendChild(buildDailyGoalRow(g, dateStr)));
+      });
+    }
+    if(state.weeklyGoals.length){
+      addSection('Weekly', box => {
+        box.className = 'goals-box';
+        state.weeklyGoals.forEach(g => box.appendChild(buildWeeklyGoalRow(g, weekStart)));
+      });
+    }
+    if(monthlyGoals.length){
+      addSection('Monthly', box => {
+        monthlyGoals.forEach(g => box.appendChild(buildLongGoalCard(g, 'monthly', weekStart)));
+      });
+    }
+    if(yearlyGoals.length){
+      addSection('Yearly', box => {
+        yearlyGoals.forEach(g => box.appendChild(buildLongGoalCard(g, 'yearly', weekStart)));
+      });
+    }
+  }
+
+  // Everything in state.longTermGoals, grouped by its own timeframe
+  // (Monthly/Quarterly/Yearly/Custom) — the original, uncurated list.
+  function renderAllGoalsView(wrap, weekStart){
     if(!state.longTermGoals.length){
       const empty = document.createElement('div');
       empty.className = 'empty-note';
@@ -2527,41 +2624,28 @@
       title.textContent = tf.label;
       wrap.appendChild(title);
 
-      goals.forEach(g => {
-        const card = document.createElement('div');
-        card.className = 'lg-card';
-        const dateLine = (tf.id === 'custom' && g.targetDate) ? '<div class="proj-desc">Due ' + fmtDate(g.targetDate) + '</div>' : '';
-        card.innerHTML = `
-          <div class="lg-card-top">
-            <div>
-              <div class="lg-card-name">${escapeHtml(g.name)}</div>
-              ${dateLine}
-            </div>
-            <button class="lg-card-del">×</button>
-          </div>
-          <label>This week's progress</label>
-          <textarea placeholder="What did you do this week toward this goal?" rows="2"></textarea>
-          <div class="lg-saved-tag">Saved</div>
-        `;
-        const textarea = card.querySelector('textarea');
-        textarea.value = (g.weeklyNotes && g.weeklyNotes[weekStart]) || '';
-        const savedTag = card.querySelector('.lg-saved-tag');
-        textarea.addEventListener('blur', () => {
-          if(!g.weeklyNotes) g.weeklyNotes = {};
-          g.weeklyNotes[weekStart] = textarea.value.trim();
-          save();
-          savedTag.classList.add('show');
-          setTimeout(() => savedTag.classList.remove('show'), 1500);
-          renderHabitsSection(); // the auto-tracked reflection habit may have just changed
-        });
-        card.querySelector('.lg-card-del').onclick = () => {
-          state.longTermGoals = state.longTermGoals.filter(x => x.id !== g.id);
-          save();
-          renderAll();
-        };
-        wrap.appendChild(card);
-      });
+      goals.forEach(g => wrap.appendChild(buildLongGoalCard(g, tf.id, weekStart)));
     });
+  }
+
+  function renderLongGoalsSection(){
+    const wrap = document.getElementById('longGoalsContent');
+    wrap.innerHTML = '';
+    const weekStart = realCurrentWeekStart();
+
+    const modeToggle = document.createElement('div');
+    modeToggle.className = 'view-toggle';
+    modeToggle.style.margin = '0 0 14px';
+    modeToggle.innerHTML = `
+      <button id="goalsModeActive" class="${goalsViewMode === 'active' ? 'active' : ''}">Active</button>
+      <button id="goalsModeAll" class="${goalsViewMode === 'all' ? 'active' : ''}">All</button>
+    `;
+    wrap.appendChild(modeToggle);
+    modeToggle.querySelector('#goalsModeActive').onclick = () => { goalsViewMode = 'active'; renderLongGoalsSection(); };
+    modeToggle.querySelector('#goalsModeAll').onclick = () => { goalsViewMode = 'all'; renderLongGoalsSection(); };
+
+    if(goalsViewMode === 'active') renderActiveGoalsView(wrap, weekStart);
+    else renderAllGoalsView(wrap, weekStart);
   }
 
   function openAddLongGoalModal(){
