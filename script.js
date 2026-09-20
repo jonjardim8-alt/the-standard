@@ -4,6 +4,13 @@
   const START_HOUR = 5;
   const END_HOUR = 23;
 
+  // Quick Add's Cloudflare Worker endpoint — holds the Anthropic API key
+  // server-side (this file is public, so the key never can be). Deploy
+  // ai-worker/worker.js, then replace this with that Worker's
+  // *.workers.dev URL. Until then Quick Add shows a setup message instead
+  // of calling out.
+  const AI_WORKER_URL = '';
+
   const RECURRING_BLOCKS = [
     { id:'work-mon',  day:'Mon', start:'08:00', end:'16:00', category:'work',  label:'Work' },
     { id:'work-tue',  day:'Tue', start:'08:00', end:'16:00', category:'work',  label:'Work' },
@@ -2245,6 +2252,134 @@
       }
     }
     return null;
+  }
+
+  /* ---------------- Quick Add (AI) ----------------
+     Header button → one text input → the AI Worker turns it into a single
+     structured action → applied straight to state with the same
+     creation shape the relevant modal already uses. v1 covers tasks,
+     daily/weekly habits, and tomorrow's plan; calendar events are a
+     deliberate follow-up, not in scope here. */
+  function applyQuickAddAction(action){
+    if(!action || typeof action !== 'object') return { ok:false, message:"Didn't get a usable response — try again." };
+    if(action.action === 'unknown') return { ok:false, message: action.reason || "Couldn't figure that out — try rephrasing." };
+
+    const newId = () => Date.now() + '-' + Math.random().toString(36).slice(2,7);
+
+    if(action.action === 'add_task'){
+      const text = (action.text || '').toString().trim();
+      if(!text) return { ok:false, message:'No task text in that response.' };
+      const category = CATEGORIES.some(c => c.id === action.category) ? action.category : 'personal';
+      const priority = ['low','normal','high'].includes(action.priority) ? action.priority : 'normal';
+      const dueDate = action.dueDate && /^\d{4}-\d{2}-\d{2}$/.test(action.dueDate) ? action.dueDate : null;
+      state.tasks.push({ id:newId(), text, category, subcategory:'', dueDate, priority, points:0, notes:'', projectId:null, done:false });
+      save();
+      return { ok:true, message:'Added task: ' + text };
+    }
+
+    if(action.action === 'add_daily_habit'){
+      const name = (action.name || '').toString().trim();
+      if(!name) return { ok:false, message:'No habit name in that response.' };
+      state.dailyGoals.push({ id:newId(), name });
+      save();
+      return { ok:true, message:'Added daily habit: ' + name };
+    }
+
+    if(action.action === 'add_weekly_habit'){
+      const name = (action.name || '').toString().trim();
+      if(!name) return { ok:false, message:'No habit name in that response.' };
+      const target = Number.isInteger(action.target) && action.target > 0 ? action.target : 3;
+      state.weeklyGoals.push({ id:newId(), name, target });
+      save();
+      return { ok:true, message:'Added weekly habit: ' + name + ' (' + target + '/wk)' };
+    }
+
+    if(action.action === 'add_tomorrow_block'){
+      const text = (action.text || '').toString().trim();
+      if(!text) return { ok:false, message:'No block text in that response.' };
+      const timeRe = /^([01]\d|2[0-3]):[0-5]\d$/;
+      const startTime = timeRe.test(action.startTime) ? action.startTime : '09:00';
+      const endTime = timeRe.test(action.endTime) ? action.endTime : null;
+      const dateStr = tomorrowDateStr();
+      if(!state.tomorrowPlans[dateStr]) state.tomorrowPlans[dateStr] = [];
+      state.tomorrowPlans[dateStr].push({ id:newId(), text, startTime, endTime, habitKind:null, habitId:null });
+      save();
+      return { ok:true, message:'Added to tomorrow: ' + text + ' at ' + fmtTime(startTime) };
+    }
+
+    return { ok:false, message:"Didn't recognize that response — try rephrasing." };
+  }
+
+  function openQuickAddModal(){
+    const overlay = document.getElementById('modalOverlay');
+    const content = document.getElementById('modalContent');
+    content.style.removeProperty('--chip-color');
+
+    if(!AI_WORKER_URL){
+      content.innerHTML = `
+        <div class="modal-handle"></div>
+        <div class="modal-title">Quick Add</div>
+        <div class="empty-note">Quick Add isn't set up yet — deploy ai-worker/worker.js and set AI_WORKER_URL in script.js first.</div>
+        <div class="modal-actions">
+          <button class="save" id="qaClose" style="flex:1">Close</button>
+        </div>
+      `;
+      overlay.classList.remove('hidden');
+      document.getElementById('qaClose').onclick = closeModal;
+      return;
+    }
+
+    content.innerHTML = `
+      <div class="modal-handle"></div>
+      <div class="modal-title">Quick Add</div>
+      <div class="modal-subtitle">Type a task, habit, or tomorrow plan item in plain English</div>
+      <input type="text" id="qaText" placeholder="e.g. add a habit: drink water every morning">
+      <div class="empty-note" id="qaStatus" style="display:none"></div>
+      <div class="modal-actions">
+        <button class="cancel" id="qaCancel">Cancel</button>
+        <button class="save" id="qaSubmit">Add</button>
+      </div>
+    `;
+    overlay.classList.remove('hidden');
+    const input = document.getElementById('qaText');
+    const status = document.getElementById('qaStatus');
+    const submitBtn = document.getElementById('qaSubmit');
+    document.getElementById('qaCancel').onclick = closeModal;
+
+    const submit = () => {
+      const text = input.value.trim();
+      if(!text) return;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Thinking…';
+      status.style.display = 'none';
+      fetch(AI_WORKER_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text })
+      })
+        .then(res => res.json())
+        .then(action => {
+          const result = applyQuickAddAction(action);
+          if(result.ok){
+            closeModal();
+            renderAll();
+          } else {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Add';
+            status.textContent = result.message;
+            status.style.display = 'block';
+          }
+        })
+        .catch(() => {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Add';
+          status.textContent = "Couldn't reach the AI service — check your connection and try again.";
+          status.style.display = 'block';
+        });
+    };
+    submitBtn.onclick = submit;
+    input.addEventListener('keydown', e => { if(e.key === 'Enter') submit(); });
+    setTimeout(() => input.focus(), 50);
   }
 
   /* ---------------- Tomorrow (time-blocked plan for the next day) ----------------
@@ -6610,6 +6745,7 @@
   };
   document.getElementById('calendarBtn').onclick = openCalendarModal;
   document.getElementById('tomorrowBtn').onclick = openTomorrowModal;
+  document.getElementById('quickAddBtn').onclick = openQuickAddModal;
   document.getElementById('btnToday').onclick = () => switchView('today');
   document.getElementById('btnBlock').onclick = () => switchView('block');
   document.getElementById('btnList').onclick = () => switchView('list');
