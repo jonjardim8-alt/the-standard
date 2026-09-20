@@ -1624,7 +1624,9 @@
   let menuOpenForCat = null;
   let taskSubView = 'today'; // 'today' | 'upcoming'
   let expandedGroups = new Set(); // tracks which groups are open — everything starts closed
-  let todayTimelineExpanded = true; // Dashboard's unified Today section — starts open
+  let todayTimelineExpanded = true; // Dashboard's unified Today card — starts open
+  let dashMoreExpanded = true;      // Dashboard's More card — starts open
+  let dashScoresExpanded = true;    // Dashboard's Scores card — starts open
   let calendarViewMonth = null;
 
   function startOfWeek(d){
@@ -2663,7 +2665,7 @@
     // sorted by time and drawn on a single connecting line. Falls back to
     // findNextEvent() only when the whole day is empty.
     const todayCard = document.createElement('div');
-    todayCard.className = 'today-card';
+    todayCard.className = 'dash-card';
     wrap.appendChild(todayCard);
 
     const todayHeader = document.createElement('div');
@@ -2772,125 +2774,143 @@
       }
     }
 
-    // Quick-nav grid — glanceable stats for everything else, tap to jump in
-    const gridTitle = document.createElement('div');
-    gridTitle.className = 'task-section-title';
-    gridTitle.style.cursor = 'default';
-    gridTitle.style.marginTop = '18px';
-    gridTitle.innerHTML = '<span>More</span>';
-    wrap.appendChild(gridTitle);
+    // Quick-nav grid — glanceable stats for everything else, tap to jump in.
+    // Same dash-card wrapper as Today, so it reads as another module in
+    // the same set instead of a bare title floating on the page.
+    const moreCard = document.createElement('div');
+    moreCard.className = 'dash-card';
+    wrap.appendChild(moreCard);
 
-    const grid = document.createElement('div');
-    grid.className = 'dash-grid';
+    const gridHeader = document.createElement('div');
+    gridHeader.className = 'dash-section-header';
+    gridHeader.innerHTML = `<span class="dash-header-title"><span class="chev${dashMoreExpanded ? '' : ' collapsed'}">▾</span> More</span>`;
+    gridHeader.querySelector('.dash-header-title').onclick = () => {
+      dashMoreExpanded = !dashMoreExpanded;
+      renderDashboardSection();
+    };
+    moreCard.appendChild(gridHeader);
+    if(dashMoreExpanded){
+      const grid = document.createElement('div');
+      grid.className = 'dash-grid';
 
-    // Projects
-    const activeProjects = state.projects.filter(p => p.status === 'active');
-    let nextMilestone = null;
-    activeProjects.forEach(p => {
-      (p.milestones || []).filter(m => !m.done && m.targetDate).forEach(m => {
-        if(!nextMilestone || m.targetDate < nextMilestone.targetDate) nextMilestone = { name: m.name, targetDate: m.targetDate };
+      // Projects
+      const activeProjects = state.projects.filter(p => p.status === 'active');
+      let nextMilestone = null;
+      activeProjects.forEach(p => {
+        (p.milestones || []).filter(m => !m.done && m.targetDate).forEach(m => {
+          if(!nextMilestone || m.targetDate < nextMilestone.targetDate) nextMilestone = { name: m.name, targetDate: m.targetDate };
+        });
       });
-    });
-    grid.appendChild(makeDashTile({
-      color: '#5B8DEF',
-      title: 'Projects',
-      stat: activeProjects.length + ' active',
-      sub: nextMilestone ? escapeHtml(nextMilestone.name) + ' · ' + fmtDate(nextMilestone.targetDate) : (state.projects.length ? 'No upcoming milestones' : 'No projects yet'),
-      onClick: () => switchSection('projects')
-    }));
+      grid.appendChild(makeDashTile({
+        color: '#5B8DEF',
+        title: 'Projects',
+        stat: activeProjects.length + ' active',
+        sub: nextMilestone ? escapeHtml(nextMilestone.name) + ' · ' + fmtDate(nextMilestone.targetDate) : (state.projects.length ? 'No upcoming milestones' : 'No projects yet'),
+        onClick: () => switchSection('projects')
+      }));
 
-    // Habits
-    const dailyDone = state.dailyGoals.filter(g => isDailyGoalDone(g.id, habitDayStr())).length;
-    grid.appendChild(makeDashTile({
-      color: '#3CBF8C',
-      title: 'Habits',
-      stat: dailyDone + '/' + state.dailyGoals.length,
-      sub: 'done today',
-      onClick: () => switchSection('habits')
-    }));
+      // Habits
+      const dailyDone = state.dailyGoals.filter(g => isDailyGoalDone(g.id, habitDayStr())).length;
+      grid.appendChild(makeDashTile({
+        color: '#3CBF8C',
+        title: 'Habits',
+        stat: dailyDone + '/' + state.dailyGoals.length,
+        sub: 'done today',
+        onClick: () => switchSection('habits')
+      }));
 
-    // Goals
-    grid.appendChild(makeDashTile({
-      color: '#B18CF2',
-      title: 'Goals',
-      stat: String(state.longTermGoals.length),
-      sub: state.longTermGoals.length === 1 ? 'goal set' : 'goals set',
-      onClick: () => switchSection('longgoals')
-    }));
+      // Goals
+      grid.appendChild(makeDashTile({
+        color: '#B18CF2',
+        title: 'Goals',
+        stat: String(state.longTermGoals.length),
+        sub: state.longTermGoals.length === 1 ? 'goal set' : 'goals set',
+        onClick: () => switchSection('longgoals')
+      }));
 
-    // Lists
-    const openItems = state.lists.reduce((s,l) => s + l.items.filter(i => !i.done).length, 0);
-    grid.appendChild(makeDashTile({
-      color: '#F2A93B',
-      title: 'Lists',
-      stat: String(state.lists.length),
-      sub: openItems + ' open item' + (openItems !== 1 ? 's' : ''),
-      onClick: () => switchSection('lists')
-    }));
+      // Lists
+      const openItems = state.lists.reduce((s,l) => s + l.items.filter(i => !i.done).length, 0);
+      grid.appendChild(makeDashTile({
+        color: '#F2A93B',
+        title: 'Lists',
+        stat: String(state.lists.length),
+        sub: openItems + ' open item' + (openItems !== 1 ? 's' : ''),
+        onClick: () => switchSection('lists')
+      }));
 
-    // Fitness
-    const fitDayAbbr = DAYS[new Date().getDay()];
-    const fitPlan = state.fitnessSplit && state.fitnessSplit.days ? state.fitnessSplit.days[fitDayAbbr] : null;
-    grid.appendChild(makeDashTile({
-      color: '#F2617A',
-      title: 'Fitness',
-      stat: fitPlan ? fitPlan.focus : '—',
-      sub: fitPlan && fitPlan.focus !== 'Rest' ? 'today' : 'rest day',
-      onClick: () => switchSection('fitness')
-    }));
+      // Fitness
+      const fitDayAbbr = DAYS[new Date().getDay()];
+      const fitPlan = state.fitnessSplit && state.fitnessSplit.days ? state.fitnessSplit.days[fitDayAbbr] : null;
+      grid.appendChild(makeDashTile({
+        color: '#F2617A',
+        title: 'Fitness',
+        stat: fitPlan ? fitPlan.focus : '—',
+        sub: fitPlan && fitPlan.focus !== 'Rest' ? 'today' : 'rest day',
+        onClick: () => switchSection('fitness')
+      }));
 
-    // Budget
-    const bmKey = budgetMonthKey(new Date());
-    const monthExpense = state.budgetTransactions.filter(t => t.date.startsWith(bmKey) && budgetCatById[t.category]?.type === 'expense').reduce((s,t) => s + t.amount, 0);
-    grid.appendChild(makeDashTile({
-      color: '#3FC7D6',
-      title: 'Budget',
-      stat: '$' + monthExpense.toFixed(0),
-      sub: 'spent this month',
-      onClick: () => switchSection('budget')
-    }));
+      // Budget
+      const bmKey = budgetMonthKey(new Date());
+      const monthExpense = state.budgetTransactions.filter(t => t.date.startsWith(bmKey) && budgetCatById[t.category]?.type === 'expense').reduce((s,t) => s + t.amount, 0);
+      grid.appendChild(makeDashTile({
+        color: '#3FC7D6',
+        title: 'Budget',
+        stat: '$' + monthExpense.toFixed(0),
+        sub: 'spent this month',
+        onClick: () => switchSection('budget')
+      }));
 
-    wrap.appendChild(grid);
+      moreCard.appendChild(grid);
+    }
 
-    // Today's scores — tap through to the full Scores section
-    const scoresTitle = document.createElement('div');
-    scoresTitle.className = 'task-section-title';
-    scoresTitle.style.cursor = 'default';
-    scoresTitle.style.marginTop = '18px';
-    scoresTitle.innerHTML = '<span>Scores</span>';
-    wrap.appendChild(scoresTitle);
+    // Scores — same dash-card wrapper as Today and More, tap the diamond
+    // itself to jump to the full Scores tab.
+    const scoresCard = document.createElement('div');
+    scoresCard.className = 'dash-card';
+    wrap.appendChild(scoresCard);
 
-    const scores = computeScores();
-    // Corners fill in DOM order: top-left, top-right, bottom-left,
-    // bottom-right. If Budget is off there are only 3, so bottom-right
-    // is simply left empty rather than the layout reflowing.
-    const corners = [
-      { key:'core',    accent:'#5B8DEF', label:'Core' },
-      { key:'fitness', accent:'#3CBF8C', label:'Fitness' },
-      { key:'journal', accent:'#B18CF2', label:'Journal' },
-    ];
-    if(scores.budget.optedIn) corners.push({ key:'budget', accent:'#F2A93B', label:'Budget' });
+    const scoresHeader = document.createElement('div');
+    scoresHeader.className = 'dash-section-header';
+    scoresHeader.innerHTML = `<span class="dash-header-title"><span class="chev${dashScoresExpanded ? '' : ' collapsed'}">▾</span> Scores</span>`;
+    scoresHeader.querySelector('.dash-header-title').onclick = () => {
+      dashScoresExpanded = !dashScoresExpanded;
+      renderDashboardSection();
+    };
+    scoresCard.appendChild(scoresHeader);
 
-    const scoreWrap = document.createElement('div');
-    scoreWrap.className = 'dash-score-diamond';
-    scoreWrap.innerHTML = `
-      <div class="dash-score-inner">
-        <div class="dash-score-corners">
-          ${corners.map(t => `
-            <div class="dash-score-corner" style="--accent-color:${t.accent}">
-              <div class="n">${scores[t.key].score === null ? '–' : scores[t.key].score}</div>
-              <div class="l">${escapeHtml(t.label)}</div>
-            </div>
-          `).join('')}
+    if(dashScoresExpanded){
+      const scores = computeScores();
+      // Corners fill in DOM order: top-left, top-right, bottom-left,
+      // bottom-right. If Budget is off there are only 3, so bottom-right
+      // is simply left empty rather than the layout reflowing.
+      const corners = [
+        { key:'core',    accent:'#5B8DEF', label:'Core' },
+        { key:'fitness', accent:'#3CBF8C', label:'Fitness' },
+        { key:'journal', accent:'#B18CF2', label:'Journal' },
+      ];
+      if(scores.budget.optedIn) corners.push({ key:'budget', accent:'#F2A93B', label:'Budget' });
+
+      const scoreWrap = document.createElement('div');
+      scoreWrap.className = 'dash-score-diamond';
+      scoreWrap.innerHTML = `
+        <div class="dash-score-inner">
+          <div class="dash-score-corners">
+            ${corners.map(t => `
+              <div class="dash-score-corner" style="--accent-color:${t.accent}">
+                <div class="n">${scores[t.key].score === null ? '–' : scores[t.key].score}</div>
+                <div class="l">${escapeHtml(t.label)}</div>
+              </div>
+            `).join('')}
+          </div>
+          <div class="dash-score-overall" style="--accent-color:#FFFFFF">
+            <div class="n">${scores.overall.score === null ? '–' : scores.overall.score}</div>
+            <div class="l">Overall</div>
+          </div>
         </div>
-        <div class="dash-score-overall" style="--accent-color:#FFFFFF">
-          <div class="n">${scores.overall.score === null ? '–' : scores.overall.score}</div>
-          <div class="l">Overall</div>
-        </div>
-      </div>
-    `;
-    scoreWrap.onclick = () => switchSection('scores');
-    wrap.appendChild(scoreWrap);
+      `;
+      scoreWrap.onclick = () => switchSection('scores');
+      scoresCard.appendChild(scoreWrap);
+    }
   }
 
   function makeDashTile(opts){

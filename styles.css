@@ -755,18 +755,22 @@
   .lg-saved-tag.show{ opacity:1; }
 
   /* ---- Dashboard ---- */
-  /* Today card — one cohesive module (header + connected timeline) for
-     habits/tasks/planned-blocks/calendar-events together, rather than
-     each rendered as its own separately-titled, separately-bordered
-     stack of widgets. */
-  .today-card{
-    background: var(--card);
+  /* Shared card wrapper for every dashboard section (Today, More,
+     Scores) — one consistent module language (recessed container +
+     header) instead of some sections floating free and others boxed,
+     which read as disconnected. Deliberately a shade darker than the
+     --card tiles/rows inside it (dash-tile, dash-score-corner, today-
+     timeline) so content still pops forward from its container. */
+  .dash-card{
+    background: var(--bg-elevated);
     border: 1px solid var(--border);
     border-radius: 14px;
     padding: 14px 14px 4px;
     margin-bottom: 18px;
   }
-  .today-card .dash-section-header{ margin-bottom: 4px; }
+  .dash-card .dash-section-header{ margin-bottom: 4px; }
+  .dash-card .dash-grid{ padding-bottom: 10px; }
+  .dash-card .dash-score-diamond{ padding-bottom: 10px; }
   .today-timeline{
     position: relative;
     padding: 4px 0 10px;
