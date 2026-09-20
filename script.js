@@ -2247,6 +2247,232 @@
     return null;
   }
 
+  /* ---------------- Goldie (free, local quick-add) ----------------
+     No network call, no API key, no cost — a small keyword/pattern
+     parser that turns one line of typed text into a structured action,
+     applied straight to state. Not real natural-language understanding:
+     it looks for a leading keyword ("task:", "habit:", "weekly habit:",
+     "tomorrow:") to pick the action, then does best-effort date/time/
+     category extraction from what's left. Good enough for short,
+     predictable phrasing; won't handle genuinely free-form sentences
+     the way an AI-backed version would. */
+
+  const GOLDIE_WEEKDAYS = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+
+  // Finds the first month/day, "tomorrow", "today", or weekday mention in
+  // the text and returns it as YYYY-MM-DD, plus the text with that
+  // mention removed so it doesn't linger in the task's name.
+  function goldieParseDate(text){
+    let m = text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+    if(m) return { dueDate: m[0], cleaned: text.replace(m[0], '').trim() };
+
+    m = text.match(/\b(\d{1,2})\/(\d{1,2})\b/);
+    if(m){
+      const year = new Date().getFullYear();
+      const dueDate = year + '-' + String(m[1]).padStart(2,'0') + '-' + String(m[2]).padStart(2,'0');
+      return { dueDate, cleaned: text.replace(m[0], '').trim() };
+    }
+
+    m = text.match(/\btomorrow\b/i);
+    if(m){
+      const d = new Date(); d.setDate(d.getDate() + 1);
+      return { dueDate: toDateStr(d), cleaned: text.replace(m[0], '').trim() };
+    }
+
+    m = text.match(/\btoday\b/i);
+    if(m) return { dueDate: todayStr(), cleaned: text.replace(m[0], '').trim() };
+
+    for(let i = 0; i < GOLDIE_WEEKDAYS.length; i++){
+      const name = GOLDIE_WEEKDAYS[i];
+      const re = new RegExp('\\b(next\\s+)?(' + name + '|' + name.slice(0,3) + ')\\b', 'i');
+      const wm = text.match(re);
+      if(wm){
+        const d = new Date();
+        let diff = (i - d.getDay() + 7) % 7;
+        if(diff === 0) diff = 7; // saying "friday" on a Friday means next Friday
+        if(wm[1]) diff += 7; // "next friday" pushes another week out
+        d.setDate(d.getDate() + diff);
+        return { dueDate: toDateStr(d), cleaned: text.replace(wm[0], '').trim() };
+      }
+    }
+
+    return { dueDate: null, cleaned: text };
+  }
+
+  // Order matters: checked in this sequence, first match wins — health
+  // ahead of work so e.g. "call dentist" lands on health, not work.
+  const GOLDIE_CATEGORY_KEYWORDS = {
+    health: ['gym','doctor','workout','dentist','appointment','run','exercise','therapy','medicine'],
+    faith: ['church','bible','pray','worship','faith','sermon'],
+    school: ['class','homework','exam','professor','assignment','study','lecture','school','quiz'],
+    work: ['work','meeting','email','project','client','boss','office','report','deadline'],
+  };
+  function goldieGuessCategory(text){
+    const lower = text.toLowerCase();
+    for(const cat in GOLDIE_CATEGORY_KEYWORDS){
+      if(GOLDIE_CATEGORY_KEYWORDS[cat].some(kw => lower.includes(kw))) return cat;
+    }
+    return 'personal';
+  }
+
+  function goldieGuessPriority(text){
+    const lower = text.toLowerCase();
+    if(/\b(urgent|asap|important|critical)\b/.test(lower)) return 'high';
+    if(/\b(low priority|whenever|someday|no rush)\b/.test(lower)) return 'low';
+    return 'normal';
+  }
+
+  // Matches "at 6pm", "6:30 pm", "18:00", or a bare "6pm" and returns 24h
+  // HH:MM, plus the text with that mention removed.
+  function goldieParseTime(text){
+    const re = /\bat\s+(\d{1,2})(?::([0-5]\d))?\s*(am|pm)?\b|\b(\d{1,2}):([0-5]\d)\s*(am|pm)?\b|\b(\d{1,2})\s*(am|pm)\b/i;
+    const m = text.match(re);
+    if(!m) return { time: null, cleaned: text };
+    let hour, min, ampm;
+    if(m[1] !== undefined){ hour = m[1]; min = m[2] || '00'; ampm = m[3]; }
+    else if(m[4] !== undefined){ hour = m[4]; min = m[5]; ampm = m[6]; }
+    else { hour = m[7]; min = '00'; ampm = m[8]; }
+    hour = parseInt(hour, 10);
+    if(ampm){
+      ampm = ampm.toLowerCase();
+      if(ampm === 'pm' && hour < 12) hour += 12;
+      if(ampm === 'am' && hour === 12) hour = 0;
+    }
+    if(hour < 0 || hour > 23) return { time: null, cleaned: text };
+    return { time: String(hour).padStart(2,'0') + ':' + min, cleaned: text.replace(m[0], '').trim() };
+  }
+
+  // "gym 3x", "gym x3", "gym 3 times a week" -> target 3, default 3.
+  function goldieParseWeeklyTarget(text){
+    let m = text.match(/\b(\d+)\s*(?:x|times?)(?:\s*a\s*week)?\b/i);
+    if(m) return { target: parseInt(m[1], 10), cleaned: text.replace(m[0], '').trim() };
+    m = text.match(/\bx\s*(\d+)\b/i);
+    if(m) return { target: parseInt(m[1], 10), cleaned: text.replace(m[0], '').trim() };
+    return { target: 3, cleaned: text };
+  }
+
+  const GOLDIE_LEAD_PATTERNS = [
+    { action:'add_tomorrow_block', re:/^(?:add to tomorrow|plan tomorrow|schedule tomorrow|tomorrow)\s*:?\s*/i },
+    { action:'add_weekly_habit',   re:/^(?:add (?:a )?weekly habit|weekly habit)\s*:?\s*/i },
+    { action:'add_daily_habit',    re:/^(?:add (?:a )?daily habit|daily habit|add (?:a )?habit|habit)\s*:?\s*/i },
+    { action:'add_task',           re:/^(?:add (?:a )?task|task|todo|to-do)\s*:?\s*/i },
+  ];
+
+  function parseGoldieCommand(raw){
+    const text = (raw || '').trim();
+    if(!text) return { action:'unknown', reason:'Type something first.' };
+
+    let action = 'add_task'; // no recognized prefix -> assume a plain task
+    let remainder = text;
+    for(const p of GOLDIE_LEAD_PATTERNS){
+      if(p.re.test(text)){
+        action = p.action;
+        remainder = text.replace(p.re, '').trim();
+        break;
+      }
+    }
+    if(!remainder) return { action:'unknown', reason:"That's just the keyword — add what you want after it." };
+
+    if(action === 'add_task'){
+      const { dueDate, cleaned } = goldieParseDate(remainder);
+      const taskText = cleaned || remainder;
+      return { action:'add_task', text: taskText, category: goldieGuessCategory(taskText), dueDate, priority: goldieGuessPriority(taskText) };
+    }
+    if(action === 'add_daily_habit'){
+      return { action:'add_daily_habit', name: remainder };
+    }
+    if(action === 'add_weekly_habit'){
+      const { target, cleaned } = goldieParseWeeklyTarget(remainder);
+      return { action:'add_weekly_habit', name: cleaned || remainder, target };
+    }
+    if(action === 'add_tomorrow_block'){
+      const { time, cleaned } = goldieParseTime(remainder);
+      return { action:'add_tomorrow_block', text: cleaned || remainder, startTime: time || '09:00', endTime: null };
+    }
+    return { action:'unknown', reason:"Couldn't figure that out — try rephrasing." };
+  }
+
+  // Applies a parsed action to state — same shapes each relevant modal
+  // already uses, so this stays consistent with adding things by hand.
+  function applyGoldieAction(action){
+    if(!action || action.action === 'unknown') return { ok:false, message: (action && action.reason) || "Couldn't figure that out." };
+    const newId = () => Date.now() + '-' + Math.random().toString(36).slice(2,7);
+
+    if(action.action === 'add_task'){
+      const text = (action.text || '').toString().trim();
+      if(!text) return { ok:false, message:'No task text there.' };
+      state.tasks.push({ id:newId(), text, category:action.category, subcategory:'', dueDate:action.dueDate, priority:action.priority, points:0, notes:'', projectId:null, done:false });
+      save();
+      return { ok:true, message:'Added task: ' + text };
+    }
+    if(action.action === 'add_daily_habit'){
+      const name = (action.name || '').toString().trim();
+      if(!name) return { ok:false, message:'No habit name there.' };
+      state.dailyGoals.push({ id:newId(), name });
+      save();
+      return { ok:true, message:'Added daily habit: ' + name };
+    }
+    if(action.action === 'add_weekly_habit'){
+      const name = (action.name || '').toString().trim();
+      if(!name) return { ok:false, message:'No habit name there.' };
+      const target = Number.isInteger(action.target) && action.target > 0 ? action.target : 3;
+      state.weeklyGoals.push({ id:newId(), name, target });
+      save();
+      return { ok:true, message:'Added weekly habit: ' + name + ' (' + target + '/wk)' };
+    }
+    if(action.action === 'add_tomorrow_block'){
+      const text = (action.text || '').toString().trim();
+      if(!text) return { ok:false, message:'No plan text there.' };
+      const dateStr = tomorrowDateStr();
+      if(!state.tomorrowPlans[dateStr]) state.tomorrowPlans[dateStr] = [];
+      state.tomorrowPlans[dateStr].push({ id:newId(), text, startTime:action.startTime, endTime:action.endTime, habitKind:null, habitId:null });
+      save();
+      return { ok:true, message:'Added to tomorrow: ' + text + ' at ' + fmtTime(action.startTime) };
+    }
+    return { ok:false, message:"Didn't recognize that." };
+  }
+
+  function openGoldieModal(){
+    const overlay = document.getElementById('modalOverlay');
+    const content = document.getElementById('modalContent');
+    content.style.removeProperty('--chip-color');
+
+    content.innerHTML = `
+      <div class="modal-handle"></div>
+      <div class="modal-title">⭐ Goldie</div>
+      <div class="modal-subtitle">Free local quick-add — start with a keyword, no AI needed</div>
+      <input type="text" id="gdText" placeholder="e.g. task: call dentist tomorrow">
+      <div class="proj-desc" style="margin-top:8px">
+        Try: <b>task:</b> call dentist tomorrow · <b>habit:</b> drink water · <b>weekly habit:</b> gym 3x · <b>tomorrow:</b> workout at 6pm
+      </div>
+      <div class="empty-note" id="gdStatus" style="display:none"></div>
+      <div class="modal-actions">
+        <button class="cancel" id="gdCancel">Cancel</button>
+        <button class="save" id="gdSubmit">Add</button>
+      </div>
+    `;
+    overlay.classList.remove('hidden');
+    const input = document.getElementById('gdText');
+    const status = document.getElementById('gdStatus');
+    document.getElementById('gdCancel').onclick = closeModal;
+
+    const submit = () => {
+      const raw = input.value.trim();
+      if(!raw) return;
+      const result = applyGoldieAction(parseGoldieCommand(raw));
+      if(result.ok){
+        closeModal();
+        renderAll();
+      } else {
+        status.textContent = result.message;
+        status.style.display = 'block';
+      }
+    };
+    document.getElementById('gdSubmit').onclick = submit;
+    input.addEventListener('keydown', e => { if(e.key === 'Enter') submit(); });
+    setTimeout(() => input.focus(), 50);
+  }
+
   /* ---------------- Tomorrow (time-blocked plan for the next day) ----------------
      Deliberately not tied to the regular weekly calendar — a flat, flexible
      list of {text, startTime, endTime} blocks keyed by date in
@@ -6610,6 +6836,7 @@
   };
   document.getElementById('calendarBtn').onclick = openCalendarModal;
   document.getElementById('tomorrowBtn').onclick = openTomorrowModal;
+  document.getElementById('goldieBtn').onclick = openGoldieModal;
   document.getElementById('btnToday').onclick = () => switchView('today');
   document.getElementById('btnBlock').onclick = () => switchView('block');
   document.getElementById('btnList').onclick = () => switchView('list');

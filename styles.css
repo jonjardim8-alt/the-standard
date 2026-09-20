@@ -8,6 +8,7 @@
     --text-soft: #8B93A0;
     --text-faint: #565E68;
     --accent: #5B8DEF;
+    --gold: #E8B93F;
     --font-display: 'Space Grotesk', sans-serif;
     --font-body: 'Inter', -apple-system, sans-serif;
     --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
@@ -2264,3 +2265,25 @@
     display:flex; align-items:center; justify-content:center;
   }
   .fab-btn:active{ transform: scale(0.94); }
+
+  /* Goldie — the free, local quick-add button. Mirrors .fab-btn exactly
+     but on the opposite corner, since it's a global entry point (visible
+     on every section, unlike the fab's per-section "+") rather than a
+     context-specific add action. */
+  .goldie-btn{
+    position: fixed;
+    left: 18px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 72px);
+    z-index: 30;
+    width: 52px; height:52px;
+    border-radius: 50%;
+    background: var(--gold);
+    color: #1A1206;
+    border: none;
+    font-size: 22px;
+    line-height: 1;
+    box-shadow: 0 6px 18px rgba(232,185,63,0.4);
+    cursor: pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .goldie-btn:active{ transform: scale(0.94); }
