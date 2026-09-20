@@ -2496,15 +2496,19 @@
   /* ---------------- Long-term Goals (Monthly/Quarterly/Yearly) ---------------- */
 
   const LG_TIMEFRAMES = [
+    { id:'daily',     label:'Daily' },
+    { id:'weekly',    label:'Weekly' },
     { id:'monthly',   label:'Monthly' },
     { id:'quarterly', label:'Quarterly' },
     { id:'yearly',    label:'Yearly' },
     { id:'custom',    label:'Custom Date' },
   ];
 
-  // 'active' = curated Daily/Weekly/Monthly/Yearly split (Daily & Weekly
-  // pulled from the Habits-style dailyGoals/weeklyGoals); 'all' = every
-  // long-term goal grouped by its own timeframe, as before.
+  // 'active' = curated Daily/Weekly/Monthly/Yearly split; 'all' = every
+  // long-term goal grouped by its own timeframe, as before. Daily/Weekly
+  // goals here are their own longTermGoals entries — deliberately separate
+  // from the Habits-tab dailyGoals/weeklyGoals, which track a different
+  // thing (recurring habits, not goals with a progress note).
   let goalsViewMode = 'active';
 
   // Has the person written anything in ANY long-term goal's weekly
@@ -2517,12 +2521,17 @@
     });
   }
 
-  // One long-term-goal card (Monthly/Quarterly/Yearly/Custom) with its
-  // weekly-progress textarea — shared by the Active and All views.
-  function buildLongGoalCard(g, tf, weekStart){
+  // One long-term-goal card (Daily/Weekly/Monthly/Quarterly/Yearly/Custom)
+  // with its progress textarea — shared by the Active and All views. Daily
+  // goals get their own per-day note (g.dailyNotes, keyed by date); every
+  // other timeframe shares the existing per-week note (g.weeklyNotes).
+  function buildLongGoalCard(g, tf, weekStart, dateStr){
     const card = document.createElement('div');
     card.className = 'lg-card';
     const dateLine = (tf === 'custom' && g.targetDate) ? '<div class="proj-desc">Due ' + fmtDate(g.targetDate) + '</div>' : '';
+    const isDaily = tf === 'daily';
+    const label = isDaily ? "Today's progress" : "This week's progress";
+    const placeholder = isDaily ? 'What did you do today toward this goal?' : 'What did you do this week toward this goal?';
     card.innerHTML = `
       <div class="lg-card-top">
         <div>
@@ -2531,16 +2540,18 @@
         </div>
         <button class="lg-card-del">×</button>
       </div>
-      <label>This week's progress</label>
-      <textarea placeholder="What did you do this week toward this goal?" rows="2"></textarea>
+      <label>${label}</label>
+      <textarea placeholder="${placeholder}" rows="2"></textarea>
       <div class="lg-saved-tag">Saved</div>
     `;
     const textarea = card.querySelector('textarea');
-    textarea.value = (g.weeklyNotes && g.weeklyNotes[weekStart]) || '';
+    const notesKey = isDaily ? 'dailyNotes' : 'weeklyNotes';
+    const noteDate = isDaily ? dateStr : weekStart;
+    textarea.value = (g[notesKey] && g[notesKey][noteDate]) || '';
     const savedTag = card.querySelector('.lg-saved-tag');
     textarea.addEventListener('blur', () => {
-      if(!g.weeklyNotes) g.weeklyNotes = {};
-      g.weeklyNotes[weekStart] = textarea.value.trim();
+      if(!g[notesKey]) g[notesKey] = {};
+      g[notesKey][noteDate] = textarea.value.trim();
       save();
       savedTag.classList.add('show');
       setTimeout(() => savedTag.classList.remove('show'), 1500);
@@ -2554,54 +2565,38 @@
     return card;
   }
 
-  // Curated view: Daily/Weekly (from the Habits-style dailyGoals/
-  // weeklyGoals) plus Monthly/Yearly long-term goals, each in its own
-  // section — every goal at every horizon shown, none singled out.
+  // Curated view: every goal at every horizon (Daily/Weekly/Monthly/
+  // Yearly), each in its own section, none singled out. All four come
+  // from state.longTermGoals — deliberately not the Habits-tab data.
   function renderActiveGoalsView(wrap, weekStart){
     const dateStr = habitDayStr();
-    const monthlyGoals = state.longTermGoals.filter(g => g.timeframe === 'monthly');
-    const yearlyGoals = state.longTermGoals.filter(g => g.timeframe === 'yearly');
+    const byTf = tf => state.longTermGoals.filter(g => g.timeframe === tf);
+    const dailyGoals = byTf('daily');
+    const weeklyGoals = byTf('weekly');
+    const monthlyGoals = byTf('monthly');
+    const yearlyGoals = byTf('yearly');
 
-    if(!state.dailyGoals.length && !state.weeklyGoals.length && !monthlyGoals.length && !yearlyGoals.length){
+    if(!dailyGoals.length && !weeklyGoals.length && !monthlyGoals.length && !yearlyGoals.length){
       const empty = document.createElement('div');
       empty.className = 'empty-note';
-      empty.textContent = 'Nothing active yet — add a habit from the Habits tab, or tap + here for a monthly or yearly goal.';
+      empty.textContent = 'Nothing active yet — tap + to add a daily, weekly, monthly, or yearly goal.';
       wrap.appendChild(empty);
       return;
     }
 
-    const addSection = (label, buildRows) => {
+    const addSection = (label, goals, tf) => {
+      if(!goals.length) return;
       const title = document.createElement('div');
       title.className = 'lg-timeframe-title';
       title.textContent = label;
       wrap.appendChild(title);
-      const box = document.createElement('div');
-      buildRows(box);
-      wrap.appendChild(box);
+      goals.forEach(g => wrap.appendChild(buildLongGoalCard(g, tf, weekStart, dateStr)));
     };
 
-    if(state.dailyGoals.length){
-      addSection('Daily', box => {
-        box.className = 'goals-box';
-        state.dailyGoals.forEach(g => box.appendChild(buildDailyGoalRow(g, dateStr)));
-      });
-    }
-    if(state.weeklyGoals.length){
-      addSection('Weekly', box => {
-        box.className = 'goals-box';
-        state.weeklyGoals.forEach(g => box.appendChild(buildWeeklyGoalRow(g, weekStart)));
-      });
-    }
-    if(monthlyGoals.length){
-      addSection('Monthly', box => {
-        monthlyGoals.forEach(g => box.appendChild(buildLongGoalCard(g, 'monthly', weekStart)));
-      });
-    }
-    if(yearlyGoals.length){
-      addSection('Yearly', box => {
-        yearlyGoals.forEach(g => box.appendChild(buildLongGoalCard(g, 'yearly', weekStart)));
-      });
-    }
+    addSection('Daily', dailyGoals, 'daily');
+    addSection('Weekly', weeklyGoals, 'weekly');
+    addSection('Monthly', monthlyGoals, 'monthly');
+    addSection('Yearly', yearlyGoals, 'yearly');
   }
 
   // Everything in state.longTermGoals, grouped by its own timeframe
@@ -2610,11 +2605,12 @@
     if(!state.longTermGoals.length){
       const empty = document.createElement('div');
       empty.className = 'empty-note';
-      empty.textContent = 'No goals yet — tap + to set a monthly, quarterly, yearly, or custom-date goal.';
+      empty.textContent = 'No goals yet — tap + to set a daily, weekly, monthly, quarterly, yearly, or custom-date goal.';
       wrap.appendChild(empty);
       return;
     }
 
+    const dateStr = habitDayStr();
     LG_TIMEFRAMES.forEach(tf => {
       const goals = state.longTermGoals.filter(g => g.timeframe === tf.id);
       if(!goals.length) return;
@@ -2624,7 +2620,7 @@
       title.textContent = tf.label;
       wrap.appendChild(title);
 
-      goals.forEach(g => wrap.appendChild(buildLongGoalCard(g, tf.id, weekStart)));
+      goals.forEach(g => wrap.appendChild(buildLongGoalCard(g, tf.id, weekStart, dateStr)));
     });
   }
 
@@ -2658,6 +2654,8 @@
       <div class="modal-handle"></div>
       <div class="modal-title">Add a goal</div>
       <div class="view-toggle" id="lgTimeframeToggle" style="margin:0 0 14px">
+        <button id="lgDaily">Daily</button>
+        <button id="lgWeekly">Weekly</button>
         <button id="lgMonthly" class="active">Monthly</button>
         <button id="lgQuarterly">Quarterly</button>
         <button id="lgYearly">Yearly</button>
@@ -2679,9 +2677,11 @@
 
     const setTf = (tf, btnId) => {
       timeframe = tf;
-      ['lgMonthly','lgQuarterly','lgYearly','lgCustom'].forEach(id => document.getElementById(id).classList.toggle('active', id === btnId));
+      ['lgDaily','lgWeekly','lgMonthly','lgQuarterly','lgYearly','lgCustom'].forEach(id => document.getElementById(id).classList.toggle('active', id === btnId));
       document.getElementById('lgCustomDateField').style.display = tf === 'custom' ? 'block' : 'none';
     };
+    document.getElementById('lgDaily').onclick = () => setTf('daily', 'lgDaily');
+    document.getElementById('lgWeekly').onclick = () => setTf('weekly', 'lgWeekly');
     document.getElementById('lgMonthly').onclick = () => setTf('monthly', 'lgMonthly');
     document.getElementById('lgQuarterly').onclick = () => setTf('quarterly', 'lgQuarterly');
     document.getElementById('lgYearly').onclick = () => setTf('yearly', 'lgYearly');
@@ -2694,7 +2694,7 @@
       const targetDate = timeframe === 'custom' ? (document.getElementById('lgTargetDate').value || todayStr()) : null;
       state.longTermGoals.push({
         id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
-        name, timeframe, targetDate, weeklyNotes: {}
+        name, timeframe, targetDate, weeklyNotes: {}, dailyNotes: {}
       });
       save();
       closeModal();
