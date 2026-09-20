@@ -767,6 +767,7 @@
     border-radius: 14px;
     padding: 14px 14px 4px;
     margin-bottom: 18px;
+    box-shadow: 0 0 30px -14px var(--accent);
   }
   .dash-card .dash-section-header{ margin-bottom: 4px; }
   .dash-card .dash-grid{ padding-bottom: 10px; }
@@ -830,6 +831,7 @@
     border-left: 3px solid var(--accent-color, var(--accent));
     border-radius: 12px;
     padding: 14px 16px;
+    box-shadow: 0 0 18px -8px var(--accent-color, var(--accent));
   }
   .dash-next-time{ font-family: var(--font-mono); font-size: 12px; color: var(--accent-color, var(--accent)); }
   .dash-next-text{ font-family: var(--font-display); font-weight:600; font-size: 18px; color: var(--text); margin-top: 3px; }
@@ -993,6 +995,7 @@
     border-left: 3px solid var(--accent-color, var(--accent));
     border-radius: 12px;
     padding: 10px;
+    box-shadow: 0 0 14px -6px var(--accent-color, var(--accent));
   }
   .dash-score-corners > :nth-child(1){ justify-self:start; align-self:start; }
   .dash-score-corners > :nth-child(2){ justify-self:end;   align-self:start; }
@@ -1004,6 +1007,7 @@
     font-size: 30px;
     color: var(--accent-color, var(--accent));
     line-height: 1;
+    text-shadow: 0 0 10px color-mix(in srgb, var(--accent-color, var(--accent)) 60%, transparent);
   }
   .dash-score-corner .l{
     position: absolute;
@@ -1016,6 +1020,9 @@
     text-transform: uppercase;
     color: var(--text-soft);
   }
+  /* Overall — a glowing circular progress ring (conic-gradient sweep for
+     the score, --card cutout in the middle for the donut hole) instead of
+     a plain bordered square, for a more compelling centerpiece stat. */
   .dash-score-overall{
     position: absolute;
     top: 50%; left: 50%;
@@ -1023,32 +1030,36 @@
     width: 50%;
     aspect-ratio: 1;
     z-index: 1;
+    border-radius: 50%;
+    background: conic-gradient(var(--accent-color, var(--accent)) calc(var(--pct, 0) * 1%), var(--border) 0);
+    box-shadow: 0 0 22px -2px var(--accent-color, var(--accent));
+    padding: 9px;
+  }
+  .dash-score-overall-ring{
+    width:100%;
+    height:100%;
+    border-radius: 50%;
+    background: var(--card);
     display:flex;
+    flex-direction: column;
     align-items:center;
     justify-content:center;
-    background: var(--card);
-    border: 2px solid var(--accent-color, var(--accent));
-    border-radius: 16px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.28);
-    padding: 10px;
   }
   .dash-score-overall .n{
     font-family: var(--font-display);
     font-weight: 700;
-    font-size: 50px;
+    font-size: 40px;
     color: var(--text);
     line-height: 1;
+    text-shadow: 0 0 14px var(--accent-color, var(--accent));
   }
   .dash-score-overall .l{
-    position: absolute;
-    left: 0; right: 0;
-    bottom: 14px;
-    text-align: center;
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 10px;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--text-soft);
+    margin-top: 5px;
   }
 
   .score-card{
@@ -1167,6 +1178,7 @@
     border-radius: 12px;
     padding: 13px 14px;
     border-left: 3px solid var(--accent-color, var(--accent));
+    box-shadow: 0 0 14px -8px var(--accent-color, var(--accent));
     cursor: pointer;
   }
   .dash-tile:active{ background: var(--card-hover); }

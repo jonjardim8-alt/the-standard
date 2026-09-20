@@ -2902,9 +2902,11 @@
               </div>
             `).join('')}
           </div>
-          <div class="dash-score-overall" style="--accent-color:#FFFFFF">
-            <div class="n">${scores.overall.score === null ? '–' : scores.overall.score}</div>
-            <div class="l">Overall</div>
+          <div class="dash-score-overall" style="--accent-color:#FFFFFF; --pct:${scores.overall.score ?? 0}">
+            <div class="dash-score-overall-ring">
+              <div class="n">${scores.overall.score === null ? '–' : scores.overall.score}</div>
+              <div class="l">Overall</div>
+            </div>
           </div>
         </div>
       `;
