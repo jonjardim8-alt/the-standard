@@ -2596,27 +2596,42 @@
         .then(({ data:{ text } }) => {
           const candidates = parseTransactionsFromOcrText(text);
           if(!candidates.length){
-            renderGoldieScanStatus("Couldn't find anything that looked like a transaction in that image. Try a clearer photo, or add it manually in the Budget tab.", true);
+            renderGoldieScanStatus("Couldn't find anything that looked like a transaction in that image. Try a clearer photo, or add it manually in the Budget tab.", true, text);
           } else {
-            renderGoldieScanReview(candidates);
+            renderGoldieScanReview(candidates, text);
           }
         })
         .catch(() => renderGoldieScanStatus("Couldn't read that image — check your connection (the OCR library loads from the internet the first time) and try again.", true));
     };
   }
 
-  function renderGoldieScanStatus(message, withClose){
+  // rawText (optional): shown in a collapsible section so the raw OCR
+  // output can be inspected/copied when the parsing gets something
+  // wrong — screenshot layouts vary a lot app to app, so seeing the
+  // actual extracted text is how a parsing mismatch gets diagnosed.
+  function goldieRawTextDetailsHtml(rawText){
+    if(!rawText) return '';
+    return `
+      <details style="margin-top:10px">
+        <summary class="proj-desc" style="cursor:pointer">Show raw scanned text</summary>
+        <textarea readonly rows="6" style="width:100%;margin-top:6px;font-family:var(--font-mono);font-size:11px">${escapeHtml(rawText)}</textarea>
+      </details>
+    `;
+  }
+
+  function renderGoldieScanStatus(message, withClose, rawText){
     const content = document.getElementById('modalContent');
     content.innerHTML = `
       <div class="modal-handle"></div>
       <div class="modal-title">⭐ Goldie — Scan</div>
       <div class="empty-note">${escapeHtml(message)}</div>
+      ${goldieRawTextDetailsHtml(rawText)}
       ${withClose ? '<div class="modal-actions"><button class="save" id="gdScanClose" style="flex:1">Close</button></div>' : ''}
     `;
     if(withClose) document.getElementById('gdScanClose').onclick = closeModal;
   }
 
-  function renderGoldieScanReview(candidates){
+  function renderGoldieScanReview(candidates, rawText){
     const content = document.getElementById('modalContent');
     const catOptionsHtml = ['expense','neutral','income'].map(type => {
       const opts = BUDGET_CATEGORIES.filter(c => c.type === type)
@@ -2630,6 +2645,7 @@
       <div class="modal-title">⭐ Goldie — Review</div>
       <div class="modal-subtitle">Found ${candidates.length} possible transaction${candidates.length === 1 ? '' : 's'} — OCR guesses at date/category, so check before adding.</div>
       <div id="gdReviewList"></div>
+      ${goldieRawTextDetailsHtml(rawText)}
       <div class="modal-actions">
         <button class="cancel" id="gdReviewCancel">Cancel</button>
         <button class="save" id="gdReviewAdd">Add ${candidates.length}</button>
