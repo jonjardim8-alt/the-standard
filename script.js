@@ -1625,8 +1625,6 @@
   let taskSubView = 'today'; // 'today' | 'upcoming'
   let expandedGroups = new Set(); // tracks which groups are open — everything starts closed
   let todayTimelineExpanded = true; // Dashboard's unified Today card — starts open
-  let dashMoreExpanded = true;      // Dashboard's More card — starts open
-  let dashScoresExpanded = true;    // Dashboard's Scores card — starts open
   let calendarViewMonth = null;
 
   function startOfWeek(d){
@@ -2682,10 +2680,8 @@
     todayCard.appendChild(todayHeader);
 
     if(todayTimelineExpanded){
-      const habitDate = habitDayStr();
       const todayDayAbbr = DAYS[new Date().getDay()];
       const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
-      const tasksToday = state.tasks.filter(t => !t.done && t.dueDate === today);
       const todaysBlocks = (state.tomorrowPlans[today] || []);
 
       const eventsToday = [];
@@ -2695,41 +2691,26 @@
       (state.items[todayDayAbbr] || []).forEach(it => eventsToday.push(it));
       (state.datedEvents[today] || []).forEach(it => eventsToday.push(it));
 
-      // Anytime entries (checkable, no fixed time) first, then everything
-      // timed — planned blocks and calendar events genuinely merged and
-      // sorted together, not two separate lists.
+      // Just what's actually scheduled at a time today — planned blocks
+      // (Tomorrow tab) and calendar events genuinely merged and sorted
+      // together. Habits/tasks live in the widget tiles below instead of
+      // as rows here, so the timeline doesn't turn into a long checklist.
       const entries = [];
-      state.dailyGoals.forEach(g => {
-        const done = isDailyGoalDone(g.id, habitDate);
-        entries.push({
-          anytime:true, checkable:true, done, color:'#3CBF8C', text:g.name, meta:'Habit',
-          onToggle: () => { if(g.auto === 'Journal'){ switchSection('journal'); return; } toggleDailyGoal(g.id, habitDate); renderAll(); }
-        });
-      });
-      tasksToday.forEach(t => {
-        const cat = catById[t.category] || CATEGORIES[0];
-        entries.push({
-          anytime:true, checkable:true, done:false, color:cat.color, text:t.text,
-          meta: cat.label + (t.subcategory ? ' · ' + t.subcategory : '') + ' · due today',
-          onToggle: () => { setTaskDone(t, true); save(); renderAll(); }
-        });
-      });
       todaysBlocks.forEach(b => {
         const isNow = b.endTime && nowMin >= timeToMin(b.startTime) && nowMin < timeToMin(b.endTime);
         entries.push({
-          anytime:false, time:b.startTime, isNow, color:'#F2A93B', text:b.text,
+          time:b.startTime, isNow, color:'#F2A93B', text:b.text,
           meta: fmtTime(b.startTime) + (b.endTime ? '–' + fmtTime(b.endTime) : '') + ' · Planned'
         });
       });
       eventsToday.forEach(it => {
         const cat = catById[it.category] || CATEGORIES[0];
         entries.push({
-          anytime:false, time:it.time, color:cat.color, text:it.text,
+          time:it.time, color:cat.color, text:it.text,
           meta: fmtTime(it.time) + (it.endTime ? '–' + fmtTime(it.endTime) : '') + ' · ' + cat.label
         });
       });
-      const ordered = entries.filter(e => e.anytime)
-        .concat(entries.filter(e => !e.anytime).sort((a,b) => timeToMin(a.time) - timeToMin(b.time)));
+      const ordered = entries.sort((a,b) => timeToMin(a.time) - timeToMin(b.time));
 
       if(!ordered.length){
         const next = findNextEvent();
@@ -2774,145 +2755,124 @@
       }
     }
 
-    // Quick-nav grid — glanceable stats for everything else, tap to jump in.
-    // Same dash-card wrapper as Today, so it reads as another module in
-    // the same set instead of a bare title floating on the page.
-    const moreCard = document.createElement('div');
-    moreCard.className = 'dash-card';
-    wrap.appendChild(moreCard);
+    // Widgets — a bento grid of independent stat tiles (no enclosing card
+    // or header, each tile its own bordered box, closer to the reference
+    // image) instead of the old "More" list + separate "Scores" diamond.
+    const grid = document.createElement('div');
+    grid.className = 'dash-grid';
+    wrap.appendChild(grid);
 
-    const gridHeader = document.createElement('div');
-    gridHeader.className = 'dash-section-header';
-    gridHeader.innerHTML = `<span class="dash-header-title"><span class="chev${dashMoreExpanded ? '' : ' collapsed'}">▾</span> More</span>`;
-    gridHeader.querySelector('.dash-header-title').onclick = () => {
-      dashMoreExpanded = !dashMoreExpanded;
-      renderDashboardSection();
-    };
-    moreCard.appendChild(gridHeader);
-    if(dashMoreExpanded){
-      const grid = document.createElement('div');
-      grid.className = 'dash-grid';
+    // Overall score — ring tile
+    const scores = computeScores();
+    const overallTile = document.createElement('div');
+    overallTile.className = 'dash-ring-tile';
+    overallTile.style.setProperty('--accent-color', '#FFFFFF');
+    overallTile.style.setProperty('--pct', scores.overall.score ?? 0);
+    overallTile.innerHTML = `
+      <div class="ring"><div class="ring-inner">${scores.overall.score === null ? '–' : scores.overall.score}</div></div>
+      <div class="ring-body">
+        <div class="ring-title">Overall</div>
+        <div class="ring-sub">score · last 7 days</div>
+      </div>
+    `;
+    overallTile.onclick = () => switchSection('scores');
+    grid.appendChild(overallTile);
 
-      // Projects
-      const activeProjects = state.projects.filter(p => p.status === 'active');
-      let nextMilestone = null;
-      activeProjects.forEach(p => {
-        (p.milestones || []).filter(m => !m.done && m.targetDate).forEach(m => {
-          if(!nextMilestone || m.targetDate < nextMilestone.targetDate) nextMilestone = { name: m.name, targetDate: m.targetDate };
-        });
+    // Habits — ring tile (today's completion), not one row per habit
+    const habitDate = habitDayStr();
+    const dailyDone = state.dailyGoals.filter(g => isDailyGoalDone(g.id, habitDate)).length;
+    const dailyTotal = state.dailyGoals.length;
+    const habitsTile = document.createElement('div');
+    habitsTile.className = 'dash-ring-tile';
+    habitsTile.style.setProperty('--accent-color', '#3CBF8C');
+    habitsTile.style.setProperty('--pct', dailyTotal ? Math.round((dailyDone / dailyTotal) * 100) : 0);
+    habitsTile.innerHTML = `
+      <div class="ring"><div class="ring-inner">${dailyDone}/${dailyTotal}</div></div>
+      <div class="ring-body">
+        <div class="ring-title">Habits</div>
+        <div class="ring-sub">done today</div>
+      </div>
+    `;
+    habitsTile.onclick = () => switchSection('habits');
+    grid.appendChild(habitsTile);
+
+    // Tasks
+    const tasksDueToday = state.tasks.filter(t => !t.done && t.dueDate === today).length;
+    const tasksOverdue = state.tasks.filter(t => !t.done && t.dueDate < today).length;
+    grid.appendChild(makeDashTile({
+      color: '#5B8DEF',
+      title: 'Tasks',
+      stat: String(tasksDueToday),
+      sub: tasksOverdue ? tasksOverdue + ' overdue' : 'due today',
+      onClick: () => switchSection('tasks')
+    }));
+
+    // Next up
+    const next = findNextEvent();
+    grid.appendChild(makeDashTile({
+      color: next ? (catById[next.event.category] || CATEGORIES[0]).color : '#8B93A0',
+      title: 'Next',
+      stat: next ? fmtTime(next.event.time) : '—',
+      sub: next ? escapeHtml(next.event.text) : 'Nothing scheduled',
+      onClick: () => switchSection('calendar')
+    }));
+
+    // Projects
+    const activeProjects = state.projects.filter(p => p.status === 'active');
+    let nextMilestone = null;
+    activeProjects.forEach(p => {
+      (p.milestones || []).filter(m => !m.done && m.targetDate).forEach(m => {
+        if(!nextMilestone || m.targetDate < nextMilestone.targetDate) nextMilestone = { name: m.name, targetDate: m.targetDate };
       });
-      grid.appendChild(makeDashTile({
-        color: '#5B8DEF',
-        title: 'Projects',
-        stat: activeProjects.length + ' active',
-        sub: nextMilestone ? escapeHtml(nextMilestone.name) + ' · ' + fmtDate(nextMilestone.targetDate) : (state.projects.length ? 'No upcoming milestones' : 'No projects yet'),
-        onClick: () => switchSection('projects')
-      }));
+    });
+    grid.appendChild(makeDashTile({
+      color: '#5B8DEF',
+      title: 'Projects',
+      stat: activeProjects.length + ' active',
+      sub: nextMilestone ? escapeHtml(nextMilestone.name) + ' · ' + fmtDate(nextMilestone.targetDate) : (state.projects.length ? 'No upcoming milestones' : 'No projects yet'),
+      onClick: () => switchSection('projects')
+    }));
 
-      // Habits
-      const dailyDone = state.dailyGoals.filter(g => isDailyGoalDone(g.id, habitDayStr())).length;
-      grid.appendChild(makeDashTile({
-        color: '#3CBF8C',
-        title: 'Habits',
-        stat: dailyDone + '/' + state.dailyGoals.length,
-        sub: 'done today',
-        onClick: () => switchSection('habits')
-      }));
+    // Goals
+    grid.appendChild(makeDashTile({
+      color: '#B18CF2',
+      title: 'Goals',
+      stat: String(state.longTermGoals.length),
+      sub: state.longTermGoals.length === 1 ? 'goal set' : 'goals set',
+      onClick: () => switchSection('longgoals')
+    }));
 
-      // Goals
-      grid.appendChild(makeDashTile({
-        color: '#B18CF2',
-        title: 'Goals',
-        stat: String(state.longTermGoals.length),
-        sub: state.longTermGoals.length === 1 ? 'goal set' : 'goals set',
-        onClick: () => switchSection('longgoals')
-      }));
+    // Lists
+    const openItems = state.lists.reduce((s,l) => s + l.items.filter(i => !i.done).length, 0);
+    grid.appendChild(makeDashTile({
+      color: '#F2A93B',
+      title: 'Lists',
+      stat: String(state.lists.length),
+      sub: openItems + ' open item' + (openItems !== 1 ? 's' : ''),
+      onClick: () => switchSection('lists')
+    }));
 
-      // Lists
-      const openItems = state.lists.reduce((s,l) => s + l.items.filter(i => !i.done).length, 0);
-      grid.appendChild(makeDashTile({
-        color: '#F2A93B',
-        title: 'Lists',
-        stat: String(state.lists.length),
-        sub: openItems + ' open item' + (openItems !== 1 ? 's' : ''),
-        onClick: () => switchSection('lists')
-      }));
+    // Fitness
+    const fitDayAbbr = DAYS[new Date().getDay()];
+    const fitPlan = state.fitnessSplit && state.fitnessSplit.days ? state.fitnessSplit.days[fitDayAbbr] : null;
+    grid.appendChild(makeDashTile({
+      color: '#F2617A',
+      title: 'Fitness',
+      stat: fitPlan ? fitPlan.focus : '—',
+      sub: fitPlan && fitPlan.focus !== 'Rest' ? 'today' : 'rest day',
+      onClick: () => switchSection('fitness')
+    }));
 
-      // Fitness
-      const fitDayAbbr = DAYS[new Date().getDay()];
-      const fitPlan = state.fitnessSplit && state.fitnessSplit.days ? state.fitnessSplit.days[fitDayAbbr] : null;
-      grid.appendChild(makeDashTile({
-        color: '#F2617A',
-        title: 'Fitness',
-        stat: fitPlan ? fitPlan.focus : '—',
-        sub: fitPlan && fitPlan.focus !== 'Rest' ? 'today' : 'rest day',
-        onClick: () => switchSection('fitness')
-      }));
-
-      // Budget
-      const bmKey = budgetMonthKey(new Date());
-      const monthExpense = state.budgetTransactions.filter(t => t.date.startsWith(bmKey) && budgetCatById[t.category]?.type === 'expense').reduce((s,t) => s + t.amount, 0);
-      grid.appendChild(makeDashTile({
-        color: '#3FC7D6',
-        title: 'Budget',
-        stat: '$' + monthExpense.toFixed(0),
-        sub: 'spent this month',
-        onClick: () => switchSection('budget')
-      }));
-
-      moreCard.appendChild(grid);
-    }
-
-    // Scores — same dash-card wrapper as Today and More, tap the diamond
-    // itself to jump to the full Scores tab.
-    const scoresCard = document.createElement('div');
-    scoresCard.className = 'dash-card';
-    wrap.appendChild(scoresCard);
-
-    const scoresHeader = document.createElement('div');
-    scoresHeader.className = 'dash-section-header';
-    scoresHeader.innerHTML = `<span class="dash-header-title"><span class="chev${dashScoresExpanded ? '' : ' collapsed'}">▾</span> Scores</span>`;
-    scoresHeader.querySelector('.dash-header-title').onclick = () => {
-      dashScoresExpanded = !dashScoresExpanded;
-      renderDashboardSection();
-    };
-    scoresCard.appendChild(scoresHeader);
-
-    if(dashScoresExpanded){
-      const scores = computeScores();
-      // Corners fill in DOM order: top-left, top-right, bottom-left,
-      // bottom-right. If Budget is off there are only 3, so bottom-right
-      // is simply left empty rather than the layout reflowing.
-      const corners = [
-        { key:'core',    accent:'#5B8DEF', label:'Core' },
-        { key:'fitness', accent:'#3CBF8C', label:'Fitness' },
-        { key:'journal', accent:'#B18CF2', label:'Journal' },
-      ];
-      if(scores.budget.optedIn) corners.push({ key:'budget', accent:'#F2A93B', label:'Budget' });
-
-      const scoreWrap = document.createElement('div');
-      scoreWrap.className = 'dash-score-diamond';
-      scoreWrap.innerHTML = `
-        <div class="dash-score-inner">
-          <div class="dash-score-corners">
-            ${corners.map(t => `
-              <div class="dash-score-corner" style="--accent-color:${t.accent}">
-                <div class="n">${scores[t.key].score === null ? '–' : scores[t.key].score}</div>
-                <div class="l">${escapeHtml(t.label)}</div>
-              </div>
-            `).join('')}
-          </div>
-          <div class="dash-score-overall" style="--accent-color:#FFFFFF; --pct:${scores.overall.score ?? 0}">
-            <div class="dash-score-overall-ring">
-              <div class="n">${scores.overall.score === null ? '–' : scores.overall.score}</div>
-              <div class="l">Overall</div>
-            </div>
-          </div>
-        </div>
-      `;
-      scoreWrap.onclick = () => switchSection('scores');
-      scoresCard.appendChild(scoreWrap);
-    }
+    // Budget
+    const bmKey = budgetMonthKey(new Date());
+    const monthExpense = state.budgetTransactions.filter(t => t.date.startsWith(bmKey) && budgetCatById[t.category]?.type === 'expense').reduce((s,t) => s + t.amount, 0);
+    grid.appendChild(makeDashTile({
+      color: '#3FC7D6',
+      title: 'Budget',
+      stat: '$' + monthExpense.toFixed(0),
+      sub: 'spent this month',
+      onClick: () => switchSection('budget')
+    }));
   }
 
   function makeDashTile(opts){

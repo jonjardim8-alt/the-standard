@@ -755,23 +755,20 @@
   .lg-saved-tag.show{ opacity:1; }
 
   /* ---- Dashboard ---- */
-  /* Shared card wrapper for every dashboard section (Today, More,
-     Scores) — one consistent module language (recessed container +
-     header) instead of some sections floating free and others boxed,
-     which read as disconnected. Deliberately a shade darker than the
-     --card tiles/rows inside it (dash-tile, dash-score-corner, today-
-     timeline) so content still pops forward from its container. */
+  /* Card wrapper used for the Today timeline (a list benefits from a
+     containing card). The widgets grid below it deliberately does NOT
+     use this — each widget tile is its own independent bordered box
+     directly on the page, closer to the reference's look, with the
+     grid's own consistent spacing doing the work of tying them together
+     instead of one big enclosing card. */
   .dash-card{
     background: var(--bg-elevated);
     border: 1px solid var(--border);
     border-radius: 14px;
     padding: 14px 14px 4px;
     margin-bottom: 18px;
-    box-shadow: 0 0 30px -14px var(--accent);
   }
   .dash-card .dash-section-header{ margin-bottom: 4px; }
-  .dash-card .dash-grid{ padding-bottom: 10px; }
-  .dash-card .dash-score-diamond{ padding-bottom: 10px; }
   .today-timeline{
     position: relative;
     padding: 4px 0 10px;
@@ -831,7 +828,6 @@
     border-left: 3px solid var(--accent-color, var(--accent));
     border-radius: 12px;
     padding: 14px 16px;
-    box-shadow: 0 0 18px -8px var(--accent-color, var(--accent));
   }
   .dash-next-time{ font-family: var(--font-mono); font-size: 12px; color: var(--accent-color, var(--accent)); }
   .dash-next-text{ font-family: var(--font-display); font-weight:600; font-size: 18px; color: var(--text); margin-top: 3px; }
@@ -967,101 +963,6 @@
     padding: 2px 4px;
   }
 
-  .dash-score-diamond{
-    margin: 0 0 16px;
-    cursor: pointer;
-  }
-  .dash-score-inner{
-    position: relative;
-    width: 100%;
-    aspect-ratio: 1;
-  }
-  .dash-score-corners{
-    position: absolute;
-    inset: 0;
-    display:grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: 1fr 1fr;
-  }
-  .dash-score-corner{
-    position: relative;
-    z-index: 2;
-    width: 38%;
-    aspect-ratio: 1;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    background: color-mix(in srgb, var(--accent-color, var(--accent)) 14%, var(--card));
-    border-left: 3px solid var(--accent-color, var(--accent));
-    border-radius: 12px;
-    padding: 10px;
-    box-shadow: 0 0 14px -6px var(--accent-color, var(--accent));
-  }
-  .dash-score-corners > :nth-child(1){ justify-self:start; align-self:start; }
-  .dash-score-corners > :nth-child(2){ justify-self:end;   align-self:start; }
-  .dash-score-corners > :nth-child(3){ justify-self:start; align-self:end; }
-  .dash-score-corners > :nth-child(4){ justify-self:end;   align-self:end; }
-  .dash-score-corner .n{
-    font-family: var(--font-display);
-    font-weight: 700;
-    font-size: 30px;
-    color: var(--accent-color, var(--accent));
-    line-height: 1;
-    text-shadow: 0 0 10px color-mix(in srgb, var(--accent-color, var(--accent)) 60%, transparent);
-  }
-  .dash-score-corner .l{
-    position: absolute;
-    left: 0; right: 0;
-    bottom: 10px;
-    text-align: center;
-    font-family: var(--font-mono);
-    font-size: 11px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--text-soft);
-  }
-  /* Overall — a glowing circular progress ring (conic-gradient sweep for
-     the score, --card cutout in the middle for the donut hole) instead of
-     a plain bordered square, for a more compelling centerpiece stat. */
-  .dash-score-overall{
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    width: 50%;
-    aspect-ratio: 1;
-    z-index: 1;
-    border-radius: 50%;
-    background: conic-gradient(var(--accent-color, var(--accent)) calc(var(--pct, 0) * 1%), var(--border) 0);
-    box-shadow: 0 0 22px -2px var(--accent-color, var(--accent));
-    padding: 9px;
-  }
-  .dash-score-overall-ring{
-    width:100%;
-    height:100%;
-    border-radius: 50%;
-    background: var(--card);
-    display:flex;
-    flex-direction: column;
-    align-items:center;
-    justify-content:center;
-  }
-  .dash-score-overall .n{
-    font-family: var(--font-display);
-    font-weight: 700;
-    font-size: 40px;
-    color: var(--text);
-    line-height: 1;
-    text-shadow: 0 0 14px var(--accent-color, var(--accent));
-  }
-  .dash-score-overall .l{
-    font-family: var(--font-mono);
-    font-size: 10px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-soft);
-    margin-top: 5px;
-  }
-
   .score-card{
     background: color-mix(in srgb, var(--accent-color, var(--accent)) 14%, var(--card));
     border-left: 3px solid var(--accent-color, var(--accent));
@@ -1172,14 +1073,61 @@
     display:grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
+    margin-bottom: 18px;
   }
   .dash-tile{
     background: var(--card);
     border-radius: 12px;
     padding: 13px 14px;
     border-left: 3px solid var(--accent-color, var(--accent));
-    box-shadow: 0 0 14px -8px var(--accent-color, var(--accent));
     cursor: pointer;
+  }
+  /* Ring widget tile — same size/border language as dash-tile, but with a
+     compact conic-gradient progress ring instead of a plain stat number
+     (Overall score, Habits done-today). */
+  .dash-ring-tile{
+    background: var(--card);
+    border-radius: 12px;
+    padding: 11px 14px;
+    border-left: 3px solid var(--accent-color, var(--accent));
+    cursor: pointer;
+    display:flex;
+    align-items:center;
+    gap: 11px;
+  }
+  .dash-ring-tile:active{ background: var(--card-hover); }
+  .dash-ring-tile .ring{
+    flex: 0 0 auto;
+    width: 46px; height:46px;
+    border-radius: 50%;
+    background: conic-gradient(var(--accent-color, var(--accent)) calc(var(--pct, 0) * 1%), var(--border) 0);
+    padding: 5px;
+  }
+  .dash-ring-tile .ring-inner{
+    width:100%; height:100%;
+    border-radius:50%;
+    background: var(--card);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family: var(--font-display);
+    font-weight:700;
+    font-size: 12px;
+    color: var(--text);
+  }
+  .dash-ring-tile .ring-body{ flex:1; min-width:0; }
+  .dash-ring-tile .ring-title{
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-faint);
+    margin-bottom: 4px;
+  }
+  .dash-ring-tile .ring-sub{
+    font-size: 10.5px;
+    color: var(--text-soft);
+    line-height: 1.3;
   }
   .dash-tile:active{ background: var(--card-hover); }
   .dash-tile-title{
