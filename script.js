@@ -2258,6 +2258,15 @@
     return toDateStr(d);
   }
 
+  // Looks up a linked habit's name for display — a block stores just
+  // {habitKind, habitId}, not the name, so it always reflects a rename.
+  function linkedHabitName(b){
+    if(!b.habitId || !b.habitKind) return null;
+    const list = b.habitKind === 'daily' ? state.dailyGoals : state.weeklyGoals;
+    const habit = list.find(g => g.id === b.habitId);
+    return habit ? habit.name : null;
+  }
+
   // Opened from the header button (same spot Weekly Review used to live),
   // not a tab — a modal, same pattern as the old Week Review.
   function openTomorrowModal(){
@@ -2269,13 +2278,19 @@
     const blocks = state.tomorrowPlans[dateStr].slice().sort((a,b) => timeToMin(a.startTime) - timeToMin(b.startTime));
 
     const listHtml = blocks.length
-      ? blocks.map(b => `
+      ? blocks.map(b => {
+          const habitName = linkedHabitName(b);
+          return `
           <div class="tomorrow-block-row" data-block-id="${b.id}">
             <div class="tomorrow-block-time">${fmtTime(b.startTime)}${b.endTime ? '–' + fmtTime(b.endTime) : ''}</div>
-            <div class="tomorrow-block-text">${escapeHtml(b.text)}</div>
+            <div style="flex:1;min-width:0">
+              <div class="tomorrow-block-text">${escapeHtml(b.text)}</div>
+              ${habitName ? '<div class="proj-desc">🔗 ' + escapeHtml(habitName) + '</div>' : ''}
+            </div>
             <button class="tomorrow-block-del">×</button>
           </div>
-        `).join('')
+        `;
+        }).join('')
       : '<div class="empty-note">Nothing planned yet — tap + Add below.</div>';
 
     content.innerHTML = `
@@ -2307,6 +2322,16 @@
     content.style.removeProperty('--chip-color');
     const dateStr = tomorrowDateStr();
 
+    // Link to a habit so its schedule slot can be checked off (Daily) or
+    // logged (Weekly) directly from the Dashboard's Today timeline once
+    // this block's day arrives — see the todaysBlocks entries in
+    // renderDashboardSection.
+    const dailyOptions = state.dailyGoals.map(g => '<option value="daily:' + g.id + '">' + escapeHtml(g.name) + '</option>').join('');
+    const weeklyOptions = state.weeklyGoals.filter(g => !g.auto).map(g => '<option value="weekly:' + g.id + '">' + escapeHtml(g.name) + '</option>').join('');
+    const habitLinkOptionsHtml = '<option value="">None</option>'
+      + (dailyOptions ? '<optgroup label="Daily habits">' + dailyOptions + '</optgroup>' : '')
+      + (weeklyOptions ? '<optgroup label="Weekly habits">' + weeklyOptions + '</optgroup>' : '');
+
     content.innerHTML = `
       <div class="modal-handle"></div>
       <div class="modal-title">Add to tomorrow's plan</div>
@@ -2317,20 +2342,25 @@
       <input type="time" id="tbStart" value="09:00">
       <label>End time (optional)</label>
       <input type="time" id="tbEnd">
+      <label>Link to a habit (optional)</label>
+      ${customSelectHtml('tbHabit', habitLinkOptionsHtml, '', 'None')}
       <div class="modal-actions">
         <button class="cancel" id="tbCancel">Cancel</button>
         <button class="save" id="tbSave">Save</button>
       </div>
     `;
     overlay.classList.remove('hidden');
+    wireCustomSelect('tbHabit', habitLinkOptionsHtml, 'Link to a habit');
     document.getElementById('tbCancel').onclick = openTomorrowModal;
     document.getElementById('tbSave').onclick = () => {
       const text = document.getElementById('tbText').value.trim();
       if(!text) return;
       const startTime = document.getElementById('tbStart').value || '09:00';
       const endTime = document.getElementById('tbEnd').value || null;
+      const linkVal = document.getElementById('tbHabit').value;
+      const [habitKind, habitId] = linkVal ? linkVal.split(':') : [null, null];
       if(!state.tomorrowPlans[dateStr]) state.tomorrowPlans[dateStr] = [];
-      state.tomorrowPlans[dateStr].push({ id: Date.now() + '-' + Math.random().toString(36).slice(2,7), text, startTime, endTime });
+      state.tomorrowPlans[dateStr].push({ id: Date.now() + '-' + Math.random().toString(36).slice(2,7), text, startTime, endTime, habitKind, habitId });
       save();
       openTomorrowModal();
     };
@@ -2780,14 +2810,36 @@
       // Just what's actually scheduled at a time today — planned blocks
       // (Tomorrow tab) and calendar events genuinely merged and sorted
       // together. Habits/tasks live in the widget tiles below instead of
-      // as rows here, so the timeline doesn't turn into a long checklist.
+      // as rows here, so the timeline doesn't turn into a long checklist —
+      // the one exception is a planned block explicitly linked to a habit
+      // (set when it was added from the Tomorrow tab), which gets a
+      // checkbox so it can be marked done right from its scheduled slot.
       const entries = [];
       todaysBlocks.forEach(b => {
         const isNow = b.endTime && nowMin >= timeToMin(b.startTime) && nowMin < timeToMin(b.endTime);
-        entries.push({
+        const entry = {
           time:b.startTime, isNow, color:'#F2A93B', text:b.text,
           meta: fmtTime(b.startTime) + (b.endTime ? '–' + fmtTime(b.endTime) : '') + ' · Planned'
-        });
+        };
+        if(b.habitId && b.habitKind === 'daily'){
+          entry.checkable = true;
+          entry.done = isDailyGoalDone(b.habitId, today);
+          entry.onToggle = () => { toggleDailyGoal(b.habitId, today); renderAll(); };
+        } else if(b.habitId && b.habitKind === 'weekly'){
+          const weeklyGoal = state.weeklyGoals.find(g => g.id === b.habitId);
+          if(weeklyGoal){
+            entry.checkable = true;
+            entry.done = !!b.weeklyMarkedDone;
+            entry.meta += ' · ' + getWeeklyGoalCount(weeklyGoal, realCurrentWeekStart()) + '/' + weeklyGoal.target + ' this week';
+            entry.onToggle = () => {
+              adjustWeeklyGoal(weeklyGoal, b.weeklyMarkedDone ? -1 : 1);
+              b.weeklyMarkedDone = !b.weeklyMarkedDone;
+              save();
+              renderAll();
+            };
+          }
+        }
+        entries.push(entry);
       });
       eventsToday.forEach(it => {
         const cat = catById[it.category] || CATEGORIES[0];
