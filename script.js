@@ -2656,60 +2656,35 @@
     heading.textContent = new Date().toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' });
     wrap.appendChild(heading);
 
-    // Today's Plan — the time-blocked plan set the night before via the
-    // Tomorrow tab, now that "tomorrow" has become today. Leads the
-    // dashboard since it's the actual game plan for the day; tap through
-    // to the Tomorrow tab to edit it.
-    const planTitle = document.createElement('div');
-    planTitle.className = 'task-section-title';
-    planTitle.innerHTML = "<span>Today's plan</span>";
-    planTitle.onclick = openTomorrowModal;
-    wrap.appendChild(planTitle);
+    // Today — one connected timeline instead of stacked, separately-
+    // titled widgets: habits + tasks due today (checkable, no fixed time)
+    // first, then the planned blocks from the Tomorrow tab merged with
+    // today's calendar events (fixed blocks + recurring + one-off), all
+    // sorted by time and drawn on a single connecting line. Falls back to
+    // findNextEvent() only when the whole day is empty.
+    const todayCard = document.createElement('div');
+    todayCard.className = 'today-card';
+    wrap.appendChild(todayCard);
 
-    const todaysBlocks = (state.tomorrowPlans[today] || []).slice().sort((a,b) => timeToMin(a.startTime) - timeToMin(b.startTime));
-    if(!todaysBlocks.length){
-      const empty = document.createElement('div');
-      empty.className = 'empty-note';
-      empty.textContent = 'No plan set for today — add it the night before from the Tomorrow tab.';
-      wrap.appendChild(empty);
-    } else {
-      const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
-      const planList = document.createElement('div');
-      planList.className = 'task-list';
-      planList.style.marginBottom = '18px';
-      todaysBlocks.forEach(b => {
-        const startMin = timeToMin(b.startTime);
-        const isNow = b.endTime && nowMin >= startMin && nowMin < timeToMin(b.endTime);
-        const row = document.createElement('div');
-        row.className = 'tomorrow-block-row' + (isNow ? ' now' : '');
-        row.innerHTML = `
-          <div class="tomorrow-block-time">${fmtTime(b.startTime)}${b.endTime ? '–' + fmtTime(b.endTime) : ''}</div>
-          <div class="tomorrow-block-text"></div>
-        `;
-        row.querySelector('.tomorrow-block-text').textContent = b.text;
-        planList.appendChild(row);
-      });
-      wrap.appendChild(planList);
-    }
-
-    // Today — a true unified view: habits, tasks due today, and today's
-    // calendar events (fixed blocks + recurring + one-off) woven into one
-    // list instead of separate side-by-side widgets. Falls back to
-    // findNextEvent() only when today itself is completely empty, so
-    // there's still some forward visibility rather than a dead end.
     const todayHeader = document.createElement('div');
     todayHeader.className = 'dash-section-header';
-    todayHeader.innerHTML = `<span class="dash-header-title"><span class="chev${todayTimelineExpanded ? '' : ' collapsed'}">▾</span> Today</span>`;
+    todayHeader.innerHTML = `
+      <span class="dash-header-title"><span class="chev${todayTimelineExpanded ? '' : ' collapsed'}">▾</span> Today</span>
+      <span class="dash-header-arrow" id="todayPlanBtn">Plan →</span>
+    `;
     todayHeader.querySelector('.dash-header-title').onclick = () => {
       todayTimelineExpanded = !todayTimelineExpanded;
       renderDashboardSection();
     };
-    wrap.appendChild(todayHeader);
+    todayHeader.querySelector('#todayPlanBtn').onclick = (e) => { e.stopPropagation(); openTomorrowModal(); };
+    todayCard.appendChild(todayHeader);
 
     if(todayTimelineExpanded){
       const habitDate = habitDayStr();
       const todayDayAbbr = DAYS[new Date().getDay()];
+      const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
       const tasksToday = state.tasks.filter(t => !t.done && t.dueDate === today);
+      const todaysBlocks = (state.tomorrowPlans[today] || []);
 
       const eventsToday = [];
       blocksForDate(todayDayAbbr, today).forEach(b => {
@@ -2717,10 +2692,44 @@
       });
       (state.items[todayDayAbbr] || []).forEach(it => eventsToday.push(it));
       (state.datedEvents[today] || []).forEach(it => eventsToday.push(it));
-      eventsToday.sort((a,b) => timeToMin(a.time) - timeToMin(b.time));
 
-      const hasAnything = state.dailyGoals.length || tasksToday.length || eventsToday.length;
-      if(!hasAnything){
+      // Anytime entries (checkable, no fixed time) first, then everything
+      // timed — planned blocks and calendar events genuinely merged and
+      // sorted together, not two separate lists.
+      const entries = [];
+      state.dailyGoals.forEach(g => {
+        const done = isDailyGoalDone(g.id, habitDate);
+        entries.push({
+          anytime:true, checkable:true, done, color:'#3CBF8C', text:g.name, meta:'Habit',
+          onToggle: () => { if(g.auto === 'Journal'){ switchSection('journal'); return; } toggleDailyGoal(g.id, habitDate); renderAll(); }
+        });
+      });
+      tasksToday.forEach(t => {
+        const cat = catById[t.category] || CATEGORIES[0];
+        entries.push({
+          anytime:true, checkable:true, done:false, color:cat.color, text:t.text,
+          meta: cat.label + (t.subcategory ? ' · ' + t.subcategory : '') + ' · due today',
+          onToggle: () => { setTaskDone(t, true); save(); renderAll(); }
+        });
+      });
+      todaysBlocks.forEach(b => {
+        const isNow = b.endTime && nowMin >= timeToMin(b.startTime) && nowMin < timeToMin(b.endTime);
+        entries.push({
+          anytime:false, time:b.startTime, isNow, color:'#F2A93B', text:b.text,
+          meta: fmtTime(b.startTime) + (b.endTime ? '–' + fmtTime(b.endTime) : '') + ' · Planned'
+        });
+      });
+      eventsToday.forEach(it => {
+        const cat = catById[it.category] || CATEGORIES[0];
+        entries.push({
+          anytime:false, time:it.time, color:cat.color, text:it.text,
+          meta: fmtTime(it.time) + (it.endTime ? '–' + fmtTime(it.endTime) : '') + ' · ' + cat.label
+        });
+      });
+      const ordered = entries.filter(e => e.anytime)
+        .concat(entries.filter(e => !e.anytime).sort((a,b) => timeToMin(a.time) - timeToMin(b.time)));
+
+      if(!ordered.length){
         const next = findNextEvent();
         if(next){
           const cat = catById[next.event.category] || CATEGORIES[0];
@@ -2733,56 +2742,33 @@
             <div class="dash-next-text">${escapeHtml(next.event.text)}</div>
             <div class="dash-next-meta">Nothing today · next up ${escapeHtml(dayLabel)} · ${cat.label}</div>
           `;
-          wrap.appendChild(card);
+          todayCard.appendChild(card);
         } else {
           const empty = document.createElement('div');
           empty.className = 'empty-note';
           empty.textContent = 'Nothing on your plate today.';
-          wrap.appendChild(empty);
+          todayCard.appendChild(empty);
         }
       } else {
-        const list = document.createElement('div');
-        list.className = 'task-list';
-
-        state.dailyGoals.forEach(g => {
-          const done = isDailyGoalDone(g.id, habitDate);
+        const timeline = document.createElement('div');
+        timeline.className = 'today-timeline';
+        ordered.forEach(e => {
           const row = document.createElement('div');
-          row.className = 'task-item' + (done ? ' done' : '');
-          row.style.setProperty('--accent-color', '#3CBF8C');
-          row.innerHTML = '<button class="task-check">✓</button><div class="task-body"><div class="task-txt"></div><div class="task-meta">Habit</div></div>';
-          row.querySelector('.task-txt').textContent = g.name;
-          row.querySelector('.task-check').onclick = () => {
-            if(g.auto === 'Journal'){ switchSection('journal'); return; }
-            toggleDailyGoal(g.id, habitDate);
-            renderAll();
-          };
-          list.appendChild(row);
+          row.className = 'today-timeline-item' + (e.isNow ? ' now' : '') + (e.done ? ' done' : '');
+          row.style.setProperty('--accent-color', e.color);
+          row.innerHTML = `
+            ${e.checkable ? '<button class="today-timeline-check' + (e.done ? ' done' : '') + '"></button>' : '<span class="today-timeline-dot"></span>'}
+            <div class="today-timeline-body">
+              <div class="today-timeline-text"></div>
+              <div class="today-timeline-meta"></div>
+            </div>
+          `;
+          row.querySelector('.today-timeline-text').textContent = e.text;
+          row.querySelector('.today-timeline-meta').textContent = e.meta;
+          if(e.checkable) row.querySelector('.today-timeline-check').onclick = e.onToggle;
+          timeline.appendChild(row);
         });
-
-        tasksToday.forEach(t => {
-          const cat = catById[t.category] || CATEGORIES[0];
-          const row = document.createElement('div');
-          row.className = 'task-item';
-          row.style.setProperty('--accent-color', cat.color);
-          row.innerHTML = '<button class="task-check">✓</button><div class="task-body"><div class="task-txt"></div><div class="task-meta"></div></div>';
-          row.querySelector('.task-txt').textContent = t.text;
-          row.querySelector('.task-meta').textContent = cat.label + (t.subcategory ? ' · ' + t.subcategory : '') + ' · due today';
-          row.querySelector('.task-check').onclick = () => { setTaskDone(t, true); save(); renderAll(); };
-          list.appendChild(row);
-        });
-
-        eventsToday.forEach(it => {
-          const cat = catById[it.category] || CATEGORIES[0];
-          const row = document.createElement('div');
-          row.className = 'task-item';
-          row.style.setProperty('--accent-color', cat.color);
-          row.innerHTML = '<div class="task-body"><div class="task-txt"></div><div class="task-meta"></div></div>';
-          row.querySelector('.task-txt').textContent = it.text;
-          row.querySelector('.task-meta').textContent = fmtTime(it.time) + (it.endTime ? '–' + fmtTime(it.endTime) : '') + ' · ' + cat.label;
-          list.appendChild(row);
-        });
-
-        wrap.appendChild(list);
+        todayCard.appendChild(timeline);
       }
     }
 

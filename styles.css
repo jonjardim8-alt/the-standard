@@ -755,6 +755,72 @@
   .lg-saved-tag.show{ opacity:1; }
 
   /* ---- Dashboard ---- */
+  /* Today card — one cohesive module (header + connected timeline) for
+     habits/tasks/planned-blocks/calendar-events together, rather than
+     each rendered as its own separately-titled, separately-bordered
+     stack of widgets. */
+  .today-card{
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 14px 4px;
+    margin-bottom: 18px;
+  }
+  .today-card .dash-section-header{ margin-bottom: 4px; }
+  .today-timeline{
+    position: relative;
+    padding: 4px 0 10px;
+  }
+  .today-timeline::before{
+    content:'';
+    position:absolute;
+    left: 6px;
+    top: 6px;
+    bottom: 14px;
+    width: 2px;
+    background: var(--border);
+  }
+  .today-timeline-item{
+    position: relative;
+    display:flex;
+    align-items:flex-start;
+    gap: 12px;
+    padding-bottom: 14px;
+  }
+  .today-timeline-item:last-child{ padding-bottom:0; }
+  .today-timeline-dot, .today-timeline-check{
+    position: relative;
+    z-index: 1;
+    flex: 0 0 auto;
+    width: 14px; height:14px;
+    margin-top: 2px;
+    border-radius: 50%;
+  }
+  .today-timeline-dot{
+    background: var(--accent-color, var(--accent));
+    border: 2px solid var(--card);
+    box-shadow: 0 0 0 2px var(--accent-color, var(--accent));
+  }
+  .today-timeline-check{
+    background: var(--bg-elevated);
+    border: 2px solid var(--accent-color, var(--accent));
+    cursor:pointer;
+    padding:0;
+  }
+  .today-timeline-check.done{ background: var(--accent-color, var(--accent)); }
+  .today-timeline-check.done::after{
+    content:'✓';
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:9px; color:#fff; line-height:1;
+  }
+  .today-timeline-body{ flex:1; min-width:0; }
+  .today-timeline-text{ font-size: 13.5px; color: var(--text); line-height:1.3; }
+  .today-timeline-meta{ font-family: var(--font-mono); font-size: 10px; color: var(--text-soft); margin-top: 2px; }
+  .today-timeline-item.done .today-timeline-text{ text-decoration: line-through; color: var(--text-faint); }
+  .today-timeline-item.now .today-timeline-text{ font-weight:700; color: var(--accent-color, var(--accent)); }
+  .today-timeline-item.now .today-timeline-dot{ box-shadow: 0 0 0 2px var(--accent-color, var(--accent)), 0 0 0 5px color-mix(in srgb, var(--accent-color, var(--accent)) 30%, transparent); }
+
   .dash-next-card{
     background: color-mix(in srgb, var(--accent-color, var(--accent)) 14%, var(--card));
     border-left: 3px solid var(--accent-color, var(--accent));
