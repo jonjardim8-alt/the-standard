@@ -1626,6 +1626,7 @@
   let expandedGroups = new Set(); // tracks which groups are open — everything starts closed
   let todayTimelineExpanded = true; // Dashboard's unified Today card — starts open
   let dashTasksExpanded = false; // Dashboard's Tasks widget — starts collapsed
+  let dashBudgetExpanded = false; // Dashboard's Budget widget — starts collapsed
   let calendarViewMonth = null;
 
   function startOfWeek(d){
@@ -2798,59 +2799,68 @@
     grid.appendChild(habitsTile);
 
     // Budget — remaining for the month against category limits, not just
-    // raw spend, so the number answers "how much do I have left."
+    // raw spend, so the number answers "how much do I have left." Tapping
+    // the tile expands it in place to show the per-category breakdown
+    // instead of navigating to the Budget tab.
     const bmKey = budgetMonthKey(new Date());
-    const monthExpense = state.budgetTransactions.filter(t => t.date.startsWith(bmKey) && budgetCatById[t.category]?.type === 'expense').reduce((s,t) => s + t.amount, 0);
+    const monthTxns = state.budgetTransactions.filter(t => t.date.startsWith(bmKey));
+    const monthExpense = monthTxns.filter(t => budgetCatById[t.category]?.type === 'expense').reduce((s,t) => s + t.amount, 0);
     const totalLimit = Object.values(state.categoryBudgetLimits).reduce((s,v) => s + (v || 0), 0);
     const hasLimits = totalLimit > 0;
     const remaining = totalLimit - monthExpense;
-    grid.appendChild(makeDashTile({
+    grid.appendChild(makeDashExpandTile({
       color: hasLimits ? (remaining < 0 ? '#F2617A' : '#3FC7D6') : '#3FC7D6',
       title: 'Budget',
       stat: hasLimits ? '$' + Math.abs(remaining).toFixed(0) : '$' + monthExpense.toFixed(0),
       sub: hasLimits ? (remaining < 0 ? 'over this month' : 'left this month') : 'spent this month',
-      onClick: () => switchSection('budget')
+      expanded: dashBudgetExpanded,
+      onToggle: () => { dashBudgetExpanded = !dashBudgetExpanded; renderDashboardSection(); },
+      renderBody: (body) => {
+        const statuses = computeCategoryBudgetStatus(monthTxns);
+        if(!statuses.length){
+          const empty = document.createElement('div');
+          empty.className = 'empty-note';
+          empty.textContent = 'No category budgets set yet.';
+          body.appendChild(empty);
+          return;
+        }
+        statuses.forEach(s => {
+          const row = document.createElement('div');
+          row.className = 'dash-expand-row';
+          row.innerHTML = `<span class="drow-name">${escapeHtml(s.cat.label)}</span><span class="drow-amt${s.over ? ' over' : ''}">$${s.spent.toFixed(0)} / $${s.limit.toFixed(0)}</span>`;
+          body.appendChild(row);
+        });
+      }
     }));
 
-    // Tasks — a separate expandable widget rather than a grid tile: collapsed
-    // shows a compact due-today/overdue count, expanded lists everything due
-    // within the upcoming week so the dashboard can answer "what's coming"
-    // without opening the Tasks tab.
+    // Tasks — same expand-in-place pattern: collapsed shows a compact
+    // due-today/overdue count, expanded lists everything due within the
+    // upcoming week so the dashboard can answer "what's coming" without
+    // opening the Tasks tab.
     const tasksDueToday = state.tasks.filter(t => !t.done && t.dueDate === today).length;
     const tasksOverdue = state.tasks.filter(t => !t.done && t.dueDate < today).length;
-    const tasksStat = tasksOverdue ? tasksOverdue + ' overdue' : (tasksDueToday ? tasksDueToday + ' due today' : 'All clear');
+    grid.appendChild(makeDashExpandTile({
+      color: tasksOverdue ? '#F2617A' : '#5B8DEF',
+      title: 'Tasks',
+      stat: String(tasksOverdue || tasksDueToday || 0),
+      sub: tasksOverdue ? 'overdue' : (tasksDueToday ? 'due today' : 'all clear'),
+      expanded: dashTasksExpanded,
+      onToggle: () => { dashTasksExpanded = !dashTasksExpanded; renderDashboardSection(); },
+      renderBody: (body) => {
+        const weekAhead = new Date();
+        weekAhead.setDate(weekAhead.getDate() + 7);
+        const weekAheadStr = toDateStr(weekAhead);
+        const upcoming = state.tasks
+          .filter(t => !t.done && t.dueDate && t.dueDate <= weekAheadStr)
+          .sort((a,b) => a.dueDate.localeCompare(b.dueDate));
 
-    const tasksWidget = document.createElement('div');
-    tasksWidget.className = 'dash-card';
-    wrap.appendChild(tasksWidget);
-
-    const tasksHeader = document.createElement('div');
-    tasksHeader.className = 'dash-section-header';
-    tasksHeader.innerHTML = `
-      <span class="dash-header-title"><span class="chev${dashTasksExpanded ? '' : ' collapsed'}">▾</span> Tasks</span>
-      <span class="dash-header-arrow">${escapeHtml(tasksStat)}</span>
-    `;
-    tasksHeader.querySelector('.dash-header-title').onclick = () => {
-      dashTasksExpanded = !dashTasksExpanded;
-      renderDashboardSection();
-    };
-    tasksHeader.querySelector('.dash-header-arrow').onclick = (e) => { e.stopPropagation(); switchSection('tasks'); };
-    tasksWidget.appendChild(tasksHeader);
-
-    if(dashTasksExpanded){
-      const weekAhead = new Date();
-      weekAhead.setDate(weekAhead.getDate() + 7);
-      const weekAheadStr = toDateStr(weekAhead);
-      const upcoming = state.tasks
-        .filter(t => !t.done && t.dueDate && t.dueDate <= weekAheadStr)
-        .sort((a,b) => a.dueDate.localeCompare(b.dueDate));
-
-      if(!upcoming.length){
-        const empty = document.createElement('div');
-        empty.className = 'empty-note';
-        empty.textContent = 'Nothing due in the next week.';
-        tasksWidget.appendChild(empty);
-      } else {
+        if(!upcoming.length){
+          const empty = document.createElement('div');
+          empty.className = 'empty-note';
+          empty.textContent = 'Nothing due in the next week.';
+          body.appendChild(empty);
+          return;
+        }
         const list = document.createElement('div');
         list.className = 'task-list';
         upcoming.forEach(t => {
@@ -2867,9 +2877,9 @@
           row.querySelector('.task-check').onclick = () => { setTaskDone(t, true); save(); renderAll(); };
           list.appendChild(row);
         });
-        tasksWidget.appendChild(list);
+        body.appendChild(list);
       }
-    }
+    }));
   }
 
   function makeDashTile(opts){
@@ -2882,6 +2892,33 @@
       <div class="dash-tile-sub">${opts.sub}</div>
     `;
     tile.onclick = opts.onClick;
+    return tile;
+  }
+
+  // A dash-tile that expands in place on tap — instead of navigating away
+  // or dropping down under a header — growing to full grid width and
+  // revealing opts.renderBody's content below the usual stat/sub.
+  function makeDashExpandTile(opts){
+    const tile = document.createElement('div');
+    tile.className = 'dash-tile expandable' + (opts.expanded ? ' expanded' : '');
+    tile.style.setProperty('--accent-color', opts.color);
+
+    const head = document.createElement('div');
+    head.className = 'dash-tile-head';
+    head.innerHTML = `
+      <div class="dash-tile-title">${escapeHtml(opts.title)}</div>
+      <div class="dash-tile-stat">${opts.stat}</div>
+      <div class="dash-tile-sub">${opts.sub}</div>
+    `;
+    head.onclick = opts.onToggle;
+    tile.appendChild(head);
+
+    if(opts.expanded){
+      const body = document.createElement('div');
+      body.className = 'dash-expand-body';
+      opts.renderBody(body);
+      tile.appendChild(body);
+    }
     return tile;
   }
 

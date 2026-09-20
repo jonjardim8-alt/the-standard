@@ -1150,6 +1150,29 @@
     margin-top: 3px;
     line-height: 1.35;
   }
+  /* Expand-in-place tile (Budget, Tasks) — tapping the head grows the tile
+     to full grid width and reveals renderBody's content below, instead of
+     navigating away or dropping down under a separate header. */
+  .dash-tile.expandable .dash-tile-head{ cursor:pointer; }
+  .dash-tile.expanded{ grid-column: 1 / -1; }
+  .dash-expand-body{
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    display:flex;
+    flex-direction:column;
+    gap: 6px;
+  }
+  .dash-expand-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    font-size: 12.5px;
+  }
+  .dash-expand-row .drow-name{ color: var(--text-soft); }
+  .dash-expand-row .drow-amt{ font-family: var(--font-mono); font-size: 11.5px; color: var(--text); }
+  .dash-expand-row .drow-amt.over{ color:#F2617A; }
+  .dash-expand-body .task-item{ background: var(--bg-elevated); }
 
   /* ---- Fitness ---- */
   .fit-week-label{
