@@ -2472,6 +2472,7 @@
         Try: <b>task:</b> call dentist tomorrow · <b>habit:</b> drink water · <b>weekly habit:</b> gym 3x · <b>goal:</b> read 12 books · <b>tomorrow:</b> workout at 6pm
       </div>
       <div class="empty-note" id="gdStatus" style="display:none"></div>
+      <button type="button" class="cancel" id="gdScanBtn" style="width:100%;margin-top:10px">📷 Scan a receipt or statement</button>
       <div class="modal-actions">
         <button class="cancel" id="gdCancel">Cancel</button>
         <button class="save" id="gdSubmit">Add</button>
@@ -2481,6 +2482,7 @@
     const input = document.getElementById('gdText');
     const status = document.getElementById('gdStatus');
     document.getElementById('gdCancel').onclick = closeModal;
+    document.getElementById('gdScanBtn').onclick = openGoldieScanModal;
 
     const submit = () => {
       const raw = input.value.trim();
@@ -2497,6 +2499,192 @@
     document.getElementById('gdSubmit').onclick = submit;
     input.addEventListener('keydown', e => { if(e.key === 'Enter') submit(); });
     setTimeout(() => input.focus(), 50);
+  }
+
+  /* ---------------- Goldie: scan a receipt/statement (free, on-device OCR) ----------------
+     Tesseract.js (loaded from a CDN on first use, not bundled) runs OCR
+     entirely in the browser — the image itself never leaves the device,
+     no AI, no API key, no cost. This is text extraction, not real
+     understanding, so results go through a review screen (editable
+     description/amount/date/category per row) before anything touches
+     state.budgetTransactions. Works best on a clean statement screenshot;
+     a photo of a crumpled receipt will need more correcting. */
+
+  let _tesseractLoadPromise = null;
+  function loadTesseract(){
+    if(window.Tesseract) return Promise.resolve(window.Tesseract);
+    if(_tesseractLoadPromise) return _tesseractLoadPromise;
+    _tesseractLoadPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+      script.onload = () => resolve(window.Tesseract);
+      script.onerror = () => { _tesseractLoadPromise = null; reject(new Error('Could not load OCR library')); };
+      document.head.appendChild(script);
+    });
+    return _tesseractLoadPromise;
+  }
+
+  // Order matters — checked in sequence, first match wins.
+  const GOLDIE_BUDGET_CATEGORY_KEYWORDS = {
+    'coffee-drinks': ['starbucks','dunkin','coffee'],
+    'dining-out': ['restaurant','mcdonald','chipotle','doordash','uber eats','grubhub','cafe','diner','wendy','chick-fil-a','taco bell','pizza'],
+    gas: ['shell','chevron','exxon','bp #','gas station','fuel','mobil','marathon'],
+    groceries: ['publix','kroger','walmart','trader joe','whole foods','aldi','grocery','safeway'],
+    hygiene: ['cvs','walgreens','pharmacy'],
+    'car-maintenance': ['auto ','mechanic','oil change','tire','jiffy lube'],
+    clothing: ['nike','uniqlo','gap','old navy','clothing','apparel'],
+    subscriptions: ['netflix','spotify','hulu','subscription','disney+','prime video'],
+    paycheck: ['payroll','direct deposit','salary','paycheck'],
+    'other-income': ['deposit','refund','reimbursement'],
+  };
+  function goldieGuessBudgetCategory(text){
+    const lower = text.toLowerCase();
+    for(const cat in GOLDIE_BUDGET_CATEGORY_KEYWORDS){
+      if(GOLDIE_BUDGET_CATEGORY_KEYWORDS[cat].some(kw => lower.includes(kw))) return cat;
+    }
+    return 'misc';
+  }
+
+  // One line of OCR'd text -> one candidate transaction, if it has a
+  // dollar-amount-shaped number on it. Reuses goldieParseDate for the
+  // MM/DD a statement line usually carries.
+  function parseTransactionsFromOcrText(text){
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const amountRe = /-?\$?\d{1,3}(?:,\d{3})*\.\d{2}\b/;
+    const candidates = [];
+    lines.forEach(line => {
+      const m = line.match(amountRe);
+      if(!m) return;
+      const amount = Math.abs(parseFloat(m[0].replace(/[^0-9.-]/g, '')));
+      if(!amount) return;
+      const rest = line.replace(m[0], '').trim();
+      const { dueDate, cleaned } = goldieParseDate(rest);
+      let description = (cleaned || rest).replace(/[-–|.\s]+$/, '').trim();
+      if(!description) description = 'Transaction';
+      candidates.push({
+        _rowId: 'ocrtx-' + Date.now() + '-' + Math.random().toString(36).slice(2,7),
+        date: dueDate || todayStr(),
+        description,
+        amount,
+        category: goldieGuessBudgetCategory(description),
+      });
+    });
+    return candidates;
+  }
+
+  function openGoldieScanModal(){
+    const overlay = document.getElementById('modalOverlay');
+    const content = document.getElementById('modalContent');
+    content.style.removeProperty('--chip-color');
+    content.innerHTML = `
+      <div class="modal-handle"></div>
+      <div class="modal-title">⭐ Goldie — Scan</div>
+      <div class="modal-subtitle">Free, on-device OCR — the image never leaves your phone. Best on a clear statement screenshot; a receipt photo may need more fixing up after.</div>
+      <input type="file" id="gdScanFile" accept="image/*" style="margin-top:10px">
+      <div class="modal-actions">
+        <button class="cancel" id="gdScanCancel" style="flex:1">Cancel</button>
+      </div>
+    `;
+    overlay.classList.remove('hidden');
+    document.getElementById('gdScanCancel').onclick = closeModal;
+    document.getElementById('gdScanFile').onchange = (e) => {
+      const file = e.target.files[0];
+      if(!file) return;
+      renderGoldieScanStatus('Reading the image… this can take a few seconds the first time.');
+      loadTesseract()
+        .then(Tesseract => Tesseract.recognize(file, 'eng'))
+        .then(({ data:{ text } }) => {
+          const candidates = parseTransactionsFromOcrText(text);
+          if(!candidates.length){
+            renderGoldieScanStatus("Couldn't find anything that looked like a transaction in that image. Try a clearer photo, or add it manually in the Budget tab.", true);
+          } else {
+            renderGoldieScanReview(candidates);
+          }
+        })
+        .catch(() => renderGoldieScanStatus("Couldn't read that image — check your connection (the OCR library loads from the internet the first time) and try again.", true));
+    };
+  }
+
+  function renderGoldieScanStatus(message, withClose){
+    const content = document.getElementById('modalContent');
+    content.innerHTML = `
+      <div class="modal-handle"></div>
+      <div class="modal-title">⭐ Goldie — Scan</div>
+      <div class="empty-note">${escapeHtml(message)}</div>
+      ${withClose ? '<div class="modal-actions"><button class="save" id="gdScanClose" style="flex:1">Close</button></div>' : ''}
+    `;
+    if(withClose) document.getElementById('gdScanClose').onclick = closeModal;
+  }
+
+  function renderGoldieScanReview(candidates){
+    const content = document.getElementById('modalContent');
+    const catOptionsHtml = ['expense','neutral','income'].map(type => {
+      const opts = BUDGET_CATEGORIES.filter(c => c.type === type)
+        .map(c => '<option value="' + c.id + '">' + escapeHtml(c.label) + '</option>').join('');
+      const groupLabel = type === 'expense' ? 'Expense' : type === 'neutral' ? 'Savings / Transfer' : 'Income';
+      return '<optgroup label="' + groupLabel + '">' + opts + '</optgroup>';
+    }).join('');
+
+    content.innerHTML = `
+      <div class="modal-handle"></div>
+      <div class="modal-title">⭐ Goldie — Review</div>
+      <div class="modal-subtitle">Found ${candidates.length} possible transaction${candidates.length === 1 ? '' : 's'} — OCR guesses at date/category, so check before adding.</div>
+      <div id="gdReviewList"></div>
+      <div class="modal-actions">
+        <button class="cancel" id="gdReviewCancel">Cancel</button>
+        <button class="save" id="gdReviewAdd">Add ${candidates.length}</button>
+      </div>
+    `;
+    const list = document.getElementById('gdReviewList');
+    candidates.forEach(c => {
+      const dateId = 'gdDate-' + c._rowId;
+      const catId = 'gdCat-' + c._rowId;
+      const row = document.createElement('div');
+      row.className = 'lg-card';
+      row.style.marginBottom = '10px';
+      row.dataset.rowId = c._rowId;
+      row.innerHTML = `
+        <div class="lg-card-top">
+          <div style="flex:1">
+            <input type="text" class="gdReviewDesc" value="${escapeHtml(c.description)}" maxlength="60" style="width:100%;margin-bottom:6px">
+            <div style="display:flex;gap:8px;align-items:center">
+              <input type="number" class="gdReviewAmount" value="${c.amount}" min="0" step="0.01" style="width:90px">
+              ${customDateHtml(dateId, c.date)}
+            </div>
+          </div>
+          <button class="lg-card-del gdReviewRemove">×</button>
+        </div>
+        <div style="margin-top:8px">${customSelectHtml(catId, catOptionsHtml, c.category, 'Category')}</div>
+      `;
+      list.appendChild(row);
+      wireCustomDate(dateId, {});
+      wireCustomSelect(catId, catOptionsHtml, 'Category');
+      row.querySelector('.gdReviewRemove').onclick = () => {
+        row.remove();
+        const remaining = list.children.length;
+        document.getElementById('gdReviewAdd').textContent = 'Add ' + remaining;
+        if(!remaining) closeModal();
+      };
+    });
+
+    document.getElementById('gdReviewCancel').onclick = closeModal;
+    document.getElementById('gdReviewAdd').onclick = () => {
+      let count = 0;
+      list.querySelectorAll('[data-row-id]').forEach(row => {
+        const rowId = row.dataset.rowId;
+        const description = row.querySelector('.gdReviewDesc').value.trim();
+        const amount = Math.max(0, parseFloat(row.querySelector('.gdReviewAmount').value) || 0);
+        const date = document.getElementById('gdDate-' + rowId).value || todayStr();
+        const category = document.getElementById('gdCat-' + rowId).value || 'misc';
+        if(!description || !amount) return;
+        state.budgetTransactions.push({ id: Date.now() + '-' + Math.random().toString(36).slice(2,7), date, description, amount, category });
+        count++;
+      });
+      if(!count) return;
+      save();
+      closeModal();
+      renderAll();
+    };
   }
 
   /* ---------------- Tomorrow (time-blocked plan for the next day) ----------------
