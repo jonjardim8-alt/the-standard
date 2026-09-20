@@ -1625,6 +1625,7 @@
   let taskSubView = 'today'; // 'today' | 'upcoming'
   let expandedGroups = new Set(); // tracks which groups are open — everything starts closed
   let todayTimelineExpanded = true; // Dashboard's unified Today card — starts open
+  let dashTasksExpanded = false; // Dashboard's Tasks widget — starts collapsed
   let calendarViewMonth = null;
 
   function startOfWeek(d){
@@ -2796,83 +2797,79 @@
     habitsTile.onclick = () => switchSection('habits');
     grid.appendChild(habitsTile);
 
-    // Tasks
-    const tasksDueToday = state.tasks.filter(t => !t.done && t.dueDate === today).length;
-    const tasksOverdue = state.tasks.filter(t => !t.done && t.dueDate < today).length;
-    grid.appendChild(makeDashTile({
-      color: '#5B8DEF',
-      title: 'Tasks',
-      stat: String(tasksDueToday),
-      sub: tasksOverdue ? tasksOverdue + ' overdue' : 'due today',
-      onClick: () => switchSection('tasks')
-    }));
-
-    // Next up
-    const next = findNextEvent();
-    grid.appendChild(makeDashTile({
-      color: next ? (catById[next.event.category] || CATEGORIES[0]).color : '#8B93A0',
-      title: 'Next',
-      stat: next ? fmtTime(next.event.time) : '—',
-      sub: next ? escapeHtml(next.event.text) : 'Nothing scheduled',
-      onClick: () => switchSection('calendar')
-    }));
-
-    // Projects
-    const activeProjects = state.projects.filter(p => p.status === 'active');
-    let nextMilestone = null;
-    activeProjects.forEach(p => {
-      (p.milestones || []).filter(m => !m.done && m.targetDate).forEach(m => {
-        if(!nextMilestone || m.targetDate < nextMilestone.targetDate) nextMilestone = { name: m.name, targetDate: m.targetDate };
-      });
-    });
-    grid.appendChild(makeDashTile({
-      color: '#5B8DEF',
-      title: 'Projects',
-      stat: activeProjects.length + ' active',
-      sub: nextMilestone ? escapeHtml(nextMilestone.name) + ' · ' + fmtDate(nextMilestone.targetDate) : (state.projects.length ? 'No upcoming milestones' : 'No projects yet'),
-      onClick: () => switchSection('projects')
-    }));
-
-    // Goals
-    grid.appendChild(makeDashTile({
-      color: '#B18CF2',
-      title: 'Goals',
-      stat: String(state.longTermGoals.length),
-      sub: state.longTermGoals.length === 1 ? 'goal set' : 'goals set',
-      onClick: () => switchSection('longgoals')
-    }));
-
-    // Lists
-    const openItems = state.lists.reduce((s,l) => s + l.items.filter(i => !i.done).length, 0);
-    grid.appendChild(makeDashTile({
-      color: '#F2A93B',
-      title: 'Lists',
-      stat: String(state.lists.length),
-      sub: openItems + ' open item' + (openItems !== 1 ? 's' : ''),
-      onClick: () => switchSection('lists')
-    }));
-
-    // Fitness
-    const fitDayAbbr = DAYS[new Date().getDay()];
-    const fitPlan = state.fitnessSplit && state.fitnessSplit.days ? state.fitnessSplit.days[fitDayAbbr] : null;
-    grid.appendChild(makeDashTile({
-      color: '#F2617A',
-      title: 'Fitness',
-      stat: fitPlan ? fitPlan.focus : '—',
-      sub: fitPlan && fitPlan.focus !== 'Rest' ? 'today' : 'rest day',
-      onClick: () => switchSection('fitness')
-    }));
-
-    // Budget
+    // Budget — remaining for the month against category limits, not just
+    // raw spend, so the number answers "how much do I have left."
     const bmKey = budgetMonthKey(new Date());
     const monthExpense = state.budgetTransactions.filter(t => t.date.startsWith(bmKey) && budgetCatById[t.category]?.type === 'expense').reduce((s,t) => s + t.amount, 0);
+    const totalLimit = Object.values(state.categoryBudgetLimits).reduce((s,v) => s + (v || 0), 0);
+    const hasLimits = totalLimit > 0;
+    const remaining = totalLimit - monthExpense;
     grid.appendChild(makeDashTile({
-      color: '#3FC7D6',
+      color: hasLimits ? (remaining < 0 ? '#F2617A' : '#3FC7D6') : '#3FC7D6',
       title: 'Budget',
-      stat: '$' + monthExpense.toFixed(0),
-      sub: 'spent this month',
+      stat: hasLimits ? '$' + Math.abs(remaining).toFixed(0) : '$' + monthExpense.toFixed(0),
+      sub: hasLimits ? (remaining < 0 ? 'over this month' : 'left this month') : 'spent this month',
       onClick: () => switchSection('budget')
     }));
+
+    // Tasks — a separate expandable widget rather than a grid tile: collapsed
+    // shows a compact due-today/overdue count, expanded lists everything due
+    // within the upcoming week so the dashboard can answer "what's coming"
+    // without opening the Tasks tab.
+    const tasksDueToday = state.tasks.filter(t => !t.done && t.dueDate === today).length;
+    const tasksOverdue = state.tasks.filter(t => !t.done && t.dueDate < today).length;
+    const tasksStat = tasksOverdue ? tasksOverdue + ' overdue' : (tasksDueToday ? tasksDueToday + ' due today' : 'All clear');
+
+    const tasksWidget = document.createElement('div');
+    tasksWidget.className = 'dash-card';
+    wrap.appendChild(tasksWidget);
+
+    const tasksHeader = document.createElement('div');
+    tasksHeader.className = 'dash-section-header';
+    tasksHeader.innerHTML = `
+      <span class="dash-header-title"><span class="chev${dashTasksExpanded ? '' : ' collapsed'}">▾</span> Tasks</span>
+      <span class="dash-header-arrow">${escapeHtml(tasksStat)}</span>
+    `;
+    tasksHeader.querySelector('.dash-header-title').onclick = () => {
+      dashTasksExpanded = !dashTasksExpanded;
+      renderDashboardSection();
+    };
+    tasksHeader.querySelector('.dash-header-arrow').onclick = (e) => { e.stopPropagation(); switchSection('tasks'); };
+    tasksWidget.appendChild(tasksHeader);
+
+    if(dashTasksExpanded){
+      const weekAhead = new Date();
+      weekAhead.setDate(weekAhead.getDate() + 7);
+      const weekAheadStr = toDateStr(weekAhead);
+      const upcoming = state.tasks
+        .filter(t => !t.done && t.dueDate && t.dueDate <= weekAheadStr)
+        .sort((a,b) => a.dueDate.localeCompare(b.dueDate));
+
+      if(!upcoming.length){
+        const empty = document.createElement('div');
+        empty.className = 'empty-note';
+        empty.textContent = 'Nothing due in the next week.';
+        tasksWidget.appendChild(empty);
+      } else {
+        const list = document.createElement('div');
+        list.className = 'task-list';
+        upcoming.forEach(t => {
+          const cat = catById[t.category] || CATEGORIES[0];
+          const overdue = t.dueDate < today;
+          const row = document.createElement('div');
+          row.className = 'task-item';
+          row.style.setProperty('--accent-color', cat.color);
+          row.innerHTML = '<button class="task-check">✓</button><div class="task-body"><div class="task-txt"></div><div class="task-meta"></div></div>';
+          row.querySelector('.task-txt').textContent = t.text;
+          const meta = row.querySelector('.task-meta');
+          meta.textContent = (overdue ? 'was due ' : (t.dueDate === today ? 'due today' : 'due ')) + (t.dueDate === today ? '' : fmtDate(t.dueDate)) + ' · ' + cat.label;
+          if(overdue) meta.classList.add('overdue');
+          row.querySelector('.task-check').onclick = () => { setTaskDone(t, true); save(); renderAll(); };
+          list.appendChild(row);
+        });
+        tasksWidget.appendChild(list);
+      }
+    }
   }
 
   function makeDashTile(opts){
