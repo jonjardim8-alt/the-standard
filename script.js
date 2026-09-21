@@ -36,12 +36,16 @@
     { id:'quay-church-attending',  label:'Attending — Quay Church',           category:'faith', time:'08:00', endTime:'13:30', day:'Sun' },
   ];
 
+  // Colors/labels from ~/Downloads/the-standard-schedule-categories.html.
+  // 'health' id kept as-is internally (existing tasks/events already
+  // store category:'health') — only its label and color changed, so no
+  // data migration is needed.
   const CATEGORIES = [
-    { id:'work',     label:'Work',     color:'#5B8DEF' },
-    { id:'school',   label:'School',   color:'#3FC7D6' },
-    { id:'health',   label:'Health',   color:'#3CBF8C' },
-    { id:'personal', label:'Personal', color:'#F2A93B' },
-    { id:'faith',    label:'Faith',    color:'#B18CF2' },
+    { id:'work',     label:'Work',     color:'#8B76A1' },
+    { id:'school',   label:'School',   color:'#6E85A6' },
+    { id:'health',   label:'Fitness',  color:'#4F9C93' },
+    { id:'personal', label:'Personal', color:'#A38F7E' },
+    { id:'faith',    label:'Faith',    color:'#6B5B95' },
   ];
   const catById = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
 

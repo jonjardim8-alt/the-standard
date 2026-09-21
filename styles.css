@@ -2,8 +2,14 @@
     /* The Standard brand guidelines: dark warm base, muted gold accent.
        Gold is reserved for key actions/completion states, not everyday
        chrome — see --accent usage below. Category colors (--cat-*) are
-       a separate, deliberately vivid system for calendar/task scanning
-       and are intentionally left outside this palette. */
+       a separate system for calendar/task scanning, from
+       the-standard-schedule-categories.html — kept in sync here for
+       reference, though the actual source of truth the app reads from
+       is the CATEGORIES array in script.js (these CSS vars aren't
+       currently referenced anywhere). --cat-health is still named for
+       the id it maps to ('health', kept internally so existing tasks/
+       events don't need a data migration) — its color/label are now
+       Fitness's, per that same file. */
     --bg: #0E0E10;
     --bg-elevated: #18181B;
     --card: #212124;
@@ -23,11 +29,11 @@
     --font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
     --font-mono: 'SF Mono', 'Menlo', monospace;
 
-    --cat-work: #5B8DEF;
-    --cat-school: #3FC7D6;
-    --cat-health: #3CBF8C;
-    --cat-personal: #F2A93B;
-    --cat-faith: #B18CF2;
+    --cat-work: #8B76A1;
+    --cat-school: #6E85A6;
+    --cat-health: #4F9C93;
+    --cat-personal: #A38F7E;
+    --cat-faith: #6B5B95;
   }
 
   *{ box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
