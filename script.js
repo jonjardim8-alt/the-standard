@@ -47,7 +47,7 @@
 
   // Matches the categories + Type field from the connected Google Form
   // exactly, so entries stay consistent with the existing sheet.
-  const BUDGET_TYPE_COLORS = { expense:'#F2617A', income:'#3CBF8C', neutral:'#5B8DEF' };
+  const BUDGET_TYPE_COLORS = { expense:'var(--error)', income:'var(--success)', neutral:'#5B8DEF' };
   const BUDGET_CATEGORIES = [
     { id:'gas',             label:'Gas',              type:'expense' },
     { id:'tithes',          label:'Tithes',           type:'expense' },
@@ -3401,7 +3401,7 @@
     const hasLimits = totalLimit > 0;
     const remaining = totalLimit - monthExpense;
     grid.appendChild(makeDashExpandTile({
-      color: hasLimits ? (remaining < 0 ? '#F2617A' : '#3FC7D6') : '#3FC7D6',
+      color: hasLimits ? (remaining < 0 ? 'var(--error)' : '#3FC7D6') : '#3FC7D6',
       title: 'Budget',
       stat: hasLimits ? '$' + Math.abs(remaining).toFixed(0) : '$' + monthExpense.toFixed(0),
       sub: hasLimits ? (remaining < 0 ? 'over this month' : 'left this month') : 'spent this month',
@@ -3432,7 +3432,7 @@
     const tasksDueToday = state.tasks.filter(t => !t.done && t.dueDate === today).length;
     const tasksOverdue = state.tasks.filter(t => !t.done && t.dueDate < today).length;
     grid.appendChild(makeDashExpandTile({
-      color: tasksOverdue ? '#F2617A' : '#5B8DEF',
+      color: tasksOverdue ? 'var(--error)' : '#5B8DEF',
       title: 'Tasks',
       stat: String(tasksOverdue || tasksDueToday || 0),
       sub: tasksOverdue ? 'overdue' : (tasksDueToday ? 'due today' : 'all clear'),
@@ -3846,9 +3846,9 @@
     const stats = document.createElement('div');
     stats.className = 'budget-stats-row';
     stats.innerHTML = `
-      <div class="budget-stat"><div class="budget-stat-num" style="color:#3CBF8C">$${totalIncome.toFixed(2)}</div><div class="budget-stat-label">Income</div></div>
-      <div class="budget-stat"><div class="budget-stat-num" style="color:#F2617A">$${totalExpense.toFixed(2)}</div><div class="budget-stat-label">Expenses</div></div>
-      <div class="budget-stat"><div class="budget-stat-num" style="color:${net >= 0 ? '#3CBF8C' : '#F2617A'}">$${net.toFixed(2)}</div><div class="budget-stat-label">Net</div></div>
+      <div class="budget-stat"><div class="budget-stat-num" style="color:var(--success)">$${totalIncome.toFixed(2)}</div><div class="budget-stat-label">Income</div></div>
+      <div class="budget-stat"><div class="budget-stat-num" style="color:var(--error)">$${totalExpense.toFixed(2)}</div><div class="budget-stat-label">Expenses</div></div>
+      <div class="budget-stat"><div class="budget-stat-num" style="color:${net >= 0 ? 'var(--success)' : 'var(--error)'}">$${net.toFixed(2)}</div><div class="budget-stat-label">Net</div></div>
     `;
     wrap.appendChild(stats);
 
@@ -3876,7 +3876,7 @@
         let amtStyle = '';
         if(limit){
           amtHtml += ' <span style="opacity:0.6">/ $' + limit.toFixed(2) + '</span>';
-          if(r.total > limit) amtStyle = 'color:#F2617A';
+          if(r.total > limit) amtStyle = 'color:var(--error)';
         }
         row.innerHTML = '<span class="budget-cat-name">' + escapeHtml(r.cat.label) + '</span><span class="budget-cat-amt" style="' + amtStyle + '">' + amtHtml + '</span>';
         wrap.appendChild(row);
@@ -3904,9 +3904,9 @@
     const overOnes = statuses.filter(s => s.over);
 
     if(overOnes.length){
-      box.innerHTML = '<div class="budget-limit-top" style="color:#F2617A">'
+      box.innerHTML = '<div class="budget-limit-top" style="color:var(--error)">'
         + overOnes.length + ' categor' + (overOnes.length > 1 ? 'ies' : 'y') + ' over budget</div>'
-        + overOnes.map(s => '<div style="font-size:11.5px;color:#F2617A;margin-top:4px">'
+        + overOnes.map(s => '<div style="font-size:11.5px;color:var(--error);margin-top:4px">'
             + escapeHtml(s.cat.label) + ' — $' + s.spent.toFixed(2) + ' of $' + s.limit.toFixed(2) + '</div>').join('')
         + '<button class="budget-limit-edit" id="budgetLimitEdit" style="margin-top:9px">Edit category budgets</button>';
     } else if(statuses.length){
@@ -4845,7 +4845,7 @@
 
   const ENERGY_LEVELS = ['high', 'medium', 'low'];
   const ENERGY_LABELS = { high:'High', medium:'Medium', low:'Low' };
-  const ENERGY_COLORS = { high:'#3CBF8C', medium:'#F2A93B', low:'#F2617A' };
+  const ENERGY_COLORS = { high:'var(--success)', medium:'var(--warning)', low:'var(--error)' };
 
   function renderEnergySettingsModal(){
     const content = document.getElementById('modalContent');
@@ -5804,9 +5804,9 @@
   }
 
   const PRIORITY_OPTIONS = [
-    { id:'low',    label:'Low',    color:'#8B93A0' },
+    { id:'low',    label:'Low',    color:'var(--text-soft)' },
     { id:'normal', label:'Normal', color:'#5B8DEF' },
-    { id:'high',   label:'High',   color:'#F2617A' },
+    { id:'high',   label:'High',   color:'var(--error)' },
   ];
 
   // Renders a row of Low/Normal/High pills into any container id. Calls
@@ -6402,13 +6402,13 @@
       const cat = catById[it.category] || CATEGORIES[0];
       const row = document.createElement('div');
       row.className = 'list-item' + (it.off ? '' : '');
-      row.style.setProperty('--accent-color', it.off ? '#565E68' : cat.color);
+      row.style.setProperty('--accent-color', it.off ? 'var(--text-faint)' : cat.color);
       const label = it.off ? it.text + ' (off)' : it.text;
       row.innerHTML = '<div class="time"></div><div style="flex:1"><div class="txt"></div><div class="cat"></div>' + (it.notes ? '<div class="event-notes"></div>' : '') + '</div>' + (it.fixed ? '' : '<button class="del">×</button>');
       row.querySelector('.time').textContent = it.endTime ? (fmtTime(it.time) + '–' + fmtTime(it.endTime)) : fmtTime(it.time);
       row.querySelector('.txt').textContent = label;
       row.querySelector('.cat').textContent = cat.label + (it.fixed ? ' · fixed' : '');
-      row.querySelector('.cat').style.color = it.off ? '#565E68' : cat.color;
+      row.querySelector('.cat').style.color = it.off ? 'var(--text-faint)' : cat.color;
       if(it.notes) row.querySelector('.event-notes').textContent = it.notes;
       if(!it.fixed){
         row.querySelector('.del').onclick = (e) => { e.stopPropagation(); removeItem(dayAbbr, it.id); };
@@ -6434,16 +6434,21 @@
     renderAll();
   }
 
+  // Icon markup follows the brand guideline's custom set (2px stroke,
+  // rounded joins, outline treatment; bold stroke for Fitness/Budget).
+  // Scores/Email/Settings aren't in the guideline's defined set, so
+  // those three are drawn to match its conventions rather than left as
+  // mismatched leftover glyphs.
   const OVERFLOW_SECTIONS = [
-    { id:'lists',     icon:'☰', label:'Lists' },
-    { id:'longgoals', icon:'✦', label:'Goals' },
-    { id:'fitness',   icon:'⚡', label:'Fitness' },
-    { id:'budget',    icon:'$', label:'Budget' },
-    { id:'projects',  icon:'◈', label:'Projects' },
-    { id:'journal',   icon:'✎', label:'Journal' },
-    { id:'scores',    icon:'★', label:'Scores' },
-    { id:'email',     icon:'✉', label:'Email' },
-    { id:'settings',  icon:'⚙', label:'Settings' },
+    { id:'lists',     icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="4.5" cy="6" r="1.3" fill="currentColor" stroke="none"/><path d="M9 6h11"/><circle cx="4.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><path d="M9 12h11"/><circle cx="4.5" cy="18" r="1.3" fill="currentColor" stroke="none"/><path d="M9 18h11"/></svg>', label:'Lists' },
+    { id:'longgoals', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg>', label:'Goals' },
+    { id:'fitness',   icon:'<svg viewBox="0 0 24 24"><rect x="2" y="9.4" width="3.4" height="5.2" rx="1.4" fill="currentColor"/><rect x="18.6" y="9.4" width="3.4" height="5.2" rx="1.4" fill="currentColor"/><rect x="6" y="11" width="12" height="2" rx="1" fill="currentColor"/><rect x="6.6" y="7.4" width="2.8" height="9.2" rx="1.4" fill="currentColor"/><rect x="14.6" y="7.4" width="2.8" height="9.2" rx="1.4" fill="currentColor"/></svg>', label:'Fitness' },
+    { id:'budget',    icon:'<svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="4" x2="12" y2="18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M16.5 7.2c-.9-1.6-2.7-2.5-4.5-2.5c-2.5 0-4.5 1.3-4.5 3.1c0 4 8.8 2 8.8 6c0 1.9-2 3.2-4.5 3.2c-1.9 0-3.7-.9-4.6-2.4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>', label:'Budget' },
+    { id:'projects',  icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 6.5a1.5 1.5 0 0 1 1.5-1.5h5l2 2.5h8a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>', label:'Projects' },
+    { id:'journal',   icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.2c-2-1.5-5-2-9-1.5v13c4-.5 7 0 9 1.5c2-1.5 5-2 9-1.5v-13c-4-.5-7 0-9 1.5z"/><path d="M12 6.2v13"/></svg>', label:'Journal' },
+    { id:'scores',    icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19V11"/><path d="M12 19V5"/><path d="M19 19V14"/></svg>', label:'Scores' },
+    { id:'email',     icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M4 7l8 6l8-6"/></svg>', label:'Email' },
+    { id:'settings',  icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.2M12 18.8V21M4.2 12H2M22 12h-2.2M6 6l1.5 1.5M16.5 16.5L18 18M18 6l-1.5 1.5M7.5 16.5L6 18"/></svg>', label:'Settings' },
   ];
 
   /* ---------------- Scores ----------------
@@ -6886,7 +6891,7 @@
         const err = document.createElement('div');
         err.className = 'score-card-note';
         err.style.marginTop = '10px';
-        err.style.color = '#F2617A';
+        err.style.color = 'var(--error)';
         err.textContent = gmailState.error;
         wrap.appendChild(err);
       }
@@ -6904,7 +6909,7 @@
     if(gmailState.error){
       const err = document.createElement('div');
       err.className = 'score-card-note';
-      err.style.color = '#F2617A';
+      err.style.color = 'var(--error)';
       err.style.marginBottom = '10px';
       err.textContent = gmailState.error;
       wrap.appendChild(err);
