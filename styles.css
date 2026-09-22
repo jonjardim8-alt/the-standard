@@ -839,6 +839,13 @@
   .today-timeline-item.done .today-timeline-text{ text-decoration: line-through; color: var(--text-faint); }
   .today-timeline-item.now .today-timeline-text{ font-weight:700; color: var(--accent-color, var(--accent)); }
   .today-timeline-item.now .today-timeline-dot{ box-shadow: 0 0 0 2px var(--accent-color, var(--accent)), 0 0 0 5px color-mix(in srgb, var(--accent-color, var(--accent)) 30%, transparent); }
+  /* A task pulled in by a category-linked block (e.g. a "School work"
+     block showing School tasks) — indented under its parent row so it
+     reads as attached, not another top-level scheduled item. */
+  .today-timeline-item.sub-task{ margin-left: 22px; padding-bottom: 10px; gap: 10px; }
+  .today-timeline-item.sub-task .today-timeline-check{ width: 12px; height: 12px; }
+  .today-timeline-item.sub-task .today-timeline-text{ font-size: 12.5px; }
+  .today-timeline-item.sub-task .today-timeline-meta.overdue{ color: var(--error); }
 
   .dash-next-card{
     background: color-mix(in srgb, var(--accent-color, var(--accent)) 14%, var(--card));

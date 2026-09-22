@@ -2727,6 +2727,18 @@
     return habit ? habit.name : null;
   }
 
+  // Label for a block's link tag, whichever kind it is (habit or task
+  // category) — used in the Tomorrow list; null when unlinked.
+  function linkedTagLabel(b){
+    const habitName = linkedHabitName(b);
+    if(habitName) return habitName;
+    if(b.taskCategory){
+      const cat = catById[b.taskCategory];
+      return cat ? cat.label + ' tasks' : null;
+    }
+    return null;
+  }
+
   // Opened from the header button (same spot Weekly Review used to live),
   // not a tab — a modal, same pattern as the old Week Review.
   function openTomorrowModal(){
@@ -2739,13 +2751,13 @@
 
     const listHtml = blocks.length
       ? blocks.map(b => {
-          const habitName = linkedHabitName(b);
+          const tagLabel = linkedTagLabel(b);
           return `
           <div class="tomorrow-block-row" data-block-id="${b.id}">
             <div class="tomorrow-block-time">${fmtTime(b.startTime)}${b.endTime ? '–' + fmtTime(b.endTime) : ''}</div>
             <div style="flex:1;min-width:0">
               <div class="tomorrow-block-text">${escapeHtml(b.text)}</div>
-              ${habitName ? '<div class="proj-desc">🔗 ' + escapeHtml(habitName) + '</div>' : ''}
+              ${tagLabel ? '<div class="proj-desc">🔗 ' + escapeHtml(tagLabel) + '</div>' : ''}
             </div>
             <button class="tomorrow-block-del">×</button>
           </div>
@@ -2785,12 +2797,16 @@
     // Link to a habit so its schedule slot can be checked off (Daily) or
     // logged (Weekly) directly from the Dashboard's Today timeline once
     // this block's day arrives — see the todaysBlocks entries in
-    // renderDashboardSection.
+    // renderDashboardSection. A block can instead link to a task category
+    // (e.g. a "School work" block pulls in School tasks) — mutually
+    // exclusive with a habit link, same picker.
     const dailyOptions = state.dailyGoals.map(g => '<option value="daily:' + g.id + '">' + escapeHtml(g.name) + '</option>').join('');
     const weeklyOptions = state.weeklyGoals.filter(g => !g.auto).map(g => '<option value="weekly:' + g.id + '">' + escapeHtml(g.name) + '</option>').join('');
+    const categoryOptions = CATEGORIES.map(c => '<option value="taskcat:' + c.id + '">' + escapeHtml(c.label) + '</option>').join('');
     const habitLinkOptionsHtml = '<option value="">None</option>'
       + (dailyOptions ? '<optgroup label="Daily habits">' + dailyOptions + '</optgroup>' : '')
-      + (weeklyOptions ? '<optgroup label="Weekly habits">' + weeklyOptions + '</optgroup>' : '');
+      + (weeklyOptions ? '<optgroup label="Weekly habits">' + weeklyOptions + '</optgroup>' : '')
+      + '<optgroup label="Task category">' + categoryOptions + '</optgroup>';
 
     content.innerHTML = `
       <div class="modal-handle"></div>
@@ -2802,7 +2818,7 @@
       <input type="time" id="tbStart" value="09:00">
       <label>End time (optional)</label>
       <input type="time" id="tbEnd">
-      <label>Link to a habit (optional)</label>
+      <label>Link to a habit or task category (optional)</label>
       ${customSelectHtml('tbHabit', habitLinkOptionsHtml, '', 'None')}
       <div class="modal-actions">
         <button class="cancel" id="tbCancel">Cancel</button>
@@ -2810,7 +2826,7 @@
       </div>
     `;
     overlay.classList.remove('hidden');
-    wireCustomSelect('tbHabit', habitLinkOptionsHtml, 'Link to a habit');
+    wireCustomSelect('tbHabit', habitLinkOptionsHtml, 'Link to a habit or task category');
     document.getElementById('tbCancel').onclick = openTomorrowModal;
     document.getElementById('tbSave').onclick = () => {
       const text = document.getElementById('tbText').value.trim();
@@ -2818,9 +2834,14 @@
       const startTime = document.getElementById('tbStart').value || '09:00';
       const endTime = document.getElementById('tbEnd').value || null;
       const linkVal = document.getElementById('tbHabit').value;
-      const [habitKind, habitId] = linkVal ? linkVal.split(':') : [null, null];
+      let habitKind = null, habitId = null, taskCategory = null;
+      if(linkVal.startsWith('taskcat:')){
+        taskCategory = linkVal.slice('taskcat:'.length);
+      } else if(linkVal){
+        [habitKind, habitId] = linkVal.split(':');
+      }
       if(!state.tomorrowPlans[dateStr]) state.tomorrowPlans[dateStr] = [];
-      state.tomorrowPlans[dateStr].push({ id: Date.now() + '-' + Math.random().toString(36).slice(2,7), text, startTime, endTime, habitKind, habitId });
+      state.tomorrowPlans[dateStr].push({ id: Date.now() + '-' + Math.random().toString(36).slice(2,7), text, startTime, endTime, habitKind, habitId, taskCategory });
       save();
       openTomorrowModal();
     };
@@ -3221,6 +3242,18 @@
     return null;
   }
 
+  // Up to 5 undone tasks in a category, earliest due date first — tasks
+  // due today naturally sort first, overdue ones even earlier; tasks
+  // with no due date at all are excluded since there's nothing to sort
+  // them by. Backs a Tomorrow block linked to a task category instead
+  // of a habit (e.g. a "School work" block pulls in School tasks).
+  function tasksForBlockCategory(categoryId){
+    return state.tasks
+      .filter(t => !t.done && t.category === categoryId && t.dueDate)
+      .sort((a,b) => a.dueDate.localeCompare(b.dueDate))
+      .slice(0, 5);
+  }
+
   function renderDashboardSection(){
     const wrap = document.getElementById('dashboardContent');
     wrap.innerHTML = '';
@@ -3271,9 +3304,11 @@
       // (Tomorrow tab) and calendar events genuinely merged and sorted
       // together. Habits/tasks live in the widget tiles below instead of
       // as rows here, so the timeline doesn't turn into a long checklist —
-      // the one exception is a planned block explicitly linked to a habit
+      // the exceptions are a planned block explicitly linked to a habit
       // (set when it was added from the Tomorrow tab), which gets a
-      // checkbox so it can be marked done right from its scheduled slot.
+      // checkbox so it can be marked done right from its scheduled slot,
+      // and one linked to a task category, which pulls in up to 5 of
+      // that category's tasks (subTasks) as checkable rows nested under it.
       const entries = [];
       todaysBlocks.forEach(b => {
         const isNow = b.endTime && nowMin >= timeToMin(b.startTime) && nowMin < timeToMin(b.endTime);
@@ -3297,6 +3332,17 @@
               save();
               renderAll();
             };
+          }
+        } else if(b.taskCategory){
+          const cat = catById[b.taskCategory];
+          if(cat){
+            entry.subTasks = tasksForBlockCategory(b.taskCategory).map(t => ({
+              color: cat.color,
+              text: t.text,
+              meta: (t.dueDate < today ? 'was due ' + fmtDate(t.dueDate) : t.dueDate === today ? 'due today' : 'due ' + fmtDate(t.dueDate)),
+              overdue: t.dueDate < today,
+              onToggle: () => { setTaskDone(t, true); save(); renderAll(); }
+            }));
           }
         }
         entries.push(entry);
@@ -3348,6 +3394,25 @@
           row.querySelector('.today-timeline-meta').textContent = e.meta;
           if(e.checkable) row.querySelector('.today-timeline-check').onclick = e.onToggle;
           timeline.appendChild(row);
+
+          if(e.subTasks && e.subTasks.length){
+            e.subTasks.forEach(st => {
+              const subRow = document.createElement('div');
+              subRow.className = 'today-timeline-item sub-task';
+              subRow.style.setProperty('--accent-color', st.color);
+              subRow.innerHTML = `
+                <button class="today-timeline-check"></button>
+                <div class="today-timeline-body">
+                  <div class="today-timeline-text"></div>
+                  <div class="today-timeline-meta${st.overdue ? ' overdue' : ''}"></div>
+                </div>
+              `;
+              subRow.querySelector('.today-timeline-text').textContent = st.text;
+              subRow.querySelector('.today-timeline-meta').textContent = st.meta;
+              subRow.querySelector('.today-timeline-check').onclick = st.onToggle;
+              timeline.appendChild(subRow);
+            });
+          }
         });
         todayCard.appendChild(timeline);
       }
