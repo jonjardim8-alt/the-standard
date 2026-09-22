@@ -6112,48 +6112,6 @@
     });
   }
 
-  function renderFixedBanners(){
-    const wrap = document.getElementById('fixedBanners');
-    wrap.innerHTML = '';
-    const day = DAYS[activeDay];
-    const dates = weekDates();
-    const dateStr = toDateStr(dates[activeDay]);
-    const blocks = blocksForDate(day, dateStr);
-
-    blocks.forEach(b => {
-      const cat = catById[b.category];
-      const offKey = b.id + '_' + dateStr;
-      const isOff = !!state.workOff[offKey];
-
-      const banner = document.createElement('div');
-      banner.className = 'fixed-banner' + (isOff ? ' off' : '');
-      banner.style.setProperty('--accent-color', cat.color);
-
-      const top = document.createElement('div');
-      top.className = 'fb-top';
-      top.innerHTML = '<div class="fb-left"><div class="fb-title"></div><div class="fb-time"></div></div><div class="fb-right"></div>';
-      top.querySelector('.fb-title').textContent = b.label;
-      top.querySelector('.fb-time').textContent = isOff
-        ? 'Marked off · ' + fmtTime(b.start) + '–' + fmtTime(b.end)
-        : fmtTime(b.start) + ' – ' + fmtTime(b.end);
-
-      const right = top.querySelector('.fb-right');
-
-      const toggleBtn = document.createElement('button');
-      toggleBtn.className = 'fb-toggle';
-      toggleBtn.textContent = isOff ? 'Restore' : 'Day off';
-      toggleBtn.onclick = () => {
-        if(isOff){ delete state.workOff[offKey]; } else { state.workOff[offKey] = true; }
-        save();
-        renderAll();
-      };
-      right.appendChild(toggleBtn);
-
-      banner.appendChild(top);
-      wrap.appendChild(banner);
-    });
-  }
-
   /* ---------------- Tasks section (due date, shown on the active day) ---------------- */
 
   // Single choke point for marking a task done/undone so the completion
@@ -6422,10 +6380,16 @@
 
   function renderBlockView(){
     const day = DAYS[activeDay];
+    const dateStr = toDateStr(weekDates()[activeDay]);
     const items = visibleItems(day).slice().sort((a,b) => a.time.localeCompare(b.time));
     const fixedBlocks = activeFixedBlocksForHours();
     const spanItems = items.filter(it => it.endTime).map(it => ({ start: it.time, end: it.endTime, category: it.category }));
     const allSpans = fixedBlocks.concat(spanItems);
+    // Unfiltered by on/off state (unlike fixedBlocks above, which excludes
+    // blocks already marked off so their tint disappears) — this is only
+    // used to find where to show the label+toggle, so an off block can
+    // still be found and restored.
+    const allFixedBlocksToday = blocksForDate(day, dateStr).filter(b => filterCats.has(b.category));
 
     const wrap = document.getElementById('blockView');
     wrap.innerHTML = '';
@@ -6476,17 +6440,44 @@
           slot.appendChild(ev);
         });
       } else {
-        const addBtn = document.createElement('button');
-        addBtn.className = 'add-slot-btn';
-        addBtn.textContent = '+';
-        addBtn.onclick = () => {
-          openAddEventModal(null);
-          setTimeout(() => {
-            const timeInput = document.getElementById('evTime');
-            if(timeInput) timeInput.value = hourStr + ':00';
-          }, 60);
-        };
-        slot.appendChild(addBtn);
+        // A fixed/recurring block (Work, etc.) starting in this exact hour
+        // gets its label + Day off/Restore toggle instead of the usual
+        // "+" add button — shown once per block (its starting hour only),
+        // not repeated across every hour it spans.
+        const startingBlock = allFixedBlocksToday.find(b => {
+          const bStart = timeToMin(b.start);
+          return bStart >= hourStartMin && bStart < hourEndMin;
+        });
+        if(startingBlock){
+          const cat = catById[startingBlock.category];
+          const offKey = startingBlock.id + '_' + dateStr;
+          const isOff = !!state.workOff[offKey];
+          const tag = document.createElement('div');
+          tag.className = 'fixed-slot-tag' + (isOff ? ' off' : '');
+          tag.style.setProperty('--accent-color', cat.color);
+          tag.innerHTML = '<span class="fixed-slot-label"></span><button class="fixed-slot-toggle"></button>';
+          tag.querySelector('.fixed-slot-label').textContent = startingBlock.label;
+          const toggleBtn = tag.querySelector('.fixed-slot-toggle');
+          toggleBtn.textContent = isOff ? 'Restore' : 'Day off';
+          toggleBtn.onclick = () => {
+            if(isOff){ delete state.workOff[offKey]; } else { state.workOff[offKey] = true; }
+            save();
+            renderAll();
+          };
+          slot.appendChild(tag);
+        } else {
+          const addBtn = document.createElement('button');
+          addBtn.className = 'add-slot-btn';
+          addBtn.textContent = '+';
+          addBtn.onclick = () => {
+            openAddEventModal(null);
+            setTimeout(() => {
+              const timeInput = document.getElementById('evTime');
+              if(timeInput) timeInput.value = hourStr + ':00';
+            }, 60);
+          };
+          slot.appendChild(addBtn);
+        }
       }
 
       row.appendChild(slot);
@@ -7233,7 +7224,6 @@
     renderTabs();
     renderLegend();
     renderAllDayBanners();
-    renderFixedBanners();
     renderTaskSection();
     renderBlockView();
     renderListView();

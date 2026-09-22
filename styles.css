@@ -1718,56 +1718,41 @@
     font-size:15px; cursor:pointer; padding:0 2px; flex:0 0 auto;
   }
 
-  #fixedBanners{ display:flex; flex-direction:column; gap:8px; margin-bottom: 14px; }
-  .fixed-banner{
-    display:flex;
-    flex-direction: column;
-    gap: 10px;
-    background: color-mix(in srgb, var(--accent-color, var(--accent)) 14%, var(--bg-elevated));
-    border: 1px solid color-mix(in srgb, var(--accent-color, var(--accent)) 40%, var(--border));
-    border-left: 3px solid var(--accent-color, var(--accent));
-    border-radius: 10px;
-    padding: 11px 13px;
-  }
-  .fb-top{
+  /* Fixed/recurring block (Work, etc.) on the hourly timeline — no
+     separate banner anymore, just a tinted background on its hours (see
+     #blockView .hour-slot) plus this compact label+toggle shown in the
+     block's starting hour only, so an 8-hour block doesn't repeat the
+     control on every row. */
+  .fixed-slot-tag{
     display:flex;
     align-items:center;
     justify-content:space-between;
-    gap:10px;
+    gap:8px;
+    width:100%;
+    height:100%;
+    padding: 0 10px;
   }
-  .fixed-banner.off{
-    background: var(--bg-elevated);
-    border-color: var(--border);
-    border-left-color: var(--text-faint);
-  }
-  .fixed-banner .fb-left{ display:flex; flex-direction:column; gap:2px; }
-  .fixed-banner .fb-title{
+  .fixed-slot-label{
     font-family: var(--font-display);
     font-weight: 600;
-    font-size: 14.5px;
+    font-size: 13px;
     color: var(--text);
   }
-  .fixed-banner.off .fb-title{ color: var(--text-faint); text-decoration: line-through; }
-  .fixed-banner .fb-time{
-    font-family: var(--font-mono);
-    font-size: 11px;
-    color: var(--accent-color, var(--accent));
-  }
-  .fixed-banner.off .fb-time{ color: var(--text-faint); }
-  .fixed-banner .fb-toggle{
+  .fixed-slot-tag.off .fixed-slot-label{ color: var(--text-faint); text-decoration: line-through; }
+  .fixed-slot-toggle{
     flex: 0 0 auto;
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 9.5px;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    padding: 7px 11px;
-    border-radius: 7px;
+    padding: 5px 9px;
+    border-radius: 6px;
     border: 1px solid var(--border);
     background: var(--card);
     color: var(--text-soft);
     cursor: pointer;
   }
-  .fixed-banner.off .fb-toggle{
+  .fixed-slot-tag.off .fixed-slot-toggle{
     background: var(--accent-color, var(--accent));
     border-color: var(--accent-color, var(--accent));
     color: #fff;
@@ -1973,12 +1958,6 @@
     white-space: nowrap;
   }
 
-  .fb-right{
-    display:flex;
-    align-items:center;
-    gap: 6px;
-    flex: 0 0 auto;
-  }
   .fb-log-btn{
     width: 28px; height:28px;
     border-radius: 7px;
