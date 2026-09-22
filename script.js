@@ -16,11 +16,6 @@
       startDate:'2026-08-25', endDate:'2026-09-18' },
     { id:'walk-fri', day:'Fri', start:'06:00', end:'06:15', category:'health', label:'Morning Walk',
       startDate:'2026-08-25', endDate:'2026-09-18' },
-    { id:'gym-mon', day:'Mon', start:'18:00', end:'20:00', category:'health', label:'Gym' },
-    { id:'gym-tue', day:'Tue', start:'18:00', end:'20:00', category:'health', label:'Gym' },
-    { id:'gym-wed', day:'Wed', start:'09:30', end:'11:30', category:'health', label:'Gym' },
-    { id:'gym-thu', day:'Thu', start:'12:00', end:'14:00', category:'health', label:'Gym' },
-    { id:'gym-fri', day:'Fri', start:'17:00', end:'19:00', category:'health', label:'Gym' },
   ];
 
   // Quick-add presets — pre-filled events for recurring commitments where the
