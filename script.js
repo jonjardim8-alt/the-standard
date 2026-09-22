@@ -1398,6 +1398,10 @@
         { id:'ex-incline-db-press',  name:'Incline DB Press',     type:'hypertrophy', sets:3, repMin:8,  repMax:10 },
         { id:'ex-pec-deck',          name:'Pec Deck',             type:'hypertrophy', sets:3, repMin:10, repMax:12 },
         { id:'ex-cable-lat-raise',   name:'Cable Lateral Raise',  type:'accessory',   sets:3, repMin:12, repMax:15 },
+        { id:'ex-bench-press',       name:'Bench Press',          type:'strength',    sets:3, repMin:6,  repMax:6 },
+        { id:'ex-pushups',           name:'Pushups',              type:'hypertrophy', sets:3, repMin:10, repMax:10 },
+        { id:'ex-db-lat-raise',      name:'DB Lat Raises',        type:'accessory',   sets:3, repMin:12, repMax:12 },
+        { id:'ex-tricep-pulldown',   name:'Tricep Pulldown',      type:'accessory',   sets:2, repMin:15, repMax:15 },
       ]},
       Tue: { focus:'Back', exercises:[
         { id:'ex-bb-row',            name:'Barbell Row',          type:'strength',    sets:4, repMin:4,  repMax:6 },
@@ -1551,6 +1555,15 @@
       'ex-face-pull':       [{weight:105,reps:15},{weight:105,reps:15},{weight:105,reps:15}],
       'ex-rear-delt-fly':   [{weight:95,reps:20},{weight:95,reps:20},{weight:95,reps:''}],
     }, coachNotes: "Last 2 reps of last set of barbell rows were slightly cheated by some extra body motion. Nothing too crazy though still solid overall form. Did one set of cable rows before low row machine because someone was on it." },
+
+    { date: '2026-09-21', exercises: {
+      'ex-bench-press':        [{weight:225,reps:6},{weight:225,reps:6},{weight:225,reps:6}],
+      'ex-cable-press-around': [{weight:35,reps:15},{weight:35,reps:15},{weight:35,reps:15}],
+      'ex-incline-db-press':   [{weight:75,reps:10},{weight:75,reps:10},{weight:75,reps:10}],
+      'ex-pushups':            [{weight:0,reps:10},{weight:0,reps:10},{weight:0,reps:10}],
+      'ex-db-lat-raise':       [{weight:15,reps:12},{weight:15,reps:12},{weight:15,reps:12}],
+      'ex-tricep-pulldown':    [{weight:60,reps:15},{weight:60,reps:15}],
+    }, coachNotes: '' },
   ];
   function importFallSplitSessions(){
     if(!state.seedFlags) state.seedFlags = {};
