@@ -2076,7 +2076,11 @@
   // Shared by the Habits tab and the Goals tab's Active view — same
   // underlying state.dailyGoals list, so editing/checking off from either
   // place affects the other.
-  function buildDailyGoalRow(g, dateStr){
+  // onAfterChange (optional): called after check/delete, in addition to
+  // renderAll() — lets a caller showing this row inside its own modal
+  // (the Dashboard's Habits pop-up) refresh that modal's own content,
+  // since renderAll() alone doesn't touch an already-open modal's DOM.
+  function buildDailyGoalRow(g, dateStr, onAfterChange){
     const done = isDailyGoalDone(g.id, dateStr);
     const streak = computeDailyGoalStreak(g.id);
     const monthTotal = dailyGoalCompletionsThisMonth(g.id);
@@ -2091,16 +2095,18 @@
       if(g.auto === 'Journal'){ switchSection('journal'); return; }
       toggleDailyGoal(g.id, dateStr);
       renderAll();
+      if(onAfterChange) onAfterChange();
     };
     row.querySelector('.goal-del').onclick = () => {
       state.dailyGoals = state.dailyGoals.filter(x => x.id !== g.id);
       save();
       renderAll();
+      if(onAfterChange) onAfterChange();
     };
     return row;
   }
 
-  function buildWeeklyGoalRow(g, weekStart){
+  function buildWeeklyGoalRow(g, weekStart, onAfterChange){
     const count = getWeeklyGoalCount(g, weekStart);
     const pct = Math.min(100, Math.round((count / g.target) * 100));
     const row = document.createElement('div');
@@ -2115,13 +2121,14 @@
       ${g.auto ? '' : '<div class="goal-weekly-btns"><button class="goal-adj minus">−</button><button class="goal-adj plus">+</button></div>'}
     `;
     if(!g.auto){
-      row.querySelector('.minus').onclick = () => { adjustWeeklyGoal(g, -1); renderAll(); };
-      row.querySelector('.plus').onclick = () => { adjustWeeklyGoal(g, 1); renderAll(); };
+      row.querySelector('.minus').onclick = () => { adjustWeeklyGoal(g, -1); renderAll(); if(onAfterChange) onAfterChange(); };
+      row.querySelector('.plus').onclick = () => { adjustWeeklyGoal(g, 1); renderAll(); if(onAfterChange) onAfterChange(); };
     }
     row.querySelector('.goal-del').onclick = () => {
       state.weeklyGoals = state.weeklyGoals.filter(x => x.id !== g.id);
       save();
       renderAll();
+      if(onAfterChange) onAfterChange();
     };
     return row;
   }
@@ -3436,7 +3443,33 @@
         <div class="ring-sub">score · last 7 days</div>
       </div>
     `;
-    overallTile.onclick = () => switchSection('scores');
+    // Tapping opens a centered pop-up with the per-category breakdown,
+    // same pattern as Budget/Tasks below, instead of navigating away.
+    overallTile.onclick = () => openDashDetailModal('Overall Score', (body) => {
+      const s = computeScores();
+      const cards = [
+        { key:'core',    title:'Core productivity', note:'Habits, tasks, and weekly goals — last 7 days.' },
+        { key:'fitness', title:'Fitness',            note:'Workout days with real reps logged — last 7 days.' },
+        { key:'journal', title:'Journal',            note:'Days with a journal entry — last 7 days.' },
+        { key:'budget',  title:'Budget',             note:'Days within category limits this month.' },
+      ];
+      cards.forEach(c => {
+        const row = document.createElement('div');
+        row.className = 'dash-expand-row';
+        if(c.key === 'budget' && !s.budget.optedIn){
+          row.innerHTML = `<span class="drow-name">${escapeHtml(c.title)}</span><span class="drow-amt">off</span>`;
+        } else {
+          const val = s[c.key].score;
+          row.innerHTML = `<span class="drow-name">${escapeHtml(c.title)}</span><span class="drow-amt">${val === null ? '–' : val + ' / 100'}</span>`;
+        }
+        body.appendChild(row);
+      });
+      const note = document.createElement('div');
+      note.className = 'proj-desc';
+      note.style.marginTop = '4px';
+      note.textContent = 'Turn Budget scoring on/off in Settings. For the full breakdown, see Scores in the More menu.';
+      body.appendChild(note);
+    });
     grid.appendChild(overallTile);
 
     // Habits — ring tile (today's completion), not one row per habit
@@ -3454,7 +3487,42 @@
         <div class="ring-sub">done today</div>
       </div>
     `;
-    habitsTile.onclick = () => switchSection('habits');
+    // Tapping opens a centered pop-up with the same Daily/Weekly checkable
+    // lists as the Habits tab, instead of navigating away — so a habit can
+    // be checked off right from the dashboard.
+    habitsTile.onclick = () => openDashDetailModal('Habits', (body, refresh) => {
+      if(!state.dailyGoals.length && !state.weeklyGoals.length){
+        const empty = document.createElement('div');
+        empty.className = 'empty-note';
+        empty.textContent = 'No habits set up yet — add one from the Habits tab.';
+        body.appendChild(empty);
+        return;
+      }
+      const weekStart = realCurrentWeekStart();
+      if(state.dailyGoals.length){
+        const title = document.createElement('div');
+        title.className = 'task-section-title';
+        title.style.cursor = 'default';
+        title.innerHTML = '<span>Daily</span>';
+        body.appendChild(title);
+        const box = document.createElement('div');
+        box.className = 'goals-box';
+        state.dailyGoals.forEach(g => box.appendChild(buildDailyGoalRow(g, habitDate, refresh)));
+        body.appendChild(box);
+      }
+      if(state.weeklyGoals.length){
+        const title = document.createElement('div');
+        title.className = 'task-section-title';
+        title.style.cursor = 'default';
+        title.style.marginTop = state.dailyGoals.length ? '18px' : '0';
+        title.innerHTML = '<span>Weekly</span>';
+        body.appendChild(title);
+        const box = document.createElement('div');
+        box.className = 'goals-box';
+        state.weeklyGoals.forEach(g => box.appendChild(buildWeeklyGoalRow(g, weekStart, refresh)));
+        body.appendChild(box);
+      }
+    });
     grid.appendChild(habitsTile);
 
     // Budget — remaining for the month against category limits, not just
