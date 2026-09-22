@@ -1628,7 +1628,6 @@
   let menuOpenForCat = null;
   let taskSubView = 'today'; // 'today' | 'upcoming'
   let expandedGroups = new Set(); // tracks which groups are open — everything starts closed
-  let todayTimelineExpanded = true; // Dashboard's unified Today card — starts open
   let calendarViewMonth = null;
 
   function startOfWeek(d){
@@ -3259,6 +3258,120 @@
       .slice(0, 5);
   }
 
+  // Everything actually scheduled at a time today — planned blocks
+  // (Tomorrow tab) and calendar events (fixed blocks + recurring +
+  // one-off) genuinely merged and sorted together. Habits/tasks live in
+  // their own dashboard tiles instead of as rows here, so the timeline
+  // doesn't turn into a long checklist — the exceptions are a planned
+  // block explicitly linked to a habit (set when it was added from the
+  // Tomorrow tab), which gets a checkbox so it can be marked done right
+  // from its scheduled slot, and one linked to a task category, which
+  // pulls in up to 5 of that category's tasks (subTasks) as checkable
+  // rows nested under it.
+  function buildTodayEntries(today){
+    const todayDayAbbr = DAYS[new Date().getDay()];
+    const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+    const todaysBlocks = (state.tomorrowPlans[today] || []);
+
+    const eventsToday = [];
+    blocksForDate(todayDayAbbr, today).forEach(b => {
+      if(!state.workOff[b.id + '_' + today]) eventsToday.push({ time:b.start, endTime:b.end, text:b.label, category:b.category });
+    });
+    (state.items[todayDayAbbr] || []).forEach(it => eventsToday.push(it));
+    (state.datedEvents[today] || []).forEach(it => eventsToday.push(it));
+
+    const entries = [];
+    todaysBlocks.forEach(b => {
+      const isNow = b.endTime && nowMin >= timeToMin(b.startTime) && nowMin < timeToMin(b.endTime);
+      const entry = {
+        time:b.startTime, isNow, color:'#F2A93B', text:b.text,
+        meta: fmtTime(b.startTime) + (b.endTime ? '–' + fmtTime(b.endTime) : '') + ' · Planned'
+      };
+      if(b.habitId && b.habitKind === 'daily'){
+        entry.checkable = true;
+        entry.done = isDailyGoalDone(b.habitId, today);
+        entry.onToggle = () => { toggleDailyGoal(b.habitId, today); renderAll(); };
+      } else if(b.habitId && b.habitKind === 'weekly'){
+        const weeklyGoal = state.weeklyGoals.find(g => g.id === b.habitId);
+        if(weeklyGoal){
+          entry.checkable = true;
+          entry.done = !!b.weeklyMarkedDone;
+          entry.meta += ' · ' + getWeeklyGoalCount(weeklyGoal, realCurrentWeekStart()) + '/' + weeklyGoal.target + ' this week';
+          entry.onToggle = () => {
+            adjustWeeklyGoal(weeklyGoal, b.weeklyMarkedDone ? -1 : 1);
+            b.weeklyMarkedDone = !b.weeklyMarkedDone;
+            save();
+            renderAll();
+          };
+        }
+      } else if(b.taskCategory){
+        const cat = catById[b.taskCategory];
+        if(cat){
+          entry.subTasks = tasksForBlockCategory(b.taskCategory).map(t => ({
+            color: cat.color,
+            text: t.text,
+            meta: (t.dueDate < today ? 'was due ' + fmtDate(t.dueDate) : t.dueDate === today ? 'due today' : 'due ' + fmtDate(t.dueDate)),
+            overdue: t.dueDate < today,
+            onToggle: () => { setTaskDone(t, true); save(); renderAll(); }
+          }));
+        }
+      }
+      entries.push(entry);
+    });
+    eventsToday.forEach(it => {
+      const cat = catById[it.category] || CATEGORIES[0];
+      const isNow = it.endTime && nowMin >= timeToMin(it.time) && nowMin < timeToMin(it.endTime);
+      entries.push({
+        time:it.time, isNow, color:cat.color, text:it.text,
+        meta: fmtTime(it.time) + (it.endTime ? '–' + fmtTime(it.endTime) : '') + ' · ' + cat.label
+      });
+    });
+    return { ordered: entries.sort((a,b) => timeToMin(a.time) - timeToMin(b.time)), nowMin };
+  }
+
+  // The full timeline — every entry, in order, with checkable sub-tasks
+  // nested under a category-linked block. Used inside the Today pop-up.
+  function renderTodayTimelineRows(container, ordered){
+    const timeline = document.createElement('div');
+    timeline.className = 'today-timeline';
+    ordered.forEach(e => {
+      const row = document.createElement('div');
+      row.className = 'today-timeline-item' + (e.isNow ? ' now' : '') + (e.done ? ' done' : '');
+      row.style.setProperty('--accent-color', e.color);
+      row.innerHTML = `
+        ${e.checkable ? '<button class="today-timeline-check' + (e.done ? ' done' : '') + '"></button>' : '<span class="today-timeline-dot"></span>'}
+        <div class="today-timeline-body">
+          <div class="today-timeline-text"></div>
+          <div class="today-timeline-meta"></div>
+        </div>
+      `;
+      row.querySelector('.today-timeline-text').textContent = e.text;
+      row.querySelector('.today-timeline-meta').textContent = e.meta;
+      if(e.checkable) row.querySelector('.today-timeline-check').onclick = e.onToggle;
+      timeline.appendChild(row);
+
+      if(e.subTasks && e.subTasks.length){
+        e.subTasks.forEach(st => {
+          const subRow = document.createElement('div');
+          subRow.className = 'today-timeline-item sub-task';
+          subRow.style.setProperty('--accent-color', st.color);
+          subRow.innerHTML = `
+            <button class="today-timeline-check"></button>
+            <div class="today-timeline-body">
+              <div class="today-timeline-text"></div>
+              <div class="today-timeline-meta${st.overdue ? ' overdue' : ''}"></div>
+            </div>
+          `;
+          subRow.querySelector('.today-timeline-text').textContent = st.text;
+          subRow.querySelector('.today-timeline-meta').textContent = st.meta;
+          subRow.querySelector('.today-timeline-check').onclick = st.onToggle;
+          timeline.appendChild(subRow);
+        });
+      }
+    });
+    container.appendChild(timeline);
+  }
+
   function renderDashboardSection(){
     const wrap = document.getElementById('dashboardContent');
     wrap.innerHTML = '';
@@ -3270,158 +3383,89 @@
     heading.textContent = new Date().toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' });
     wrap.appendChild(heading);
 
-    // Today — one connected timeline instead of stacked, separately-
-    // titled widgets: habits + tasks due today (checkable, no fixed time)
-    // first, then the planned blocks from the Tomorrow tab merged with
-    // today's calendar events (fixed blocks + recurring + one-off), all
-    // sorted by time and drawn on a single connecting line. Falls back to
-    // findNextEvent() only when the whole day is empty.
+    // Today — starts collapsed to just what's current/next, tapping opens
+    // the full merged timeline (calendar events + Tomorrow-planned blocks,
+    // with linked habits/task-category sub-tasks) as a centered pop-up,
+    // same pattern as the tiles below. Falls back to findNextEvent() only
+    // when the whole day is empty.
     const todayCard = document.createElement('div');
     todayCard.className = 'dash-card';
+    todayCard.style.cursor = 'pointer';
     wrap.appendChild(todayCard);
 
     const todayHeader = document.createElement('div');
     todayHeader.className = 'dash-section-header';
     todayHeader.innerHTML = `
-      <span class="dash-header-title"><span class="chev${todayTimelineExpanded ? '' : ' collapsed'}">▾</span> Today</span>
+      <span class="dash-header-title">Today</span>
       <span class="dash-header-arrow" id="todayPlanBtn">Plan →</span>
     `;
-    todayHeader.querySelector('.dash-header-title').onclick = () => {
-      todayTimelineExpanded = !todayTimelineExpanded;
-      renderDashboardSection();
-    };
     todayHeader.querySelector('#todayPlanBtn').onclick = (e) => { e.stopPropagation(); openTomorrowModal(); };
     todayCard.appendChild(todayHeader);
 
-    if(todayTimelineExpanded){
-      const todayDayAbbr = DAYS[new Date().getDay()];
-      const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
-      const todaysBlocks = (state.tomorrowPlans[today] || []);
+    const { ordered, nowMin } = buildTodayEntries(today);
 
-      const eventsToday = [];
-      blocksForDate(todayDayAbbr, today).forEach(b => {
-        if(!state.workOff[b.id + '_' + today]) eventsToday.push({ time:b.start, endTime:b.end, text:b.label, category:b.category });
+    if(!ordered.length){
+      const next = findNextEvent();
+      if(next){
+        const cat = catById[next.event.category] || CATEGORIES[0];
+        const dayLabel = next.dayIndex === 1 ? 'Tomorrow' : fmtDate(next.dateStr);
+        const card = document.createElement('div');
+        card.className = 'dash-next-card';
+        card.style.setProperty('--accent-color', cat.color);
+        card.innerHTML = `
+          <div class="dash-next-time">${fmtTime(next.event.time)}${next.event.endTime ? '–' + fmtTime(next.event.endTime) : ''}</div>
+          <div class="dash-next-text">${escapeHtml(next.event.text)}</div>
+          <div class="dash-next-meta">Nothing today · next up ${escapeHtml(dayLabel)} · ${cat.label}</div>
+        `;
+        todayCard.appendChild(card);
+      } else {
+        const empty = document.createElement('div');
+        empty.className = 'empty-note';
+        empty.textContent = 'Nothing on your plate today.';
+        todayCard.appendChild(empty);
+      }
+    } else {
+      const current = ordered.find(e => e.isNow);
+      const next = ordered.find(e => !e.isNow && timeToMin(e.time) > nowMin);
+      const summary = document.createElement('div');
+      summary.className = 'today-timeline';
+      [{ e:current, label:'Now' }, { e:next, label:'Next' }].forEach(({ e, label }) => {
+        if(!e) return;
+        const row = document.createElement('div');
+        row.className = 'today-timeline-item' + (e.isNow ? ' now' : '');
+        row.style.setProperty('--accent-color', e.color);
+        row.innerHTML = `
+          <span class="today-timeline-dot"></span>
+          <div class="today-timeline-body">
+            <div class="today-timeline-text"></div>
+            <div class="today-timeline-meta"></div>
+          </div>
+        `;
+        row.querySelector('.today-timeline-text').textContent = e.text;
+        row.querySelector('.today-timeline-meta').textContent = label + ' · ' + e.meta;
+        summary.appendChild(row);
       });
-      (state.items[todayDayAbbr] || []).forEach(it => eventsToday.push(it));
-      (state.datedEvents[today] || []).forEach(it => eventsToday.push(it));
+      if(!current && !next){
+        const empty = document.createElement('div');
+        empty.className = 'empty-note';
+        empty.textContent = 'Nothing left on the schedule today.';
+        summary.appendChild(empty);
+      }
+      todayCard.appendChild(summary);
+    }
 
-      // Just what's actually scheduled at a time today — planned blocks
-      // (Tomorrow tab) and calendar events genuinely merged and sorted
-      // together. Habits/tasks live in the widget tiles below instead of
-      // as rows here, so the timeline doesn't turn into a long checklist —
-      // the exceptions are a planned block explicitly linked to a habit
-      // (set when it was added from the Tomorrow tab), which gets a
-      // checkbox so it can be marked done right from its scheduled slot,
-      // and one linked to a task category, which pulls in up to 5 of
-      // that category's tasks (subTasks) as checkable rows nested under it.
-      const entries = [];
-      todaysBlocks.forEach(b => {
-        const isNow = b.endTime && nowMin >= timeToMin(b.startTime) && nowMin < timeToMin(b.endTime);
-        const entry = {
-          time:b.startTime, isNow, color:'#F2A93B', text:b.text,
-          meta: fmtTime(b.startTime) + (b.endTime ? '–' + fmtTime(b.endTime) : '') + ' · Planned'
-        };
-        if(b.habitId && b.habitKind === 'daily'){
-          entry.checkable = true;
-          entry.done = isDailyGoalDone(b.habitId, today);
-          entry.onToggle = () => { toggleDailyGoal(b.habitId, today); renderAll(); };
-        } else if(b.habitId && b.habitKind === 'weekly'){
-          const weeklyGoal = state.weeklyGoals.find(g => g.id === b.habitId);
-          if(weeklyGoal){
-            entry.checkable = true;
-            entry.done = !!b.weeklyMarkedDone;
-            entry.meta += ' · ' + getWeeklyGoalCount(weeklyGoal, realCurrentWeekStart()) + '/' + weeklyGoal.target + ' this week';
-            entry.onToggle = () => {
-              adjustWeeklyGoal(weeklyGoal, b.weeklyMarkedDone ? -1 : 1);
-              b.weeklyMarkedDone = !b.weeklyMarkedDone;
-              save();
-              renderAll();
-            };
-          }
-        } else if(b.taskCategory){
-          const cat = catById[b.taskCategory];
-          if(cat){
-            entry.subTasks = tasksForBlockCategory(b.taskCategory).map(t => ({
-              color: cat.color,
-              text: t.text,
-              meta: (t.dueDate < today ? 'was due ' + fmtDate(t.dueDate) : t.dueDate === today ? 'due today' : 'due ' + fmtDate(t.dueDate)),
-              overdue: t.dueDate < today,
-              onToggle: () => { setTaskDone(t, true); save(); renderAll(); }
-            }));
-          }
-        }
-        entries.push(entry);
-      });
-      eventsToday.forEach(it => {
-        const cat = catById[it.category] || CATEGORIES[0];
-        entries.push({
-          time:it.time, color:cat.color, text:it.text,
-          meta: fmtTime(it.time) + (it.endTime ? '–' + fmtTime(it.endTime) : '') + ' · ' + cat.label
-        });
-      });
-      const ordered = entries.sort((a,b) => timeToMin(a.time) - timeToMin(b.time));
-
-      if(!ordered.length){
-        const next = findNextEvent();
-        if(next){
-          const cat = catById[next.event.category] || CATEGORIES[0];
-          const dayLabel = next.dayIndex === 1 ? 'Tomorrow' : fmtDate(next.dateStr);
-          const card = document.createElement('div');
-          card.className = 'dash-next-card';
-          card.style.setProperty('--accent-color', cat.color);
-          card.innerHTML = `
-            <div class="dash-next-time">${fmtTime(next.event.time)}${next.event.endTime ? '–' + fmtTime(next.event.endTime) : ''}</div>
-            <div class="dash-next-text">${escapeHtml(next.event.text)}</div>
-            <div class="dash-next-meta">Nothing today · next up ${escapeHtml(dayLabel)} · ${cat.label}</div>
-          `;
-          todayCard.appendChild(card);
-        } else {
+    todayCard.onclick = () => {
+      openDashDetailModal('Today', (body) => {
+        if(!ordered.length){
           const empty = document.createElement('div');
           empty.className = 'empty-note';
           empty.textContent = 'Nothing on your plate today.';
-          todayCard.appendChild(empty);
+          body.appendChild(empty);
+          return;
         }
-      } else {
-        const timeline = document.createElement('div');
-        timeline.className = 'today-timeline';
-        ordered.forEach(e => {
-          const row = document.createElement('div');
-          row.className = 'today-timeline-item' + (e.isNow ? ' now' : '') + (e.done ? ' done' : '');
-          row.style.setProperty('--accent-color', e.color);
-          row.innerHTML = `
-            ${e.checkable ? '<button class="today-timeline-check' + (e.done ? ' done' : '') + '"></button>' : '<span class="today-timeline-dot"></span>'}
-            <div class="today-timeline-body">
-              <div class="today-timeline-text"></div>
-              <div class="today-timeline-meta"></div>
-            </div>
-          `;
-          row.querySelector('.today-timeline-text').textContent = e.text;
-          row.querySelector('.today-timeline-meta').textContent = e.meta;
-          if(e.checkable) row.querySelector('.today-timeline-check').onclick = e.onToggle;
-          timeline.appendChild(row);
-
-          if(e.subTasks && e.subTasks.length){
-            e.subTasks.forEach(st => {
-              const subRow = document.createElement('div');
-              subRow.className = 'today-timeline-item sub-task';
-              subRow.style.setProperty('--accent-color', st.color);
-              subRow.innerHTML = `
-                <button class="today-timeline-check"></button>
-                <div class="today-timeline-body">
-                  <div class="today-timeline-text"></div>
-                  <div class="today-timeline-meta${st.overdue ? ' overdue' : ''}"></div>
-                </div>
-              `;
-              subRow.querySelector('.today-timeline-text').textContent = st.text;
-              subRow.querySelector('.today-timeline-meta').textContent = st.meta;
-              subRow.querySelector('.today-timeline-check').onclick = st.onToggle;
-              timeline.appendChild(subRow);
-            });
-          }
-        });
-        todayCard.appendChild(timeline);
-      }
-    }
+        renderTodayTimelineRows(body, ordered);
+      });
+    };
 
     // Widgets — a bento grid of independent stat tiles (no enclosing card
     // or header, each tile its own bordered box, closer to the reference

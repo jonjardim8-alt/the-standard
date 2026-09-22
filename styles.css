@@ -785,6 +785,7 @@
     padding: 14px 14px 4px;
     margin-bottom: 18px;
   }
+  .dash-card:active{ background: var(--card-hover); }
   .dash-card .dash-section-header{ margin-bottom: 4px; }
   .today-timeline{
     position: relative;
