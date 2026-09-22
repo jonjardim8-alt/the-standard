@@ -1174,18 +1174,14 @@
     margin-top: 3px;
     line-height: 1.35;
   }
-  /* Expand-in-place tile (Budget, Tasks) — tapping the head grows the tile
-     to full grid width and reveals renderBody's content below, instead of
-     navigating away or dropping down under a separate header. */
-  .dash-tile.expandable .dash-tile-head{ cursor:pointer; }
-  .dash-tile.expanded{ grid-column: 1 / -1; }
+  /* Modal-detail tile (Budget, Tasks) — tapping opens a centered pop-up
+     (openDashDetailModal) showing renderBody's content, instead of
+     navigating away or pushing content down inline under the tile. */
   .dash-expand-body{
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px solid var(--border);
     display:flex;
     flex-direction:column;
-    gap: 6px;
+    gap: 8px;
+    margin-top: 4px;
   }
   .dash-expand-row{
     display:flex;

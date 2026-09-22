@@ -1629,8 +1629,6 @@
   let taskSubView = 'today'; // 'today' | 'upcoming'
   let expandedGroups = new Set(); // tracks which groups are open — everything starts closed
   let todayTimelineExpanded = true; // Dashboard's unified Today card — starts open
-  let dashTasksExpanded = false; // Dashboard's Tasks widget — starts collapsed
-  let dashBudgetExpanded = false; // Dashboard's Budget widget — starts collapsed
   let calendarViewMonth = null;
 
   function startOfWeek(d){
@@ -3461,7 +3459,7 @@
 
     // Budget — remaining for the month against category limits, not just
     // raw spend, so the number answers "how much do I have left." Tapping
-    // the tile expands it in place to show the per-category breakdown
+    // the tile opens a centered pop-up with the per-category breakdown
     // instead of navigating to the Budget tab.
     const bmKey = budgetMonthKey(new Date());
     const monthTxns = state.budgetTransactions.filter(t => t.date.startsWith(bmKey));
@@ -3469,13 +3467,11 @@
     const totalLimit = Object.values(state.categoryBudgetLimits).reduce((s,v) => s + (v || 0), 0);
     const hasLimits = totalLimit > 0;
     const remaining = totalLimit - monthExpense;
-    grid.appendChild(makeDashExpandTile({
+    grid.appendChild(makeDashModalTile({
       color: hasLimits ? (remaining < 0 ? 'var(--error)' : '#3FC7D6') : '#3FC7D6',
       title: 'Budget',
       stat: hasLimits ? '$' + Math.abs(remaining).toFixed(0) : '$' + monthExpense.toFixed(0),
       sub: hasLimits ? (remaining < 0 ? 'over this month' : 'left this month') : 'spent this month',
-      expanded: dashBudgetExpanded,
-      onToggle: () => { dashBudgetExpanded = !dashBudgetExpanded; renderDashboardSection(); },
       renderBody: (body) => {
         const statuses = computeCategoryBudgetStatus(monthTxns);
         if(!statuses.length){
@@ -3494,20 +3490,18 @@
       }
     }));
 
-    // Tasks — same expand-in-place pattern: collapsed shows a compact
-    // due-today/overdue count, expanded lists everything due within the
+    // Tasks — same centered-pop-up pattern: the tile shows a compact
+    // due-today/overdue count, the modal lists everything due within the
     // upcoming week so the dashboard can answer "what's coming" without
     // opening the Tasks tab.
     const tasksDueToday = state.tasks.filter(t => !t.done && t.dueDate === today).length;
     const tasksOverdue = state.tasks.filter(t => !t.done && t.dueDate < today).length;
-    grid.appendChild(makeDashExpandTile({
+    grid.appendChild(makeDashModalTile({
       color: tasksOverdue ? 'var(--error)' : '#5B8DEF',
       title: 'Tasks',
       stat: String(tasksOverdue || tasksDueToday || 0),
       sub: tasksOverdue ? 'overdue' : (tasksDueToday ? 'due today' : 'all clear'),
-      expanded: dashTasksExpanded,
-      onToggle: () => { dashTasksExpanded = !dashTasksExpanded; renderDashboardSection(); },
-      renderBody: (body) => {
+      renderBody: (body, refresh) => {
         const weekAhead = new Date();
         weekAhead.setDate(weekAhead.getDate() + 7);
         const weekAheadStr = toDateStr(weekAhead);
@@ -3535,7 +3529,7 @@
           const meta = row.querySelector('.task-meta');
           meta.textContent = (overdue ? 'was due ' : (t.dueDate === today ? 'due today' : 'due ')) + (t.dueDate === today ? '' : fmtDate(t.dueDate)) + ' · ' + cat.label;
           if(overdue) meta.classList.add('overdue');
-          row.querySelector('.task-check').onclick = () => { setTaskDone(t, true); save(); renderAll(); };
+          row.querySelector('.task-check').onclick = () => { setTaskDone(t, true); save(); renderAll(); refresh(); };
           list.appendChild(row);
         });
         body.appendChild(list);
@@ -3556,30 +3550,46 @@
     return tile;
   }
 
-  // A dash-tile that expands in place on tap — instead of navigating away
-  // or dropping down under a header — growing to full grid width and
-  // revealing opts.renderBody's content below the usual stat/sub.
-  function makeDashExpandTile(opts){
-    const tile = document.createElement('div');
-    tile.className = 'dash-tile expandable' + (opts.expanded ? ' expanded' : '');
-    tile.style.setProperty('--accent-color', opts.color);
+  // Opens a centered modal (the app's existing modalOverlay) showing a
+  // dashboard tile's detail, instead of the old pattern of pushing
+  // content down inline underneath the tile. renderBody(body, refresh)
+  // gets a refresh callback to call after any state change inside the
+  // modal (e.g. checking a task off) — renderAll() alone updates the
+  // dashboard behind the modal, but doesn't touch the open modal's own
+  // content, so the two are called together where that matters.
+  function openDashDetailModal(title, renderBody){
+    const overlay = document.getElementById('modalOverlay');
+    const content = document.getElementById('modalContent');
+    content.style.removeProperty('--chip-color');
+    content.innerHTML = `
+      <div class="modal-handle"></div>
+      <div class="modal-title">${escapeHtml(title)}</div>
+      <div class="dash-expand-body" id="dashDetailBody"></div>
+      <div class="modal-actions">
+        <button class="save" id="dashDetailClose" style="flex:1">Close</button>
+      </div>
+    `;
+    overlay.classList.remove('hidden');
+    const refresh = () => {
+      const body = document.getElementById('dashDetailBody');
+      if(!body) return;
+      body.innerHTML = '';
+      renderBody(body, refresh);
+    };
+    refresh();
+    document.getElementById('dashDetailClose').onclick = () => { closeModal(); renderAll(); };
+  }
 
-    const head = document.createElement('div');
-    head.className = 'dash-tile-head';
-    head.innerHTML = `
+  function makeDashModalTile(opts){
+    const tile = document.createElement('div');
+    tile.className = 'dash-tile expandable';
+    tile.style.setProperty('--accent-color', opts.color);
+    tile.innerHTML = `
       <div class="dash-tile-title">${escapeHtml(opts.title)}</div>
       <div class="dash-tile-stat">${opts.stat}</div>
       <div class="dash-tile-sub">${opts.sub}</div>
     `;
-    head.onclick = opts.onToggle;
-    tile.appendChild(head);
-
-    if(opts.expanded){
-      const body = document.createElement('div');
-      body.className = 'dash-expand-body';
-      opts.renderBody(body);
-      tile.appendChild(body);
-    }
+    tile.onclick = () => openDashDetailModal(opts.title, opts.renderBody);
     return tile;
   }
 
