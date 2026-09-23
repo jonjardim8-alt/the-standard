@@ -1564,6 +1564,15 @@
       'ex-db-lat-raise':       [{weight:15,reps:12},{weight:15,reps:12},{weight:15,reps:12}],
       'ex-tricep-pulldown':    [{weight:60,reps:15},{weight:60,reps:15}],
     }, coachNotes: '' },
+
+    { date: '2026-09-22', exercises: {
+      'ex-bb-row':          [{weight:175,reps:6},{weight:175,reps:6},{weight:175,reps:6},{weight:175,reps:6}],
+      'ex-sa-lat-pulldown': [{weight:155,reps:10},{weight:155,reps:10},{weight:155,reps:10}],
+      'ex-low-row-machine': [{weight:205,reps:12},{weight:205,reps:12},{weight:205,reps:12}],
+      'ex-cable-row':       [{weight:155,reps:12},{weight:155,reps:12},{weight:155,reps:12}],
+      'ex-face-pull':       [{weight:110,reps:15},{weight:110,reps:15},{weight:110,reps:15}],
+      'ex-rear-delt-fly':   [{weight:95,reps:18},{weight:95,reps:15},{weight:95,reps:12}],
+    }, coachNotes: '' },
   ];
   function importFallSplitSessions(){
     if(!state.seedFlags) state.seedFlags = {};
