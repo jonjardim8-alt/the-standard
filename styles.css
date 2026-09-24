@@ -412,6 +412,16 @@
     color: var(--text);
     color-scheme: dark;
   }
+  /* iOS Safari's native time control can render past a plain width:100%
+     — its internal shadow-DOM layout for the HH:MM AM/PM segments isn't
+     always clamped by width alone the way it is in Chrome. min-width:0
+     lets it actually shrink to fit; max-width/box-sizing belt-and-braces
+     it against the same overflow. */
+  .modal input[type=time]{
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
   /* Custom select — replaces native <select>/its OS picker with an
      in-app dark sheet (see .picker-overlay below) so it matches the rest
      of the UI instead of iOS's system dropdown/wheel. */
