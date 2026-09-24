@@ -5544,8 +5544,16 @@
       <div class="modal-subtitle">${it.__dated ? fmtDate(it.__dateStr) : fullDayName(day)}</div>
       <label>What is it?</label>
       <input type="text" id="editText" maxlength="80">
-      <label>Time</label>
-      <input type="time" id="editTime">
+      <div class="ev-time-row">
+        <div>
+          <label>Start time</label>
+          <input type="time" id="editTime">
+        </div>
+        <div>
+          <label>End time (optional)</label>
+          <input type="time" id="editEndTime">
+        </div>
+      </div>
       <label>Notes (optional)</label>
       <textarea id="editNotes" placeholder="Any extra detail…" rows="2"></textarea>
       <div class="modal-actions">
@@ -5557,6 +5565,7 @@
     // in existing text can't break the markup.
     document.getElementById('editText').value = ref.text;
     document.getElementById('editTime').value = ref.time;
+    document.getElementById('editEndTime').value = ref.endTime || '';
     document.getElementById('editNotes').value = ref.notes || '';
 
     overlay.classList.remove('hidden');
@@ -5566,6 +5575,7 @@
       if(!text) return;
       ref.text = text;
       ref.time = document.getElementById('editTime').value || ref.time;
+      ref.endTime = document.getElementById('editEndTime').value || null;
       ref.notes = document.getElementById('editNotes').value.trim();
       save();
       closeModal();
@@ -5596,22 +5606,36 @@
       ${catPickerHtml}
       <div id="evPresetShortcut"></div>
 
-      <label class="allday-toggle-row">
-        <input type="checkbox" id="evAllDay"> All day / multi-day (e.g. vacation)
-      </label>
-      <label class="allday-toggle-row">
-        <input type="checkbox" id="evBirthday"> Birthday (repeats every year)
-      </label>
+      <label id="evTextLabel">What is it?</label>
+      <input type="text" id="evText" placeholder="e.g. Doctor appointment" maxlength="80">
+
+      <div class="view-toggle" id="evModeToggle" style="margin:14px 0">
+        <button id="evModeTimed" class="active">Timed</button>
+        <button id="evModeAllDay">All day</button>
+        <button id="evModeBirthday">Birthday</button>
+      </div>
 
       <div id="evTimedFields">
         <label>Day</label>
         ${customSelectHtml('evDay', dayOptions, DAYS[activeDay], 'Day')}
-        <label>Time</label>
-        <input type="time" id="evTime" value="09:00">
+        <div class="ev-time-row">
+          <div>
+            <label>Start time</label>
+            <input type="time" id="evTime" value="09:00">
+          </div>
+          <div>
+            <label>End time (optional)</label>
+            <input type="time" id="evEndTime">
+          </div>
+        </div>
         <div id="evEnergyWarn" class="energy-warn" style="display:none">⚡ This is one of your low-energy hours</div>
-        <label class="allday-toggle-row">
-          <input type="checkbox" id="evRepeatWeekly"> Repeats weekly (same day, every week)
-        </label>
+        <div class="settings-row" style="margin-top:12px">
+          <div>
+            <div class="settings-row-label">Repeats weekly</div>
+            <div class="settings-row-sub">Same day, every week</div>
+          </div>
+          <button class="toggle-switch" id="evRepeatWeekly"></button>
+        </div>
       </div>
 
       <div id="evAllDayFields" style="display:none">
@@ -5628,8 +5652,6 @@
         <input type="number" id="evBdayDay" min="1" max="31" value="${activeDateObj.getDate()}">
       </div>
 
-      <label id="evTextLabel">What is it?</label>
-      <input type="text" id="evText" placeholder="e.g. Doctor appointment" maxlength="80">
       <div id="evNotesField">
         <label>Notes (optional)</label>
         <textarea id="evNotes" placeholder="Any extra detail…" rows="2"></textarea>
@@ -5644,6 +5666,13 @@
     wireCustomDate('evStartDate', {});
     wireCustomDate('evEndDate', {});
     wireCustomSelect('evBdayMonth', bdayMonthOptions, 'Month');
+
+    let eventMode = 'timed'; // 'timed' | 'allday' | 'birthday'
+    let repeatsWeekly = false;
+    document.getElementById('evRepeatWeekly').onclick = () => {
+      repeatsWeekly = !repeatsWeekly;
+      document.getElementById('evRepeatWeekly').classList.toggle('on', repeatsWeekly);
+    };
 
     function updatePresetShortcut(){
       const box = document.getElementById('evPresetShortcut');
@@ -5681,11 +5710,14 @@
       });
     }
 
-    // Three mutually-exclusive modes — checking one unchecks the other and
-    // swaps which field group + label set shows.
+    // Three mutually-exclusive modes as one segmented control instead of
+    // two independent checkboxes — picking one swaps which field group +
+    // label set shows.
+    const EV_MODE_BTN = { timed:'evModeTimed', allday:'evModeAllDay', birthday:'evModeBirthday' };
     function updateEventMode(){
-      const isAllDay = document.getElementById('evAllDay').checked;
-      const isBirthday = document.getElementById('evBirthday').checked;
+      const isAllDay = eventMode === 'allday';
+      const isBirthday = eventMode === 'birthday';
+      Object.keys(EV_MODE_BTN).forEach(m => document.getElementById(EV_MODE_BTN[m]).classList.toggle('active', m === eventMode));
       document.getElementById('evTimedFields').style.display = (!isAllDay && !isBirthday) ? 'block' : 'none';
       document.getElementById('evAllDayFields').style.display = isAllDay ? 'block' : 'none';
       document.getElementById('evBirthdayFields').style.display = isBirthday ? 'block' : 'none';
@@ -5699,19 +5731,14 @@
           ? "No specific time — shown as a banner, doesn't tint the schedule"
           : 'Scheduled at a specific time';
     }
-    document.getElementById('evAllDay').onchange = (e) => {
-      if(e.target.checked) document.getElementById('evBirthday').checked = false;
-      updateEventMode();
-    };
-    document.getElementById('evBirthday').onchange = (e) => {
-      if(e.target.checked) document.getElementById('evAllDay').checked = false;
-      updateEventMode();
-    };
+    document.getElementById('evModeTimed').onclick = () => { eventMode = 'timed'; updateEventMode(); };
+    document.getElementById('evModeAllDay').onclick = () => { eventMode = 'allday'; updateEventMode(); };
+    document.getElementById('evModeBirthday').onclick = () => { eventMode = 'birthday'; updateEventMode(); };
 
     document.getElementById('evCancel').onclick = closeModal;
     document.getElementById('evSave').onclick = () => {
-      const isAllDay = document.getElementById('evAllDay').checked;
-      const isBirthday = document.getElementById('evBirthday').checked;
+      const isAllDay = eventMode === 'allday';
+      const isBirthday = eventMode === 'birthday';
       const text = document.getElementById('evText').value.trim();
       if(!text) return;
 
@@ -5735,16 +5762,16 @@
       } else {
         const day = document.getElementById('evDay').value;
         const time = document.getElementById('evTime').value || '09:00';
-        const repeatsWeekly = document.getElementById('evRepeatWeekly').checked;
+        const endTime = document.getElementById('evEndTime').value || null;
         if(repeatsWeekly){
-          state.items[day].push({ id: Date.now() + '-' + Math.random().toString(36).slice(2,7), time, text, category: selectedCat, notes });
+          state.items[day].push({ id: Date.now() + '-' + Math.random().toString(36).slice(2,7), time, endTime, text, category: selectedCat, notes });
         } else {
           // One-time by default — placed on this specific date (the
           // selected weekday within the currently-viewed week), not every
           // week's occurrence of that day.
           const dateStr = toDateStr(weekDates()[DAYS.indexOf(day)]);
           if(!state.datedEvents[dateStr]) state.datedEvents[dateStr] = [];
-          state.datedEvents[dateStr].push({ id: Date.now() + '-' + Math.random().toString(36).slice(2,7), time, text, category: selectedCat, notes });
+          state.datedEvents[dateStr].push({ id: Date.now() + '-' + Math.random().toString(36).slice(2,7), time, endTime, text, category: selectedCat, notes });
         }
       }
       save();
