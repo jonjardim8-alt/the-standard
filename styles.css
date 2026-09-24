@@ -379,7 +379,11 @@
     margin: 12px 0 6px;
   }
   /* Add/Edit event's start+end time side by side, instead of stacked. */
-  .ev-time-row{ display:flex; flex-direction:column; gap:0; }
+  /* Plain block flow, not flex — a flex column lets the native time
+     input's intrinsic width refuse to shrink (min-width:auto by
+     default), overflowing the modal. Block layout makes it 100% of the
+     modal's content width, same as every other field including Notes. */
+  .ev-time-row > div{ width:100%; }
   .preset-shortcut-btn{
     width:100%;
     font-family: var(--font-mono);
