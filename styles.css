@@ -379,8 +379,7 @@
     margin: 12px 0 6px;
   }
   /* Add/Edit event's start+end time side by side, instead of stacked. */
-  .ev-time-row{ display:flex; gap:10px; }
-  .ev-time-row > div{ flex:1; min-width:0; }
+  .ev-time-row{ display:flex; flex-direction:column; gap:0; }
   .preset-shortcut-btn{
     width:100%;
     font-family: var(--font-mono);
