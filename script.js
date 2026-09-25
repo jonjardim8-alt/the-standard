@@ -1573,6 +1573,11 @@
       'ex-face-pull':       [{weight:110,reps:15},{weight:110,reps:15},{weight:110,reps:15}],
       'ex-rear-delt-fly':   [{weight:95,reps:18},{weight:95,reps:15},{weight:95,reps:12}],
     }, coachNotes: '' },
+
+    { date: '2026-09-23', exercises: {
+      'ex-pendulum-squat':  [{weight:205,reps:6},{weight:205,reps:6},{weight:205,reps:6},{weight:205,reps:6}],
+      'ex-bulgarian-split': [{weight:70,reps:8},{weight:70,reps:8},{weight:70,reps:8}],
+    }, coachNotes: "I wasn’t feeling the best and I’m going to Disney tonight so I'll be doing a lot of moving so I decided to cut it short and just do pendulum and bulgarian" },
   ];
   function importFallSplitSessions(){
     if(!state.seedFlags) state.seedFlags = {};
