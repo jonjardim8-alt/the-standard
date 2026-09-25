@@ -2894,7 +2894,7 @@
           <div class="tomorrow-block-row" data-block-id="${b.id}">
             <div class="tomorrow-block-time">${fmtTime(b.startTime)}${b.endTime ? '–' + fmtTime(b.endTime) : ''}</div>
             <div style="flex:1;min-width:0">
-              <div class="tomorrow-block-text">${b.auto ? '✨ ' : ''}${escapeHtml(b.text)}</div>
+              <div class="tomorrow-block-text">${escapeHtml(b.text)}</div>
               ${tagLabel ? '<div class="proj-desc">🔗 ' + escapeHtml(tagLabel) + '</div>' : ''}
             </div>
             <button class="tomorrow-block-del">×</button>
