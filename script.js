@@ -1721,6 +1721,8 @@
           if(!parsed.birthdays) parsed.birthdays = [];
           if(!parsed.tomorrowPlans) parsed.tomorrowPlans = {};
           if(!parsed.recurringTransactions) parsed.recurringTransactions = [];
+          if(!parsed.autoScheduleRules) parsed.autoScheduleRules = [];
+          if(!parsed.tomorrowWakeTimes) parsed.tomorrowWakeTimes = {};
           return parsed;
         }
       }
@@ -1738,7 +1740,9 @@
       blockedSenders: [],
       birthdays: [],
       tomorrowPlans: {},
-      recurringTransactions: []
+      recurringTransactions: [],
+      autoScheduleRules: [],
+      tomorrowWakeTimes: {}
     };
   }
   function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
@@ -2765,6 +2769,86 @@
     return null;
   }
 
+  // Everything already committed for a given date — fixed recurring blocks
+  // (not marked off), weekly-recurring events, one-off dated events, tasks
+  // due, and project milestones due. Read-only preview for the Tomorrow
+  // modal's auto-pull section — none of this is editable from there.
+  function tomorrowCommitments(dateStr){
+    const dayAbbr = dayAbbrFromDateStr(dateStr);
+    const events = [];
+    blocksForDate(dayAbbr, dateStr).forEach(b => {
+      if(state.workOff[b.id + '_' + dateStr]) return;
+      events.push({ time:b.start, endTime:b.end, text:b.label });
+    });
+    (state.items[dayAbbr] || []).forEach(it => events.push({ time:it.time, endTime:it.endTime, text:it.text }));
+    (state.datedEvents[dateStr] || []).forEach(it => events.push({ time:it.time, endTime:it.endTime, text:it.text }));
+    events.sort((a,b) => timeToMin(a.time) - timeToMin(b.time));
+
+    const tasksDue = state.tasks.filter(t => !t.done && t.dueDate === dateStr);
+    const milestonesDue = [];
+    state.projects.forEach(p => (p.milestones || []).forEach(m => {
+      if(!m.done && m.targetDate === dateStr) milestonesDue.push({ text:m.name, project:p.name });
+    }));
+
+    return { events, tasksDue, milestonesDue };
+  }
+
+  // Finds the latest end time (HH:MM) among a date's calendar commitments
+  // in a given category — fixed recurring blocks (respecting Day off),
+  // weekly-recurring items, and one-off dated events. Returns null when the
+  // category doesn't occur that day (e.g. a Work rule on a day off), so the
+  // rule is silently skipped rather than anchored to a stale/wrong time.
+  function latestCategoryEndTime(dateStr, categoryId){
+    const dayAbbr = dayAbbrFromDateStr(dateStr);
+    let latest = null;
+    const consider = (endTime) => {
+      if(!endTime) return;
+      if(latest === null || timeToMin(endTime) > timeToMin(latest)) latest = endTime;
+    };
+    blocksForDate(dayAbbr, dateStr).forEach(b => {
+      if(b.category !== categoryId) return;
+      if(state.workOff[b.id + '_' + dateStr]) return;
+      consider(b.end);
+    });
+    (state.items[dayAbbr] || []).forEach(it => {
+      if(it.category !== categoryId) return;
+      consider(it.endTime || minToTime(timeToMin(it.time) + 30));
+    });
+    (state.datedEvents[dateStr] || []).forEach(it => {
+      if(it.category !== categoryId) return;
+      consider(it.endTime || minToTime(timeToMin(it.time) + 30));
+    });
+    return latest;
+  }
+
+  // Builds tomorrowPlans-shaped blocks from state.autoScheduleRules for a
+  // date + wake time — 'auto:true, ruleId' so openTomorrowModal can find
+  // and replace just these when the wake time changes, leaving any blocks
+  // the user added or edited by hand untouched.
+  function computeAutoScheduleBlocks(dateStr, wakeTime){
+    const blocks = [];
+    state.autoScheduleRules.forEach(r => {
+      let anchorMin;
+      if(r.anchorType === 'wake'){
+        if(!wakeTime) return;
+        anchorMin = timeToMin(wakeTime);
+      } else {
+        const end = latestCategoryEndTime(dateStr, r.categoryId);
+        if(!end) return;
+        anchorMin = timeToMin(end);
+      }
+      const startMin = ((anchorMin + r.offsetMinutes) % 1440 + 1440) % 1440;
+      const endMin = ((startMin + r.durationMinutes) % 1440 + 1440) % 1440;
+      blocks.push({
+        id: Date.now() + '-' + Math.random().toString(36).slice(2,7) + '-' + r.id,
+        text: r.text, startTime: minToTime(startMin), endTime: minToTime(endMin),
+        habitKind: r.habitKind, habitId: r.habitId, taskCategory: r.taskCategory,
+        auto: true, ruleId: r.id
+      });
+    });
+    return blocks;
+  }
+
   // Opened from the header button (same spot Weekly Review used to live),
   // not a tab — a modal, same pattern as the old Week Review.
   function openTomorrowModal(){
@@ -2773,7 +2857,35 @@
     content.style.removeProperty('--chip-color');
     const dateStr = tomorrowDateStr();
     if(!state.tomorrowPlans[dateStr]) state.tomorrowPlans[dateStr] = [];
+    const wakeTime = state.tomorrowWakeTimes[dateStr] || '';
     const blocks = state.tomorrowPlans[dateStr].slice().sort((a,b) => timeToMin(a.startTime) - timeToMin(b.startTime));
+    const { events, tasksDue, milestonesDue } = tomorrowCommitments(dateStr);
+    const hasCommitments = events.length || tasksDue.length || milestonesDue.length;
+
+    const commitmentsHtml = hasCommitments ? `
+      <div class="section-label" style="margin:14px 0 8px">Already committed</div>
+      <div class="task-list">
+        ${events.map(e => `
+          <div class="tomorrow-block-row" style="opacity:0.7">
+            <div class="tomorrow-block-time">${fmtTime(e.time)}${e.endTime ? '–' + fmtTime(e.endTime) : ''}</div>
+            <div style="flex:1;min-width:0"><div class="tomorrow-block-text">${escapeHtml(e.text)}</div></div>
+          </div>
+        `).join('')}
+        ${tasksDue.map(t => `
+          <div class="tomorrow-block-row" style="opacity:0.7">
+            <div class="tomorrow-block-time">Due</div>
+            <div style="flex:1;min-width:0"><div class="tomorrow-block-text">${escapeHtml(t.text)}</div></div>
+          </div>
+        `).join('')}
+        ${milestonesDue.map(m => `
+          <div class="tomorrow-block-row" style="opacity:0.7">
+            <div class="tomorrow-block-time">Milestone</div>
+            <div style="flex:1;min-width:0"><div class="tomorrow-block-text">${escapeHtml(m.text)}</div><div class="proj-desc">${escapeHtml(m.project)}</div></div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="section-label" style="margin:14px 0 8px">Your plan</div>
+    ` : '';
 
     const listHtml = blocks.length
       ? blocks.map(b => {
@@ -2782,7 +2894,7 @@
           <div class="tomorrow-block-row" data-block-id="${b.id}">
             <div class="tomorrow-block-time">${fmtTime(b.startTime)}${b.endTime ? '–' + fmtTime(b.endTime) : ''}</div>
             <div style="flex:1;min-width:0">
-              <div class="tomorrow-block-text">${escapeHtml(b.text)}</div>
+              <div class="tomorrow-block-text">${b.auto ? '✨ ' : ''}${escapeHtml(b.text)}</div>
               ${tagLabel ? '<div class="proj-desc">🔗 ' + escapeHtml(tagLabel) + '</div>' : ''}
             </div>
             <button class="tomorrow-block-del">×</button>
@@ -2795,6 +2907,11 @@
       <div class="modal-handle"></div>
       <div class="modal-title">Tomorrow</div>
       <div class="modal-subtitle">${dateFromStr(dateStr).toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' })}</div>
+      ${commitmentsHtml}
+      ${state.autoScheduleRules.length ? `
+        <label>Wake-up time</label>
+        ${customTimeHtml('tomorrowWake', wakeTime, 'Not set')}
+      ` : ''}
       <div class="task-list">${listHtml}</div>
       <div class="modal-actions">
         <button class="cancel" id="tomorrowAddBtn" style="flex:1">+ Add</button>
@@ -2802,6 +2919,15 @@
       </div>
     `;
     overlay.classList.remove('hidden');
+    if(state.autoScheduleRules.length){
+      wireCustomTime('tomorrowWake', { allowClear:true, placeholder:'Not set' }, (val) => {
+        state.tomorrowWakeTimes[dateStr] = val || null;
+        state.tomorrowPlans[dateStr] = state.tomorrowPlans[dateStr].filter(b => !b.auto);
+        if(val) state.tomorrowPlans[dateStr].push(...computeAutoScheduleBlocks(dateStr, val));
+        save();
+        openTomorrowModal();
+      });
+    }
     content.querySelectorAll('.tomorrow-block-del').forEach(btn => {
       btn.onclick = () => {
         const id = btn.closest('.tomorrow-block-row').dataset.blockId;
@@ -7111,6 +7237,133 @@
       });
     }
     wrap.appendChild(bdayChipWrap);
+
+    const autoSub = document.createElement('div');
+    autoSub.className = 'section-label';
+    autoSub.style.marginTop = '18px';
+    autoSub.textContent = 'Tomorrow Auto-Schedule';
+    wrap.appendChild(autoSub);
+
+    const autoNote = document.createElement('div');
+    autoNote.className = 'settings-row-sub';
+    autoNote.style.margin = '0 0 10px';
+    autoNote.textContent = 'Automatically added to Tomorrow’s plan once you set a wake-up time there — e.g. "Bible reading, 10 min after waking" or "Gym, 45 min after Work ends."';
+    wrap.appendChild(autoNote);
+
+    const autoAddBtn = document.createElement('button');
+    autoAddBtn.className = 'preset-shortcut-btn';
+    autoAddBtn.textContent = '+ Add rule';
+    autoAddBtn.onclick = openAddAutoRuleModal;
+    wrap.appendChild(autoAddBtn);
+
+    const autoChipWrap = document.createElement('div');
+    autoChipWrap.className = 'blocklist-chips';
+    autoChipWrap.style.marginTop = '10px';
+    if(!state.autoScheduleRules.length){
+      autoChipWrap.innerHTML = '<div class="empty-note">No auto-schedule rules yet.</div>';
+    } else {
+      state.autoScheduleRules.forEach(r => {
+        const chip = document.createElement('div');
+        chip.className = 'blocklist-chip';
+        chip.innerHTML = `<span></span><button aria-label="Remove">×</button>`;
+        const anchorLabel = r.anchorType === 'wake'
+          ? 'after waking'
+          : 'after ' + (catById[r.categoryId] ? catById[r.categoryId].label : 'category') + ' ends';
+        chip.querySelector('span').textContent = r.text + ' — ' + r.offsetMinutes + ' min ' + anchorLabel + ', ' + r.durationMinutes + ' min';
+        chip.querySelector('button').onclick = () => {
+          state.autoScheduleRules = state.autoScheduleRules.filter(x => x.id !== r.id);
+          save();
+          renderAll();
+        };
+        autoChipWrap.appendChild(chip);
+      });
+    }
+    wrap.appendChild(autoChipWrap);
+  }
+
+  function openAddAutoRuleModal(){
+    const overlay = document.getElementById('modalOverlay');
+    const content = document.getElementById('modalContent');
+    content.style.removeProperty('--chip-color');
+
+    const categoryOptionsHtml = CATEGORIES.map(c => '<option value="' + c.id + '">' + escapeHtml(c.label) + '</option>').join('');
+    const dailyOptions = state.dailyGoals.map(g => '<option value="daily:' + g.id + '">' + escapeHtml(g.name) + '</option>').join('');
+    const weeklyOptions = state.weeklyGoals.filter(g => !g.auto).map(g => '<option value="weekly:' + g.id + '">' + escapeHtml(g.name) + '</option>').join('');
+    const taskCatOptions = CATEGORIES.map(c => '<option value="taskcat:' + c.id + '">' + escapeHtml(c.label) + '</option>').join('');
+    const linkOptionsHtml = '<option value="">None</option>'
+      + (dailyOptions ? '<optgroup label="Daily habits">' + dailyOptions + '</optgroup>' : '')
+      + (weeklyOptions ? '<optgroup label="Weekly habits">' + weeklyOptions + '</optgroup>' : '')
+      + '<optgroup label="Task category">' + taskCatOptions + '</optgroup>';
+
+    let anchorType = 'wake';
+
+    content.innerHTML = `
+      <div class="modal-handle"></div>
+      <div class="modal-title">Add auto-schedule rule</div>
+      <div class="modal-subtitle">Added to Tomorrow once you set a wake-up time there</div>
+      <label>What is it?</label>
+      <input type="text" id="ruleText" placeholder="e.g. Bible reading" maxlength="60">
+      <label>Anchor</label>
+      <div class="view-toggle" id="ruleAnchorToggle" style="margin-bottom:14px">
+        <button type="button" id="ruleAnchorWake" class="active">After waking</button>
+        <button type="button" id="ruleAnchorCategory">After a category ends</button>
+      </div>
+      <div id="ruleCategoryField" style="display:none">
+        <label>Category</label>
+        ${customSelectHtml('ruleCategory', categoryOptionsHtml, CATEGORIES[0].id, 'Category')}
+      </div>
+      <label id="ruleOffsetLabel">Minutes after waking</label>
+      <input type="number" id="ruleOffset" min="0" step="5" value="10">
+      <label>Duration (minutes)</label>
+      <input type="number" id="ruleDuration" min="5" step="5" value="15">
+      <label>Link to a habit or task category (optional)</label>
+      ${customSelectHtml('ruleLink', linkOptionsHtml, '', 'None')}
+      <div class="modal-actions">
+        <button class="cancel" id="ruleCancel">Cancel</button>
+        <button class="save" id="ruleSave">Save</button>
+      </div>
+    `;
+    overlay.classList.remove('hidden');
+    wireCustomSelect('ruleCategory', categoryOptionsHtml, 'Category');
+    wireCustomSelect('ruleLink', linkOptionsHtml, 'Link to a habit or task category');
+
+    document.getElementById('ruleAnchorWake').onclick = () => {
+      anchorType = 'wake';
+      document.getElementById('ruleAnchorWake').classList.add('active');
+      document.getElementById('ruleAnchorCategory').classList.remove('active');
+      document.getElementById('ruleCategoryField').style.display = 'none';
+      document.getElementById('ruleOffsetLabel').textContent = 'Minutes after waking';
+    };
+    document.getElementById('ruleAnchorCategory').onclick = () => {
+      anchorType = 'category';
+      document.getElementById('ruleAnchorCategory').classList.add('active');
+      document.getElementById('ruleAnchorWake').classList.remove('active');
+      document.getElementById('ruleCategoryField').style.display = 'block';
+      document.getElementById('ruleOffsetLabel').textContent = 'Minutes after it ends';
+    };
+    document.getElementById('ruleCancel').onclick = () => { closeModal(); renderSettingsSection(); };
+    document.getElementById('ruleSave').onclick = () => {
+      const text = document.getElementById('ruleText').value.trim();
+      if(!text) return;
+      const offsetMinutes = Math.max(0, parseInt(document.getElementById('ruleOffset').value, 10) || 0);
+      const durationMinutes = Math.max(5, parseInt(document.getElementById('ruleDuration').value, 10) || 15);
+      const categoryId = anchorType === 'category' ? document.getElementById('ruleCategory').value : null;
+      const linkVal = document.getElementById('ruleLink').value;
+      let habitKind = null, habitId = null, taskCategory = null;
+      if(linkVal.startsWith('taskcat:')){
+        taskCategory = linkVal.slice('taskcat:'.length);
+      } else if(linkVal){
+        [habitKind, habitId] = linkVal.split(':');
+      }
+      state.autoScheduleRules.push({
+        id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
+        text, anchorType, categoryId, offsetMinutes, durationMinutes,
+        habitKind, habitId, taskCategory
+      });
+      save();
+      closeModal();
+      renderSettingsSection();
+    };
   }
 
   /* ---------------- Email (Gmail, read-only, client-side OAuth) ----------------
