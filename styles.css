@@ -532,6 +532,44 @@
   .cal-picker-cell.today{ color: var(--accent); font-weight:700; }
   .cal-picker-cell.selected{ background: var(--accent); color: #14120B; font-weight:700; }
 
+  .time-picker-preview{
+    font-family: var(--font-display);
+    font-size: 32px;
+    font-weight: 700;
+    text-align: center;
+    color: var(--accent);
+    margin-bottom: 14px;
+  }
+  .time-picker-label{
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-faint);
+    margin-bottom: 6px;
+  }
+  .time-picker-grid{
+    display:grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .time-picker-cell{
+    padding: 10px 0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background: var(--card);
+    border:none;
+    border-radius: 10px;
+    font-family: var(--font-body);
+    font-size: 13px;
+    color: var(--text);
+    cursor:pointer;
+  }
+  .time-picker-cell:active{ background: var(--card-hover); }
+  .time-picker-cell.selected{ background: var(--accent); color: #14120B; font-weight:700; }
+
   .modal-actions{ display:flex; gap:8px; margin-top:18px; }
   .modal-actions button{
     flex:1;

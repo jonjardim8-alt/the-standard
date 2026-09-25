@@ -2841,9 +2841,9 @@
       <label>What is it?</label>
       <input type="text" id="tbText" placeholder="e.g. Wake up, Breakfast, Gym" maxlength="80">
       <label>Start time</label>
-      <input type="time" id="tbStart" value="09:00">
+      ${customTimeHtml('tbStart', '09:00')}
       <label>End time (optional)</label>
-      <input type="time" id="tbEnd">
+      ${customTimeHtml('tbEnd', '', 'No end time')}
       <label>Link to a habit or task category (optional)</label>
       ${customSelectHtml('tbHabit', habitLinkOptionsHtml, '', 'None')}
       <div class="modal-actions">
@@ -2852,6 +2852,8 @@
       </div>
     `;
     overlay.classList.remove('hidden');
+    wireCustomTime('tbStart', {});
+    wireCustomTime('tbEnd', { allowClear:true, placeholder:'No end time' });
     wireCustomSelect('tbHabit', habitLinkOptionsHtml, 'Link to a habit or task category');
     document.getElementById('tbCancel').onclick = openTomorrowModal;
     document.getElementById('tbSave').onclick = () => {
@@ -5519,6 +5521,115 @@
     render();
   }
 
+  /* ---------------- Custom time (replaces native <input type=time>) ----------------
+     Same trigger-button-plus-pickerOverlay pattern as customDate above.
+     iOS Safari renders <input type=time> entirely outside the webview —
+     it ignores CSS width/max-width, so it can overflow the screen with no
+     CSS fix possible. This fully replaces it, same fix already applied to
+     <select> and <input type=date> for the identical rendering problem. */
+  function customTimeHtml(id, currentValue, placeholder){
+    const label = currentValue ? fmtTime(currentValue) : (placeholder || 'Select time');
+    return `
+      <input type="hidden" id="${id}" value="${escapeHtml(currentValue || '')}">
+      <button type="button" class="custom-select" id="${id}Trigger">
+        <span class="custom-select-label${currentValue ? '' : ' placeholder'}">${escapeHtml(label)}</span>
+        <span class="custom-select-chev">▾</span>
+      </button>
+    `;
+  }
+
+  // opts: { allowClear, placeholder }. onChange (optional) fires immediately
+  // on pick, same as wireCustomDate's onChange.
+  function wireCustomTime(id, opts, onChange){
+    const trigger = document.getElementById(id + 'Trigger');
+    if(!trigger) return;
+    trigger._timeOpts = opts || {};
+    trigger._onChange = onChange;
+    trigger.onclick = () => openTimePicker(id, trigger._onChange, trigger._timeOpts);
+  }
+
+  function openTimePicker(id, onChange, opts){
+    opts = opts || {};
+    const hiddenInput = document.getElementById(id);
+    if(!hiddenInput) return;
+    const initial = hiddenInput.value || '09:00';
+    let [selHour24, selMin] = initial.split(':').map(n => parseInt(n, 10));
+    let selHour12 = ((selHour24 + 11) % 12) + 1;
+    let selPeriod = selHour24 >= 12 ? 'PM' : 'AM';
+
+    const currentTimeStr = () => {
+      let h24 = selHour12 % 12;
+      if(selPeriod === 'PM') h24 += 12;
+      return pad2(h24) + ':' + pad2(selMin);
+    };
+
+    const selectTime = (t) => {
+      hiddenInput.value = t;
+      const trigger = document.getElementById(id + 'Trigger');
+      if(trigger){
+        const labelEl = trigger.querySelector('.custom-select-label');
+        labelEl.textContent = t ? fmtTime(t) : (opts.placeholder || 'Select time');
+        labelEl.classList.toggle('placeholder', !t);
+      }
+      closePickerSheet();
+      if(onChange) onChange(t);
+    };
+
+    const render = () => {
+      const pickerContent = document.getElementById('pickerContent');
+      const hoursHtml = Array.from({length:12}, (_, i) => i + 1).map(h => `
+        <button type="button" class="time-picker-cell${h === selHour12 ? ' selected' : ''}" data-hour="${h}">${h}</button>
+      `).join('');
+      const minsHtml = Array.from({length:12}, (_, i) => i * 5).map(m => `
+        <button type="button" class="time-picker-cell${m === selMin ? ' selected' : ''}" data-min="${m}">${pad2(m)}</button>
+      `).join('');
+      pickerContent.innerHTML = `
+        <div class="modal-handle"></div>
+        <div class="time-picker-preview">${fmtTime(currentTimeStr())}</div>
+        <div class="time-picker-label">Hour</div>
+        <div class="time-picker-grid">${hoursHtml}</div>
+        <div class="time-picker-label">Minute</div>
+        <div class="time-picker-grid">${minsHtml}</div>
+        <div class="view-toggle">
+          <button type="button" id="timePickerAM" class="${selPeriod === 'AM' ? 'active' : ''}">AM</button>
+          <button type="button" id="timePickerPM" class="${selPeriod === 'PM' ? 'active' : ''}">PM</button>
+        </div>
+        <div class="modal-actions">
+          ${opts.allowClear ? '<button class="cancel" id="timePickerClear">Clear</button>' : '<button class="cancel" id="timePickerCancel">Cancel</button>'}
+          <button class="save" id="timePickerSet">Set</button>
+        </div>
+      `;
+      document.getElementById('pickerOverlay').classList.remove('hidden');
+      pickerContent.querySelectorAll('[data-hour]').forEach(cell => {
+        cell.onclick = () => { selHour12 = parseInt(cell.dataset.hour, 10); render(); };
+      });
+      pickerContent.querySelectorAll('[data-min]').forEach(cell => {
+        cell.onclick = () => { selMin = parseInt(cell.dataset.min, 10); render(); };
+      });
+      document.getElementById('timePickerAM').onclick = () => { selPeriod = 'AM'; render(); };
+      document.getElementById('timePickerPM').onclick = () => { selPeriod = 'PM'; render(); };
+      if(opts.allowClear) document.getElementById('timePickerClear').onclick = () => selectTime('');
+      else document.getElementById('timePickerCancel').onclick = () => closePickerSheet();
+      document.getElementById('timePickerSet').onclick = () => selectTime(currentTimeStr());
+    };
+    render();
+  }
+
+  // Programmatically sets a customTimeHtml field's value + trigger label,
+  // for callers that preset a time without opening the picker (e.g. tapping
+  // "+" on a specific hour in the block view).
+  function setCustomTimeValue(id, value){
+    const hiddenInput = document.getElementById(id);
+    if(!hiddenInput) return;
+    hiddenInput.value = value || '';
+    const trigger = document.getElementById(id + 'Trigger');
+    if(trigger){
+      const labelEl = trigger.querySelector('.custom-select-label');
+      labelEl.textContent = value ? fmtTime(value) : (trigger._timeOpts && trigger._timeOpts.placeholder || 'Select time');
+      labelEl.classList.toggle('placeholder', !value);
+    }
+  }
+
   function fullDayName(abbr){
     const map = { Sun:'Sunday', Mon:'Monday', Tue:'Tuesday', Wed:'Wednesday', Thu:'Thursday', Fri:'Friday', Sat:'Saturday' };
     return map[abbr];
@@ -5552,11 +5663,11 @@
       <div class="ev-time-row">
         <div>
           <label>Start time</label>
-          <input type="time" id="editTime">
+          ${customTimeHtml('editTime', ref.time)}
         </div>
         <div>
           <label>End time (optional)</label>
-          <input type="time" id="editEndTime">
+          ${customTimeHtml('editEndTime', ref.endTime || '', 'No end time')}
         </div>
       </div>
       <label>Notes (optional)</label>
@@ -5569,11 +5680,11 @@
     // Set values via JS (not template attributes) so quotes/special chars
     // in existing text can't break the markup.
     document.getElementById('editText').value = ref.text;
-    document.getElementById('editTime').value = ref.time;
-    document.getElementById('editEndTime').value = ref.endTime || '';
     document.getElementById('editNotes').value = ref.notes || '';
 
     overlay.classList.remove('hidden');
+    wireCustomTime('editTime', {});
+    wireCustomTime('editEndTime', { allowClear:true, placeholder:'No end time' });
     document.getElementById('editCancel').onclick = closeModal;
     document.getElementById('editSave').onclick = () => {
       const text = document.getElementById('editText').value.trim();
@@ -5626,11 +5737,11 @@
         <div class="ev-time-row">
           <div>
             <label>Start time</label>
-            <input type="time" id="evTime" value="09:00">
+            ${customTimeHtml('evTime', '09:00')}
           </div>
           <div>
             <label>End time (optional)</label>
-            <input type="time" id="evEndTime">
+            ${customTimeHtml('evEndTime', '', 'No end time')}
           </div>
         </div>
         <div id="evEnergyWarn" class="energy-warn" style="display:none">⚡ This is one of your low-energy hours</div>
@@ -5671,6 +5782,8 @@
     wireCustomDate('evStartDate', {});
     wireCustomDate('evEndDate', {});
     wireCustomSelect('evBdayMonth', bdayMonthOptions, 'Month');
+    wireCustomTime('evTime', {}, () => checkEnergyWarn());
+    wireCustomTime('evEndTime', { allowClear:true, placeholder:'No end time' });
 
     let eventMode = 'timed'; // 'timed' | 'allday' | 'birthday'
     let repeatsWeekly = false;
@@ -5705,7 +5818,6 @@
       warnBox.style.display = getEnergyLevel(hour) === 'low' ? 'block' : 'none';
     };
     checkEnergyWarn();
-    document.getElementById('evTime').addEventListener('change', checkEnergyWarn);
 
     if(!catId){
       renderCategoryPickerInline('evCatPicker', selectedCat, (c) => {
@@ -6521,8 +6633,7 @@
           addBtn.onclick = () => {
             openAddEventModal(null);
             setTimeout(() => {
-              const timeInput = document.getElementById('evTime');
-              if(timeInput) timeInput.value = hourStr + ':00';
+              setCustomTimeValue('evTime', hourStr + ':00');
             }, 60);
           };
           slot.appendChild(addBtn);
