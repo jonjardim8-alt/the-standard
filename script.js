@@ -1723,6 +1723,7 @@
           if(!parsed.recurringTransactions) parsed.recurringTransactions = [];
           if(!parsed.autoScheduleRules) parsed.autoScheduleRules = [];
           if(!parsed.tomorrowWakeTimes) parsed.tomorrowWakeTimes = {};
+          if(!parsed.goalPrompts) parsed.goalPrompts = { lastDaily:null, lastWeekly:null, lastMonthly:null, lastYearly:null };
           return parsed;
         }
       }
@@ -1742,7 +1743,8 @@
       tomorrowPlans: {},
       recurringTransactions: [],
       autoScheduleRules: [],
-      tomorrowWakeTimes: {}
+      tomorrowWakeTimes: {},
+      goalPrompts: { lastDaily:null, lastWeekly:null, lastMonthly:null, lastYearly:null }
     };
   }
   function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
@@ -3366,6 +3368,85 @@
       renderAll();
     };
     setTimeout(() => document.getElementById('lgName').focus(), 50);
+  }
+
+  /* ---------------- Goal prompts (not on the roadmap, user-requested) ----------------
+     Nags for a new goal at the start of each cadence — every day, every
+     Sunday, every 1st of the month, every Jan 1st. Runs on load and again
+     whenever the tab becomes visible, since a PWA can sit backgrounded past
+     a boundary without a fresh launch. Each cadence's "already asked" key
+     is tracked independently in state.goalPrompts, compared by period
+     (YYYY-MM-DD / week-start / YYYY-MM / YYYY) rather than gating on the
+     exact calendar day, so reopening a few days late still prompts once
+     for the period that was missed instead of never firing. Multiple
+     overdue cadences (e.g. first open of a new year) queue up and show one
+     at a time rather than all at once. */
+  const GOAL_PROMPT_META = {
+    daily:   { label:'today',       stateKey:'lastDaily' },
+    weekly:  { label:'this week',   stateKey:'lastWeekly' },
+    monthly: { label:'this month',  stateKey:'lastMonthly' },
+    yearly:  { label:'this year',   stateKey:'lastYearly' },
+  };
+  const GOAL_PROMPT_EXAMPLES = {
+    daily: 'e.g. Finish the report draft',
+    weekly: 'e.g. Apply to 3 jobs',
+    monthly: 'e.g. Read 2 books',
+    yearly: 'e.g. Run a half marathon',
+  };
+
+  function checkGoalPrompts(){
+    const overlay = document.getElementById('modalOverlay');
+    if(overlay && !overlay.classList.contains('hidden')) return; // don't interrupt whatever's open
+    const dateStr = habitDayStr();
+    const weekStart = realCurrentWeekStart();
+    const monthKey = dateStr.slice(0, 7);
+    const yearKey = dateStr.slice(0, 4);
+    const periodKeys = { daily:dateStr, weekly:weekStart, monthly:monthKey, yearly:yearKey };
+
+    const queue = ['daily', 'weekly', 'monthly', 'yearly'].filter(tf => {
+      return state.goalPrompts[GOAL_PROMPT_META[tf].stateKey] !== periodKeys[tf];
+    });
+    if(!queue.length) return;
+    openGoalPromptModal(queue[0], periodKeys, queue.slice(1));
+  }
+
+  function openGoalPromptModal(timeframe, periodKeys, remainingQueue){
+    const overlay = document.getElementById('modalOverlay');
+    const content = document.getElementById('modalContent');
+    content.style.removeProperty('--chip-color');
+    const meta = GOAL_PROMPT_META[timeframe];
+
+    const advance = () => {
+      if(remainingQueue.length) openGoalPromptModal(remainingQueue[0], periodKeys, remainingQueue.slice(1));
+      else { closeModal(); renderAll(); }
+    };
+    const resolve = (name) => {
+      if(name){
+        state.longTermGoals.push({
+          id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
+          name, timeframe, targetDate: null, weeklyNotes: {}, dailyNotes: {}
+        });
+      }
+      state.goalPrompts[meta.stateKey] = periodKeys[timeframe];
+      save();
+      advance();
+    };
+
+    content.innerHTML = `
+      <div class="modal-handle"></div>
+      <div class="modal-title">New ${timeframe} goal</div>
+      <div class="modal-subtitle">Set a goal for ${meta.label}, or skip for now</div>
+      <label>Name</label>
+      <input type="text" id="goalPromptName" placeholder="${GOAL_PROMPT_EXAMPLES[timeframe]}" maxlength="60">
+      <div class="modal-actions">
+        <button class="cancel" id="goalPromptSkip">Skip</button>
+        <button class="save" id="goalPromptSave">Save</button>
+      </div>
+    `;
+    overlay.classList.remove('hidden');
+    document.getElementById('goalPromptSkip').onclick = () => resolve(null);
+    document.getElementById('goalPromptSave').onclick = () => resolve(document.getElementById('goalPromptName').value.trim());
+    setTimeout(() => document.getElementById('goalPromptName').focus(), 50);
   }
 
   /* ---------------- Dashboard ---------------- */
@@ -7755,4 +7836,8 @@
   switchView('block');
   renderAll();
   setInterval(updateNowLine, 60000);
+  checkGoalPrompts();
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'visible') checkGoalPrompts();
+  });
 })();
