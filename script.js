@@ -7774,7 +7774,10 @@
       <div class="modal-title">More</div>
       <div class="more-grid">${gridHtml}</div>
       <div class="modal-actions">
-        <button class="cancel" id="moreBackup" style="flex:1">⤓ Backup data</button>
+        <button class="cancel" id="moreBackup" style="flex:1">⤓ Backup</button>
+        <button class="cancel" id="moreRestore" style="flex:1">⤒ Restore</button>
+      </div>
+      <div class="modal-actions">
         <button class="cancel" id="moreClose" style="flex:1">Close</button>
       </div>
     `;
@@ -7786,6 +7789,7 @@
       };
     });
     document.getElementById('moreBackup').onclick = exportBackup;
+    document.getElementById('moreRestore').onclick = openRestoreBackupModal;
     document.getElementById('moreClose').onclick = closeModal;
   }
 
@@ -7801,6 +7805,73 @@
     a.click();
     a.remove();
     URL.revokeObjectURL(a.href);
+  }
+
+  // Loads a backup file exported by exportBackup() back into the app.
+  // There's no server, so this is manual — pick the file each time,
+  // rather than any kind of automatic sync — but it's how a backup
+  // actually gets restored after a reinstall, a cleared browser, or a
+  // new device. Overwrites everything currently stored, so it goes
+  // through a confirm step first, same as every other destructive
+  // action's modal pattern in this app (no native confirm() dialogs).
+  function openRestoreBackupModal(){
+    const overlay = document.getElementById('modalOverlay');
+    const content = document.getElementById('modalContent');
+    content.style.removeProperty('--chip-color');
+    content.innerHTML = `
+      <div class="modal-handle"></div>
+      <div class="modal-title">Restore from backup</div>
+      <div class="modal-subtitle">Choose a backup file exported from The Standard. This replaces everything currently in the app, with no undo — back up your current data first if you want to keep it.</div>
+      <input type="file" id="restoreFileInput" accept="application/json" style="margin-top:10px">
+      <div id="restoreStatus" class="empty-note" style="margin-top:10px; display:none"></div>
+      <div class="modal-actions">
+        <button class="cancel" id="restoreCancel" style="flex:1">Cancel</button>
+      </div>
+    `;
+    overlay.classList.remove('hidden');
+    document.getElementById('restoreCancel').onclick = closeModal;
+    document.getElementById('restoreFileInput').onchange = (e) => {
+      const file = e.target.files[0];
+      if(!file) return;
+      const statusEl = document.getElementById('restoreStatus');
+      const reader = new FileReader();
+      reader.onload = () => {
+        let raw;
+        try {
+          const parsed = JSON.parse(reader.result);
+          raw = parsed[STORAGE_KEY];
+          if(typeof raw !== 'string') throw new Error('bad shape');
+          JSON.parse(raw); // confirms it's actually valid state JSON before committing to anything
+        } catch(err){
+          statusEl.textContent = "That doesn't look like a valid backup file.";
+          statusEl.style.display = 'block';
+          return;
+        }
+        openConfirmRestoreModal(raw, file.name);
+      };
+      reader.readAsText(file);
+    };
+  }
+
+  function openConfirmRestoreModal(raw, fileName){
+    const overlay = document.getElementById('modalOverlay');
+    const content = document.getElementById('modalContent');
+    content.style.removeProperty('--chip-color');
+    content.innerHTML = `
+      <div class="modal-handle"></div>
+      <div class="modal-title">Replace all current data?</div>
+      <div class="modal-subtitle">Restoring "${escapeHtml(fileName)}" overwrites everything currently in the app. This can't be undone.</div>
+      <div class="modal-actions">
+        <button class="cancel" id="restoreBack">Cancel</button>
+        <button class="save" id="restoreConfirm">Restore</button>
+      </div>
+    `;
+    overlay.classList.remove('hidden');
+    document.getElementById('restoreBack').onclick = openRestoreBackupModal;
+    document.getElementById('restoreConfirm').onclick = () => {
+      localStorage.setItem(STORAGE_KEY, raw);
+      location.reload();
+    };
   }
 
   const PRIMARY_SECTIONS = ['dashboard', 'calendar', 'tasks', 'habits'];
