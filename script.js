@@ -2512,14 +2512,17 @@
 
     content.innerHTML = `
       <div class="modal-handle"></div>
-      <div class="modal-title">⭐ Goldie</div>
+      <div class="modal-title">
+        <span class="sw" style="background:var(--accent)"></span>Goldie
+        <button type="button" class="modal-help-btn" id="gdHelpBtn" aria-label="Command syntax">?</button>
+      </div>
       <div class="modal-subtitle">Free local quick-add — start with a keyword, no AI needed</div>
       <input type="text" id="gdText" placeholder="e.g. task: call dentist tomorrow">
-      <div class="proj-desc" style="margin-top:8px">
+      <div class="proj-desc" id="gdHint" style="margin-top:8px; display:none">
         Try: <b>task:</b> call dentist tomorrow · <b>habit:</b> drink water · <b>weekly habit:</b> gym 3x · <b>goal:</b> read 12 books · <b>tomorrow:</b> workout at 6pm
       </div>
       <div class="empty-note" id="gdStatus" style="display:none"></div>
-      <button type="button" class="cancel" id="gdScanBtn" style="width:100%;margin-top:10px">📷 Scan a receipt or statement</button>
+      <button type="button" class="preset-shortcut-btn" id="gdScanBtn">» Scan a receipt or statement</button>
       <div class="modal-actions">
         <button class="cancel" id="gdCancel">Cancel</button>
         <button class="save" id="gdSubmit">Add</button>
@@ -2530,6 +2533,10 @@
     const status = document.getElementById('gdStatus');
     document.getElementById('gdCancel').onclick = closeModal;
     document.getElementById('gdScanBtn').onclick = openGoldieScanModal;
+    document.getElementById('gdHelpBtn').onclick = () => {
+      const hint = document.getElementById('gdHint');
+      hint.style.display = hint.style.display === 'none' ? 'block' : 'none';
+    };
 
     const submit = () => {
       const raw = input.value.trim();
@@ -2625,7 +2632,7 @@
     content.style.removeProperty('--chip-color');
     content.innerHTML = `
       <div class="modal-handle"></div>
-      <div class="modal-title">⭐ Goldie — Scan</div>
+      <div class="modal-title"><span class="sw" style="background:var(--accent)"></span>Goldie — Scan</div>
       <div class="modal-subtitle">Free, on-device OCR — the image never leaves your phone. Best on a clear statement screenshot; a receipt photo may need more fixing up after.</div>
       <input type="file" id="gdScanFile" accept="image/*" style="margin-top:10px">
       <div class="modal-actions">
@@ -2670,7 +2677,7 @@
     const content = document.getElementById('modalContent');
     content.innerHTML = `
       <div class="modal-handle"></div>
-      <div class="modal-title">⭐ Goldie — Scan</div>
+      <div class="modal-title"><span class="sw" style="background:var(--accent)"></span>Goldie — Scan</div>
       <div class="empty-note">${escapeHtml(message)}</div>
       ${goldieRawTextDetailsHtml(rawText)}
       ${withClose ? '<div class="modal-actions"><button class="save" id="gdScanClose" style="flex:1">Close</button></div>' : ''}
@@ -2689,7 +2696,7 @@
 
     content.innerHTML = `
       <div class="modal-handle"></div>
-      <div class="modal-title">⭐ Goldie — Review</div>
+      <div class="modal-title"><span class="sw" style="background:var(--accent)"></span>Goldie — Review</div>
       <div class="modal-subtitle">Found ${candidates.length} possible transaction${candidates.length === 1 ? '' : 's'} — OCR guesses at date/category, so check before adding.</div>
       <div id="gdReviewList"></div>
       ${goldieRawTextDetailsHtml(rawText)}
