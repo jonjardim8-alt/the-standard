@@ -407,7 +407,7 @@
     text-align:left;
     padding: 10px 12px;
     border-radius: 8px;
-    border: 1px dashed var(--chip-color, var(--accent));
+    border: 1px solid var(--chip-color, var(--accent));
     background: transparent;
     color: var(--chip-color, var(--accent));
     cursor:pointer;
@@ -1867,7 +1867,7 @@
     border-radius: 8px;
     padding: 8px 10px;
   }
-  .dur-row.dur-add-row{ background: transparent; border: 1px dashed var(--border); }
+  .dur-row.dur-add-row{ background: transparent; border: 1px solid var(--border); }
   .dur-key{ flex:1; font-size:13.5px; color: var(--text); text-transform: capitalize; }
   .dur-min{
     width: 56px;
