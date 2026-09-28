@@ -461,6 +461,13 @@
   .custom-select:active{ background: var(--card-hover); }
   .custom-select-label.placeholder{ color: var(--text-faint); }
   .custom-select-chev{ color: var(--text-faint); font-size:11px; flex:0 0 auto; }
+  .hidden-file-input{
+    position: absolute;
+    width: 1px; height: 1px;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
   .picker-list{ display:flex; flex-direction:column; }
   .picker-group-label{
     font-family: var(--font-mono);

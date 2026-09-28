@@ -2522,7 +2522,10 @@
         Try: <b>task:</b> call dentist tomorrow · <b>habit:</b> drink water · <b>weekly habit:</b> gym 3x · <b>goal:</b> read 12 books · <b>tomorrow:</b> workout at 6pm
       </div>
       <div class="empty-note" id="gdStatus" style="display:none"></div>
-      <button type="button" class="preset-shortcut-btn" id="gdScanBtn">» Scan a receipt or statement</button>
+      <button type="button" class="custom-select" id="gdScanBtn" style="margin-top:10px">
+        <span class="custom-select-label">Scan a receipt or statement</span>
+        <span class="custom-select-chev">›</span>
+      </button>
       <div class="modal-actions">
         <button class="cancel" id="gdCancel">Cancel</button>
         <button class="save" id="gdSubmit">Add</button>
@@ -2634,15 +2637,14 @@
       <div class="modal-handle"></div>
       <div class="modal-title"><span class="sw" style="background:var(--accent)"></span>Goldie — Scan</div>
       <div class="modal-subtitle">Free, on-device OCR — the image never leaves your phone. Best on a clear statement screenshot; a receipt photo may need more fixing up after.</div>
-      <input type="file" id="gdScanFile" accept="image/*" style="margin-top:10px">
+      <div style="margin-top:10px">${customFileHtml('gdScanFile', 'image/*', 'Choose a photo')}</div>
       <div class="modal-actions">
         <button class="cancel" id="gdScanCancel" style="flex:1">Cancel</button>
       </div>
     `;
     overlay.classList.remove('hidden');
     document.getElementById('gdScanCancel').onclick = closeModal;
-    document.getElementById('gdScanFile').onchange = (e) => {
-      const file = e.target.files[0];
+    wireCustomFile('gdScanFile', (file) => {
       if(!file) return;
       renderGoldieScanStatus('Reading the image… this can take a few seconds the first time.');
       loadTesseract()
@@ -2656,7 +2658,7 @@
           }
         })
         .catch(() => renderGoldieScanStatus("Couldn't read that image — check your connection (the OCR library loads from the internet the first time) and try again.", true));
-    };
+    });
   }
 
   // rawText (optional): shown in a collapsible section so the raw OCR
@@ -5984,6 +5986,38 @@
     }
   }
 
+  /* ---------------- Custom file trigger (styles native <input type=file>) ----------------
+     The native control's own "Choose File" button can't be restyled with
+     CSS — same underlying problem as the old native time/date/select
+     inputs. Keeps the real <input type=file> for actual file access (a
+     file's value can't be set from JS), just visually hidden, and swaps
+     in a .custom-select-styled trigger button that forwards taps to it. */
+  function customFileHtml(id, accept, placeholder){
+    return `
+      <input type="file" id="${id}" accept="${accept}" class="hidden-file-input">
+      <button type="button" class="custom-select" id="${id}Trigger">
+        <span class="custom-select-label placeholder" id="${id}Label">${escapeHtml(placeholder || 'Choose a file')}</span>
+        <span class="custom-select-chev">›</span>
+      </button>
+    `;
+  }
+
+  function wireCustomFile(id, onChange){
+    const input = document.getElementById(id);
+    const trigger = document.getElementById(id + 'Trigger');
+    const label = document.getElementById(id + 'Label');
+    if(!input || !trigger) return;
+    trigger.onclick = () => input.click();
+    input.onchange = () => {
+      const file = input.files[0] || null;
+      if(file){
+        label.textContent = file.name;
+        label.classList.remove('placeholder');
+      }
+      if(onChange) onChange(file);
+    };
+  }
+
   function fullDayName(abbr){
     const map = { Sun:'Sunday', Mon:'Monday', Tue:'Tuesday', Wed:'Wednesday', Thu:'Thursday', Fri:'Friday', Sat:'Saturday' };
     return map[abbr];
@@ -7829,7 +7863,7 @@
       <div class="modal-handle"></div>
       <div class="modal-title">Restore from backup</div>
       <div class="modal-subtitle">Choose a backup file exported from The Standard. This replaces everything currently in the app, with no undo — back up your current data first if you want to keep it.</div>
-      <input type="file" id="restoreFileInput" accept="application/json" style="margin-top:10px">
+      <div style="margin-top:10px">${customFileHtml('restoreFileInput', 'application/json', 'Choose a backup file')}</div>
       <div id="restoreStatus" class="empty-note" style="margin-top:10px; display:none"></div>
       <div class="modal-actions">
         <button class="cancel" id="restoreCancel" style="flex:1">Cancel</button>
@@ -7837,8 +7871,7 @@
     `;
     overlay.classList.remove('hidden');
     document.getElementById('restoreCancel').onclick = closeModal;
-    document.getElementById('restoreFileInput').onchange = (e) => {
-      const file = e.target.files[0];
+    wireCustomFile('restoreFileInput', (file) => {
       if(!file) return;
       const statusEl = document.getElementById('restoreStatus');
       const reader = new FileReader();
@@ -7857,7 +7890,7 @@
         openConfirmRestoreModal(raw, file.name);
       };
       reader.readAsText(file);
-    };
+    });
   }
 
   function openConfirmRestoreModal(raw, fileName){
