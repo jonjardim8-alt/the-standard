@@ -2803,18 +2803,7 @@
       if(!m.done && m.targetDate === dateStr) milestonesDue.push({ text:m.name, project:p.name });
     }));
 
-    // Daily habits are due every day, full stop — no completion check
-    // needed since dateStr is always a future date (tomorrow) with nothing
-    // logged yet. Weekly habits only show if that week (which may be a
-    // new one, if tomorrow is a Sunday) still needs more completions.
-    const habitsDue = state.dailyGoals.map(g => g.name);
-    const weekStartForDate = toDateStr(startOfWeek(dateFromStr(dateStr)));
-    state.weeklyGoals.forEach(g => {
-      const count = state.weeklyGoalLog[weeklyGoalKey(g, weekStartForDate)] || 0;
-      if(count < g.target) habitsDue.push(g.name);
-    });
-
-    return { events, tasksDue, milestonesDue, habitsDue };
+    return { events, tasksDue, milestonesDue };
   }
 
   // Finds the latest end time (HH:MM) among a date's calendar commitments
@@ -2883,8 +2872,8 @@
     if(!state.tomorrowPlans[dateStr]) state.tomorrowPlans[dateStr] = [];
     const wakeTime = state.tomorrowWakeTimes[dateStr] || '';
     const blocks = state.tomorrowPlans[dateStr].slice().sort((a,b) => timeToMin(a.startTime) - timeToMin(b.startTime));
-    const { events, tasksDue, milestonesDue, habitsDue } = tomorrowCommitments(dateStr);
-    const hasCommitments = events.length || tasksDue.length || milestonesDue.length || habitsDue.length;
+    const { events, tasksDue, milestonesDue } = tomorrowCommitments(dateStr);
+    const hasCommitments = events.length || tasksDue.length || milestonesDue.length;
 
     const commitmentsHtml = hasCommitments ? `
       <div class="section-label" style="margin:14px 0 8px">Already committed</div>
@@ -2905,12 +2894,6 @@
           <div class="tomorrow-block-row" style="opacity:0.7">
             <div class="tomorrow-block-time">Milestone</div>
             <div style="flex:1;min-width:0"><div class="tomorrow-block-text">${escapeHtml(m.text)}</div><div class="proj-desc">${escapeHtml(m.project)}</div></div>
-          </div>
-        `).join('')}
-        ${habitsDue.map(name => `
-          <div class="tomorrow-block-row" style="opacity:0.7">
-            <div class="tomorrow-block-time">Habit</div>
-            <div style="flex:1;min-width:0"><div class="tomorrow-block-text">${escapeHtml(name)}</div></div>
           </div>
         `).join('')}
       </div>
@@ -2939,8 +2922,10 @@
       <div class="modal-subtitle">${dateFromStr(dateStr).toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' })}</div>
       ${commitmentsHtml}
       ${state.autoScheduleRules.length ? `
-        <label>Wake-up time</label>
-        ${customTimeHtml('tomorrowWake', wakeTime, 'Not set')}
+        <div style="margin-bottom:16px">
+          <label>Wake-up time</label>
+          ${customTimeHtml('tomorrowWake', wakeTime, 'Not set')}
+        </div>
       ` : ''}
       <div class="task-list">${listHtml}</div>
       <div class="modal-actions">
