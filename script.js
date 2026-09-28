@@ -1724,6 +1724,17 @@
           if(!parsed.autoScheduleRules) parsed.autoScheduleRules = [];
           if(!parsed.tomorrowWakeTimes) parsed.tomorrowWakeTimes = {};
           if(!parsed.goalPrompts) parsed.goalPrompts = { lastDaily:null, lastWeekly:null, lastMonthly:null, lastYearly:null };
+          if(parsed.longTermGoals && parsed.longTermGoals.length){
+            const dStr = habitDayStr();
+            const curPeriodKeys = { daily:dStr, weekly:realCurrentWeekStart(), monthly:dStr.slice(0,7), yearly:dStr.slice(0,4) };
+            parsed.longTermGoals.forEach(g => {
+              // Goals created before period-based archiving existed had no
+              // periodKey — grandfather them into the current period rather
+              // than instantly archiving something the user just made.
+              if(g.periodKey === undefined) g.periodKey = curPeriodKeys[g.timeframe] || null;
+              if(g.done === undefined) g.done = null;
+            });
+          }
           return parsed;
         }
       }
@@ -3232,12 +3243,32 @@
     return card;
   }
 
+  // The current period key for each auto-expiring timeframe — a daily
+  // goal's period is just its date, a weekly goal's is its week's Sunday,
+  // etc. Quarterly/Custom goals aren't cadence-based and never expire, so
+  // they have no entry here.
+  function currentGoalPeriodKeys(){
+    const dateStr = habitDayStr();
+    return { daily:dateStr, weekly:realCurrentWeekStart(), monthly:dateStr.slice(0,7), yearly:dateStr.slice(0,4) };
+  }
+
+  // True once a daily/weekly/monthly/yearly goal's period has ended (its
+  // periodKey no longer matches the current one) — it drops out of
+  // Active/All and only shows in the Past view from then on, whether or
+  // not the end-of-period completion popup has been answered yet.
+  function isGoalArchived(g, periodKeys){
+    if(!GOAL_PROMPT_META[g.timeframe]) return false;
+    if(g.periodKey == null) return false;
+    return g.periodKey !== periodKeys[g.timeframe];
+  }
+
   // Curated view: every goal at every horizon (Daily/Weekly/Monthly/
   // Yearly), each in its own section, none singled out. All four come
   // from state.longTermGoals — deliberately not the Habits-tab data.
   function renderActiveGoalsView(wrap, weekStart){
     const dateStr = habitDayStr();
-    const byTf = tf => state.longTermGoals.filter(g => g.timeframe === tf);
+    const periodKeys = currentGoalPeriodKeys();
+    const byTf = tf => state.longTermGoals.filter(g => g.timeframe === tf && !isGoalArchived(g, periodKeys));
     const dailyGoals = byTf('daily');
     const weeklyGoals = byTf('weekly');
     const monthlyGoals = byTf('monthly');
@@ -3266,10 +3297,15 @@
     addSection('Yearly', yearlyGoals, 'yearly');
   }
 
-  // Everything in state.longTermGoals, grouped by its own timeframe
-  // (Monthly/Quarterly/Yearly/Custom) — the original, uncurated list.
+  // Everything current in state.longTermGoals, grouped by its own
+  // timeframe (Monthly/Quarterly/Yearly/Custom) — the original, uncurated
+  // list. Excludes archived daily/weekly/monthly/yearly goals whose period
+  // has ended — those live in the Past view instead. Quarterly/Custom
+  // goals never expire, so they always show here.
   function renderAllGoalsView(wrap, weekStart){
-    if(!state.longTermGoals.length){
+    const periodKeys = currentGoalPeriodKeys();
+    const visible = state.longTermGoals.filter(g => !isGoalArchived(g, periodKeys));
+    if(!visible.length){
       const empty = document.createElement('div');
       empty.className = 'empty-note';
       empty.textContent = 'No goals yet — tap + to set a daily, weekly, monthly, quarterly, yearly, or custom-date goal.';
@@ -3279,7 +3315,7 @@
 
     const dateStr = habitDayStr();
     LG_TIMEFRAMES.forEach(tf => {
-      const goals = state.longTermGoals.filter(g => g.timeframe === tf.id);
+      const goals = visible.filter(g => g.timeframe === tf.id);
       if(!goals.length) return;
 
       const title = document.createElement('div');
@@ -3289,6 +3325,60 @@
 
       goals.forEach(g => wrap.appendChild(buildLongGoalCard(g, tf.id, weekStart, dateStr)));
     });
+  }
+
+  // Archived daily/weekly/monthly/yearly goals whose period has ended —
+  // shows the outcome (Completed/Not completed), or "Pending review" in
+  // the brief window before the end-of-period popup has been answered.
+  // Sorted most-recently-expired first. Quarterly/Custom goals never
+  // appear here — they don't have a period to expire.
+  function renderPastGoalsView(wrap){
+    const periodKeys = currentGoalPeriodKeys();
+    const past = state.longTermGoals
+      .filter(g => isGoalArchived(g, periodKeys))
+      .sort((a,b) => (b.periodKey || '').localeCompare(a.periodKey || ''));
+
+    if(!past.length){
+      const empty = document.createElement('div');
+      empty.className = 'empty-note';
+      empty.textContent = 'No past goals yet.';
+      wrap.appendChild(empty);
+      return;
+    }
+
+    past.forEach(g => {
+      const card = document.createElement('div');
+      card.className = 'lg-card';
+      const statusLabel = g.done === true ? 'Completed' : g.done === false ? 'Not completed' : 'Pending review';
+      const statusClass = g.done === true ? 'success' : g.done === false ? 'error' : 'warning';
+      card.innerHTML = `
+        <div class="lg-card-top">
+          <div>
+            <div class="lg-card-name">${escapeHtml(g.name)}</div>
+            <div class="proj-desc">${escapeHtml(pastGoalPeriodLabel(g))}</div>
+          </div>
+          <button class="lg-card-del">×</button>
+        </div>
+        <div class="past-goal-status past-goal-status--${statusClass}">${statusLabel}</div>
+      `;
+      card.querySelector('.lg-card-del').onclick = () => {
+        state.longTermGoals = state.longTermGoals.filter(x => x.id !== g.id);
+        save();
+        renderAll();
+      };
+      wrap.appendChild(card);
+    });
+  }
+
+  function pastGoalPeriodLabel(g){
+    if(g.timeframe === 'daily') return fmtDate(g.periodKey);
+    if(g.timeframe === 'weekly') return 'Week of ' + fmtDate(g.periodKey);
+    if(g.timeframe === 'monthly'){
+      const [y, m] = g.periodKey.split('-').map(Number);
+      return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month:'long', year:'numeric' });
+    }
+    if(g.timeframe === 'yearly') return g.periodKey;
+    return '';
   }
 
   function renderLongGoalsSection(){
@@ -3302,13 +3392,16 @@
     modeToggle.innerHTML = `
       <button id="goalsModeActive" class="${goalsViewMode === 'active' ? 'active' : ''}">Active</button>
       <button id="goalsModeAll" class="${goalsViewMode === 'all' ? 'active' : ''}">All</button>
+      <button id="goalsModePast" class="${goalsViewMode === 'past' ? 'active' : ''}">Past</button>
     `;
     wrap.appendChild(modeToggle);
     modeToggle.querySelector('#goalsModeActive').onclick = () => { goalsViewMode = 'active'; renderLongGoalsSection(); };
     modeToggle.querySelector('#goalsModeAll').onclick = () => { goalsViewMode = 'all'; renderLongGoalsSection(); };
+    modeToggle.querySelector('#goalsModePast').onclick = () => { goalsViewMode = 'past'; renderLongGoalsSection(); };
 
     if(goalsViewMode === 'active') renderActiveGoalsView(wrap, weekStart);
-    else renderAllGoalsView(wrap, weekStart);
+    else if(goalsViewMode === 'all') renderAllGoalsView(wrap, weekStart);
+    else renderPastGoalsView(wrap);
   }
 
   function openAddLongGoalModal(){
@@ -3359,9 +3452,11 @@
       const name = document.getElementById('lgName').value.trim();
       if(!name) return;
       const targetDate = timeframe === 'custom' ? (document.getElementById('lgTargetDate').value || todayStr()) : null;
+      const periodKeys = currentGoalPeriodKeys();
       state.longTermGoals.push({
         id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
-        name, timeframe, targetDate, weeklyNotes: {}, dailyNotes: {}
+        name, timeframe, targetDate, weeklyNotes: {}, dailyNotes: {},
+        periodKey: periodKeys[timeframe] || null, done: null
       });
       save();
       closeModal();
@@ -3371,16 +3466,20 @@
   }
 
   /* ---------------- Goal prompts (not on the roadmap, user-requested) ----------------
-     Nags for a new goal at the start of each cadence — every day, every
-     Sunday, every 1st of the month, every Jan 1st. Runs on load and again
-     whenever the tab becomes visible, since a PWA can sit backgrounded past
-     a boundary without a fresh launch. Each cadence's "already asked" key
-     is tracked independently in state.goalPrompts, compared by period
-     (YYYY-MM-DD / week-start / YYYY-MM / YYYY) rather than gating on the
-     exact calendar day, so reopening a few days late still prompts once
-     for the period that was missed instead of never firing. Multiple
-     overdue cadences (e.g. first open of a new year) queue up and show one
-     at a time rather than all at once. */
+     Two things happen at the start of each cadence — every day, every
+     Sunday, every 1st of the month, every Jan 1st: (1) any goal from the
+     period that just ended gets a "did you complete it?" popup and then
+     drops out of Active/All into the Past view (see isGoalArchived above),
+     and (2) once that's resolved, a prompt to set a new goal for the
+     period that just started. Runs on load and again whenever the tab
+     becomes visible, since a PWA can sit backgrounded past a boundary
+     without a fresh launch. Each cadence's "already asked" key is tracked
+     independently in state.goalPrompts, compared by period (YYYY-MM-DD /
+     week-start / YYYY-MM / YYYY) rather than gating on the exact calendar
+     day, so reopening a few days late still prompts once for the period
+     that was missed instead of never firing. Everything overdue at once
+     (completion checks and new-goal prompts alike) queues up and shows
+     one modal at a time. */
   const GOAL_PROMPT_META = {
     daily:   { label:'today',       stateKey:'lastDaily' },
     weekly:  { label:'this week',   stateKey:'lastWeekly' },
@@ -3397,39 +3496,78 @@
   function checkGoalPrompts(){
     const overlay = document.getElementById('modalOverlay');
     if(overlay && !overlay.classList.contains('hidden')) return; // don't interrupt whatever's open
-    const dateStr = habitDayStr();
-    const weekStart = realCurrentWeekStart();
-    const monthKey = dateStr.slice(0, 7);
-    const yearKey = dateStr.slice(0, 4);
-    const periodKeys = { daily:dateStr, weekly:weekStart, monthly:monthKey, yearly:yearKey };
+    const periodKeys = currentGoalPeriodKeys();
 
-    const queue = ['daily', 'weekly', 'monthly', 'yearly'].filter(tf => {
-      return state.goalPrompts[GOAL_PROMPT_META[tf].stateKey] !== periodKeys[tf];
-    });
-    if(!queue.length) return;
-    openGoalPromptModal(queue[0], periodKeys, queue.slice(1));
+    const resolveQueue = state.longTermGoals.filter(g =>
+      GOAL_PROMPT_META[g.timeframe] && g.periodKey != null &&
+      g.periodKey !== periodKeys[g.timeframe] && g.done === null
+    );
+    const createQueue = ['daily', 'weekly', 'monthly', 'yearly'].filter(tf =>
+      state.goalPrompts[GOAL_PROMPT_META[tf].stateKey] !== periodKeys[tf]
+    );
+    if(!resolveQueue.length && !createQueue.length) return; // nothing due — leave the UI alone
+    advanceGoalQueue(resolveQueue, periodKeys, createQueue);
   }
 
-  function openGoalPromptModal(timeframe, periodKeys, remainingQueue){
+  function advanceGoalQueue(resolveQueue, periodKeys, createQueue){
+    if(resolveQueue.length){
+      const [goal, ...rest] = resolveQueue;
+      openGoalCompletionModal(goal, rest, periodKeys, createQueue);
+      return;
+    }
+    if(createQueue.length){
+      const [tf, ...rest] = createQueue;
+      openGoalPromptModal(tf, periodKeys, rest);
+      return;
+    }
+    closeModal();
+    renderAll();
+  }
+
+  // Asks whether an expired goal was completed before it moves to Past —
+  // the only way a daily/weekly/monthly/yearly goal's `done` field gets
+  // set, per the user's request (no way to mark it early, mid-period).
+  function openGoalCompletionModal(goal, remainingResolve, periodKeys, createQueue){
+    const overlay = document.getElementById('modalOverlay');
+    const content = document.getElementById('modalContent');
+    content.style.removeProperty('--chip-color');
+
+    content.innerHTML = `
+      <div class="modal-handle"></div>
+      <div class="modal-title">${escapeHtml(goal.name)}</div>
+      <div class="modal-subtitle">Did you complete this ${goal.timeframe} goal?</div>
+      <div class="modal-actions">
+        <button class="cancel" id="goalCompleteNo">Not completed</button>
+        <button class="save" id="goalCompleteYes">Completed</button>
+      </div>
+    `;
+    overlay.classList.remove('hidden');
+    const finish = (done) => {
+      goal.done = done;
+      save();
+      advanceGoalQueue(remainingResolve, periodKeys, createQueue);
+    };
+    document.getElementById('goalCompleteNo').onclick = () => finish(false);
+    document.getElementById('goalCompleteYes').onclick = () => finish(true);
+  }
+
+  function openGoalPromptModal(timeframe, periodKeys, remainingCreate){
     const overlay = document.getElementById('modalOverlay');
     const content = document.getElementById('modalContent');
     content.style.removeProperty('--chip-color');
     const meta = GOAL_PROMPT_META[timeframe];
 
-    const advance = () => {
-      if(remainingQueue.length) openGoalPromptModal(remainingQueue[0], periodKeys, remainingQueue.slice(1));
-      else { closeModal(); renderAll(); }
-    };
     const resolve = (name) => {
       if(name){
         state.longTermGoals.push({
           id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
-          name, timeframe, targetDate: null, weeklyNotes: {}, dailyNotes: {}
+          name, timeframe, targetDate: null, weeklyNotes: {}, dailyNotes: {},
+          periodKey: periodKeys[timeframe], done: null
         });
       }
       state.goalPrompts[meta.stateKey] = periodKeys[timeframe];
       save();
-      advance();
+      advanceGoalQueue([], periodKeys, remainingCreate);
     };
 
     content.innerHTML = `

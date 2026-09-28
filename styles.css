@@ -810,6 +810,17 @@
   .lg-saved-tag{ font-family: var(--font-mono); font-size: 9.5px; color: var(--success); margin-top:4px; height:12px; opacity:0; transition: opacity .2s ease; }
   .lg-saved-tag.show{ opacity:1; }
 
+  .past-goal-status{
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+  }
+  .past-goal-status--success{ color: var(--success); }
+  .past-goal-status--error{ color: var(--error); }
+  .past-goal-status--warning{ color: var(--warning); }
+
   /* ---- Dashboard ---- */
   /* Card wrapper used for the Today timeline (a list benefits from a
      containing card). The widgets grid below it deliberately does NOT
