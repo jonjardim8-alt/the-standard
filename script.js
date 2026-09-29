@@ -3251,6 +3251,74 @@
       save();
       renderAll();
     };
+    // Steps — a checklist broken off a Monthly/Yearly goal, one at a time
+    // or all at once, whichever way the person wants to plan it out.
+    // Daily/Weekly/Quarterly/Custom goals don't get this section; undone
+    // steps also surface up in the Weekly section (see
+    // renderActiveGoalsView) tagged with which goal they belong to.
+    if(tf === 'monthly' || tf === 'yearly'){
+      appendGoalStepsSection(card, g);
+    }
+    return card;
+  }
+
+  function appendGoalStepsSection(card, g){
+    const stepsLabel = document.createElement('div');
+    stepsLabel.className = 'proj-section-label';
+    stepsLabel.textContent = 'Steps';
+    card.appendChild(stepsLabel);
+
+    (g.steps || []).forEach(s => {
+      const row = document.createElement('div');
+      row.className = 'proj-task-row' + (s.done ? ' done' : '');
+      row.innerHTML = '<button class="proj-task-check">✓</button><span class="proj-task-text"></span><button class="proj-mini-del">×</button>';
+      row.querySelector('.proj-task-text').textContent = s.text;
+      row.querySelector('.proj-task-check').onclick = () => { s.done = !s.done; save(); renderAll(); };
+      row.querySelector('.proj-mini-del').onclick = () => {
+        g.steps = g.steps.filter(x => x.id !== s.id);
+        save();
+        renderAll();
+      };
+      card.appendChild(row);
+    });
+
+    const addRow = document.createElement('div');
+    addRow.className = 'proj-add-row';
+    addRow.innerHTML = '<input type="text" placeholder="Add a step…" maxlength="70"><button>Add</button>';
+    const stepInput = addRow.querySelector('input');
+    const addStep = () => {
+      const text = stepInput.value.trim();
+      if(!text) return;
+      if(!g.steps) g.steps = [];
+      g.steps.push({ id: Date.now() + '-' + Math.random().toString(36).slice(2,7), text, done:false });
+      save();
+      renderAll();
+    };
+    addRow.querySelector('button').onclick = addStep;
+    stepInput.addEventListener('keydown', e => { if(e.key === 'Enter') addStep(); });
+    card.appendChild(addRow);
+  }
+
+  // A single undone step from a Monthly/Yearly goal, surfaced in the
+  // Weekly section of the Active view so it's part of what gets looked at
+  // this week — tagged with which goal it's actually from, since the
+  // checklist itself lives on that goal's own card, not here.
+  function buildGoalStepRow(step, goal, tfLabel){
+    const card = document.createElement('div');
+    card.className = 'lg-card';
+    card.innerHTML = `
+      <div class="proj-task-row">
+        <button class="proj-task-check">✓</button>
+        <span class="proj-task-text"></span>
+      </div>
+      <div class="proj-desc">🔗 Part of: ${escapeHtml(goal.name)} (${tfLabel})</div>
+    `;
+    card.querySelector('.proj-task-text').textContent = step.text;
+    card.querySelector('.proj-task-check').onclick = () => {
+      step.done = true;
+      save();
+      renderAll();
+    };
     return card;
   }
 
@@ -3285,6 +3353,13 @@
     const monthlyGoals = byTf('monthly');
     const yearlyGoals = byTf('yearly');
 
+    // Undone steps from Monthly/Yearly goals surface here too, so the
+    // Weekly section is everything actually worth looking at this week —
+    // not just goals whose own timeframe happens to be Weekly.
+    const stepRows = [];
+    monthlyGoals.forEach(g => (g.steps || []).forEach(s => { if(!s.done) stepRows.push({ step:s, goal:g, tfLabel:'Monthly' }); }));
+    yearlyGoals.forEach(g => (g.steps || []).forEach(s => { if(!s.done) stepRows.push({ step:s, goal:g, tfLabel:'Yearly' }); }));
+
     if(!dailyGoals.length && !weeklyGoals.length && !monthlyGoals.length && !yearlyGoals.length){
       const empty = document.createElement('div');
       empty.className = 'empty-note';
@@ -3303,7 +3378,14 @@
     };
 
     addSection('Daily', dailyGoals, 'daily');
-    addSection('Weekly', weeklyGoals, 'weekly');
+    if(weeklyGoals.length || stepRows.length){
+      const title = document.createElement('div');
+      title.className = 'lg-timeframe-title';
+      title.textContent = 'Weekly';
+      wrap.appendChild(title);
+      weeklyGoals.forEach(g => wrap.appendChild(buildLongGoalCard(g, 'weekly', weekStart, dateStr)));
+      stepRows.forEach(({ step, goal, tfLabel }) => wrap.appendChild(buildGoalStepRow(step, goal, tfLabel)));
+    }
     addSection('Monthly', monthlyGoals, 'monthly');
     addSection('Yearly', yearlyGoals, 'yearly');
   }
@@ -3466,7 +3548,7 @@
       const periodKeys = currentGoalPeriodKeys();
       state.longTermGoals.push({
         id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
-        name, timeframe, targetDate, weeklyNotes: {}, dailyNotes: {},
+        name, timeframe, targetDate, weeklyNotes: {}, dailyNotes: {}, steps: [],
         periodKey: periodKeys[timeframe] || null, done: null
       });
       save();
@@ -3572,7 +3654,7 @@
       if(name){
         state.longTermGoals.push({
           id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
-          name, timeframe, targetDate: null, weeklyNotes: {}, dailyNotes: {},
+          name, timeframe, targetDate: null, weeklyNotes: {}, dailyNotes: {}, steps: [],
           periodKey: periodKeys[timeframe], done: null
         });
       }
