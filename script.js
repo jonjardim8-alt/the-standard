@@ -1578,6 +1578,14 @@
       'ex-pendulum-squat':  [{weight:205,reps:6},{weight:205,reps:6},{weight:205,reps:6},{weight:205,reps:6}],
       'ex-bulgarian-split': [{weight:70,reps:8},{weight:70,reps:8},{weight:70,reps:8}],
     }, coachNotes: "I wasn’t feeling the best and I’m going to Disney tonight so I'll be doing a lot of moving so I decided to cut it short and just do pendulum and bulgarian" },
+
+    { date: '2026-09-28', exercises: {
+      'ex-db-bench':           [{weight:95,reps:6},{weight:95,reps:6},{weight:95,reps:6},{weight:95,reps:6}],
+      'ex-cable-press-around': [{weight:70,reps:15},{weight:70,reps:15},{weight:70,reps:15}],
+      'ex-incline-db-press':   [{weight:75,reps:10},{weight:75,reps:10},{weight:75,reps:9}],
+      'ex-pec-deck':           [{weight:110,reps:12},{weight:110,reps:12},{weight:110,reps:12}],
+      'ex-cable-lat-raise':    [{weight:45,reps:15},{weight:45,reps:15},{weight:45,reps:15}],
+    }, coachNotes: "Coach: Best complete chest session of the Fall Split. DB bench swept 95 clean — new PR territory, moving to 100. Cable press around, pec deck, and lateral raise all swept clean — all moving up. Incline one rep short on the last set — holding at 75, need a clean 10/10/10 before progressing. Post-workout stretch completed, good habit as the weights climb. 9.5/10." },
   ];
   function importFallSplitSessions(){
     if(!state.seedFlags) state.seedFlags = {};
