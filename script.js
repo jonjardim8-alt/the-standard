@@ -7053,14 +7053,32 @@
 
       const hourStartMin = h * 60;
       const hourEndMin = hourStartMin + 60;
-      const overlapping = allSpans.find(b => {
-        const bStart = timeToMin(b.start), bEnd = timeToMin(b.end);
-        return bStart < hourEndMin && bEnd > hourStartMin;
-      });
-      if(overlapping){
-        const color = catById[overlapping.category].color;
-        slot.style.background = 'color-mix(in srgb, ' + color + ' 35%, transparent)';
-        slot.style.borderTopColor = 'color-mix(in srgb, ' + color + ' 45%, var(--border))';
+
+      // Quarter-hour resolution, so a 12:30 start only tints the bottom
+      // half of the hour instead of the whole row looking identical to a
+      // 12:00 start — each 15-min segment checks its own overlap.
+      const tintLayer = document.createElement('div');
+      tintLayer.className = 'hour-slot-tint';
+      let firstSegColor = null;
+      for(let q = 0; q < 4; q++){
+        const segStart = hourStartMin + q * 15;
+        const segEnd = segStart + 15;
+        const seg = allSpans.find(b => {
+          const bStart = timeToMin(b.start), bEnd = timeToMin(b.end);
+          return bStart < segEnd && bEnd > segStart;
+        });
+        const qDiv = document.createElement('div');
+        qDiv.className = 'hour-slot-qseg';
+        if(seg){
+          const color = catById[seg.category].color;
+          qDiv.style.background = 'color-mix(in srgb, ' + color + ' 35%, transparent)';
+          if(!firstSegColor) firstSegColor = color;
+        }
+        tintLayer.appendChild(qDiv);
+      }
+      slot.appendChild(tintLayer);
+      if(firstSegColor){
+        slot.style.borderTopColor = 'color-mix(in srgb, ' + firstSegColor + ' 45%, var(--border))';
       }
 
       const hourStr = String(h).padStart(2,'0');
