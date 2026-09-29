@@ -351,7 +351,7 @@
     { date:'2026-02-02', description:'gloves and hand sanitizer for thrifting', amount:10.0, category:'misc' },
     { date:'2026-02-02', description:'deodorant', amount:55.04, category:'hygiene' },
     { date:'2026-02-02', description:'chilis', amount:22.99, category:'dining-out' },
-    { date:'2026-02-02', description:'Poker 🃏', amount:7.5, category:'other-income' },
+    { date:'2026-02-02', description:'Poker', amount:7.5, category:'other-income' },
     { date:'2026-02-01', description:'interest', amount:4.14, category:'other-income' },
     { date:'2026-02-01', description:'february tithes', amount:78.59, category:'tithes' },
     { date:'2026-02-01', description:'Chipotle', amount:13.37, category:'dining-out' },
@@ -2128,7 +2128,7 @@
     row.querySelector('.goal-name').textContent = g.name;
     // Streak (with one grace day built in) plus this month's count, so
     // one missed day never reads as "back to zero."
-    row.querySelector('.goal-streak').textContent = monthTotal ? (streak ? streak + '🔥 ' : '') + monthTotal + '✓' : '';
+    row.querySelector('.goal-streak').textContent = monthTotal ? (streak ? streak + 'd · ' : '') + monthTotal + '✓' : '';
     row.querySelector('.goal-check').onclick = () => {
       if(g.auto === 'Journal'){ switchSection('journal'); return; }
       toggleDailyGoal(g.id, dateStr);
@@ -2917,7 +2917,7 @@
             <div class="tomorrow-block-time">${fmtTime(b.startTime)}${b.endTime ? '–' + fmtTime(b.endTime) : ''}</div>
             <div style="flex:1;min-width:0">
               <div class="tomorrow-block-text">${escapeHtml(b.text)}</div>
-              ${tagLabel ? '<div class="proj-desc">🔗 ' + escapeHtml(tagLabel) + '</div>' : ''}
+              ${tagLabel ? '<div class="proj-desc">Linked: ' + escapeHtml(tagLabel) + '</div>' : ''}
             </div>
             <button class="tomorrow-block-del">×</button>
           </div>
@@ -3054,7 +3054,7 @@
           <div class="list-card-name">${escapeHtml(list.name)}</div>
           <div class="list-card-meta">
             <span>${doneCount}/${list.items.length} checked</span>
-            ${link ? '<span class="list-link-tag">🔗 ' + escapeHtml(link.kind) + ': ' + escapeHtml(link.label) + '</span>' : ''}
+            ${link ? '<span class="list-link-tag">' + escapeHtml(link.kind) + ': ' + escapeHtml(link.label) + '</span>' : ''}
           </div>
         </div>
         <button class="list-card-del">×</button>
@@ -3311,7 +3311,7 @@
         <button class="proj-task-check">✓</button>
         <span class="proj-task-text"></span>
       </div>
-      <div class="proj-desc">🔗 Part of: ${escapeHtml(goal.name)} (${tfLabel})</div>
+      <div class="proj-desc">Part of: ${escapeHtml(goal.name)} (${tfLabel})</div>
     `;
     card.querySelector('.proj-task-text').textContent = step.text;
     card.querySelector('.proj-task-check').onclick = () => {
@@ -4292,7 +4292,7 @@
     if(hasAccessoryPlanned && !hasAccessoryLogged){
       const warn = document.createElement('div');
       warn.className = 'fit-accessory-warn';
-      warn.textContent = '⚠ Accessory work not logged yet — non-negotiable, don\'t skip it.';
+      warn.textContent = 'Accessory work not logged yet — non-negotiable, don\'t skip it.';
       wrap.appendChild(warn);
     }
 
@@ -4783,8 +4783,8 @@
     const links = document.createElement('div');
     links.className = 'budget-links';
     links.innerHTML = `
-      <a class="budget-link-btn" href="${BUDGET_SHEET_URL}" target="_blank" rel="noopener">📊 Open Sheet</a>
-      <a class="budget-link-btn" href="${BUDGET_FORM_URL}" target="_blank" rel="noopener">📝 Open Form</a>
+      <a class="budget-link-btn" href="${BUDGET_SHEET_URL}" target="_blank" rel="noopener">Open Sheet</a>
+      <a class="budget-link-btn" href="${BUDGET_FORM_URL}" target="_blank" rel="noopener">Open Form</a>
     `;
     wrap.appendChild(links);
 
@@ -5289,7 +5289,7 @@
       if(monthTotal){
         const streakLine = document.createElement('div');
         streakLine.className = 'fit-week-label';
-        streakLine.textContent = (streak ? streak + '-day streak 🔥 · ' : '') + monthTotal + ' entries this month';
+        streakLine.textContent = (streak ? streak + '-day streak · ' : '') + monthTotal + ' entries this month';
         wrap.appendChild(streakLine);
       }
     }
@@ -6214,7 +6214,7 @@
             ${customTimeHtml('evEndTime', '', 'No end time')}
           </div>
         </div>
-        <div id="evEnergyWarn" class="energy-warn" style="display:none">⚡ This is one of your low-energy hours</div>
+        <div id="evEnergyWarn" class="energy-warn" style="display:none">This is one of your low-energy hours</div>
         <div class="settings-row" style="margin-top:12px">
           <div>
             <div class="settings-row-label">Repeats weekly</div>
@@ -6700,7 +6700,7 @@
       chip.style.setProperty('--accent-color', BIRTHDAY_COLOR);
       chip.innerHTML = `
         <div class="allday-left">
-          <span class="allday-badge">🎂 Birthday</span>
+          <span class="allday-badge">Birthday</span>
           <div>
             <div class="allday-text">${escapeHtml(b.name)}</div>
           </div>
@@ -6784,7 +6784,7 @@
     schedRow.innerHTML = `
       <button class="sched-btn primary" id="btnAutoSchedule">▶ Auto-schedule tasks</button>
       <button class="sched-btn" id="btnDurations">⚙ Durations</button>
-      <button class="sched-btn" id="btnEnergy">⚡ Energy</button>
+      <button class="sched-btn" id="btnEnergy">Energy</button>
     `;
     wrap.appendChild(schedRow);
     schedRow.querySelector('#btnAutoSchedule').onclick = runAutoSchedule;
