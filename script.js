@@ -7159,6 +7159,85 @@
     });
   }
 
+  function fmtTimeShort(t){
+    let [h, m] = t.split(':').map(Number);
+    const ap = h >= 12 ? 'p' : 'a';
+    let h12 = h % 12; if(h12 === 0) h12 = 12;
+    return h12 + (m ? ':' + String(m).padStart(2, '0') : '') + ap;
+  }
+
+  // Everything on one specific date, gathered fresh from dayAbbr/dateStr
+  // rather than visibleItems() (which hardcodes activeDay internally) —
+  // the week-at-a-glance view needs all 7 days at once, not just whichever
+  // day tab happens to be selected.
+  function weekGlanceEntriesForDate(dayAbbr, dateStr){
+    const fixed = blocksForDate(dayAbbr, dateStr)
+      .filter(b => filterCats.has(b.category) && !state.workOff[b.id + '_' + dateStr])
+      .map(b => ({ time:b.start, endTime:b.end, text:b.label, category:b.category }));
+    const weekly = state.items[dayAbbr].filter(it => filterCats.has(it.category));
+    const dated = (state.datedEvents[dateStr] || []).filter(it => filterCats.has(it.category));
+    return fixed.concat(weekly).concat(dated).sort((a, b) => timeToMin(a.time) - timeToMin(b.time));
+  }
+
+  // A dense, screenshot-friendly view of the whole displayed week on one
+  // scroll-free-as-possible page — every fixed block, weekly/dated event,
+  // and due task for all 7 days, one compact line each, rather than the
+  // hour-by-hour Blocks grid or the one-day-at-a-time List/Today views.
+  function renderWeekGlanceView(){
+    const wrap = document.getElementById('weekGlanceView');
+    wrap.innerHTML = '';
+    const dates = weekDates();
+    const today = todayStr();
+
+    const grid = document.createElement('div');
+    grid.className = 'wg-grid';
+
+    DAYS.forEach((dayAbbr, i) => {
+      const d = dates[i];
+      const dateStr = toDateStr(d);
+      const entries = weekGlanceEntriesForDate(dayAbbr, dateStr);
+      const dueTasks = state.tasks.filter(t => !t.done && filterCats.has(t.category) && t.dueDate === dateStr);
+
+      const col = document.createElement('div');
+      col.className = 'wg-day' + (dateStr === today ? ' wg-today' : '');
+
+      const header = document.createElement('div');
+      header.className = 'wg-day-header';
+      header.textContent = dayAbbr + ' ' + (d.getMonth() + 1) + '/' + d.getDate();
+      col.appendChild(header);
+
+      if(!entries.length && !dueTasks.length){
+        const empty = document.createElement('div');
+        empty.className = 'wg-empty';
+        empty.textContent = 'Nothing scheduled';
+        col.appendChild(empty);
+      } else {
+        dueTasks.forEach(t => {
+          const cat = catById[t.category] || CATEGORIES[0];
+          const row = document.createElement('div');
+          row.className = 'wg-row';
+          row.style.setProperty('--accent-color', cat.color);
+          row.innerHTML = '<span class="wg-time">Due</span><span class="wg-text"></span>';
+          row.querySelector('.wg-text').textContent = t.text;
+          col.appendChild(row);
+        });
+        entries.forEach(it => {
+          const cat = catById[it.category] || CATEGORIES[0];
+          const row = document.createElement('div');
+          row.className = 'wg-row';
+          row.style.setProperty('--accent-color', cat.color);
+          row.innerHTML = '<span class="wg-time"></span><span class="wg-text"></span>';
+          row.querySelector('.wg-time').textContent = fmtTimeShort(it.time);
+          row.querySelector('.wg-text').textContent = it.text;
+          col.appendChild(row);
+        });
+      }
+      grid.appendChild(col);
+    });
+
+    wrap.appendChild(grid);
+  }
+
   function renderTodayView(){
     const wrap = document.getElementById('todayView');
     wrap.innerHTML = '';
@@ -8051,9 +8130,13 @@
     document.getElementById('todayView').style.display = v === 'today' ? 'block' : 'none';
     document.getElementById('blockView').style.display = v === 'block' ? 'block' : 'none';
     document.getElementById('listView').style.display = v === 'list' ? 'block' : 'none';
+    document.getElementById('weekGlanceView').style.display = v === 'weekglance' ? 'block' : 'none';
     document.getElementById('btnToday').classList.toggle('active', v === 'today');
     document.getElementById('btnBlock').classList.toggle('active', v === 'block');
     document.getElementById('btnList').classList.toggle('active', v === 'list');
+    document.getElementById('btnWeek').classList.toggle('active', v === 'weekglance');
+    // No individual day to pick when every day's already on screen at once.
+    document.getElementById('dayTabs').style.display = v === 'weekglance' ? 'none' : '';
     requestAnimationFrame(updateNowLine);
   }
 
@@ -8066,6 +8149,7 @@
     renderBlockView();
     renderListView();
     renderTodayView();
+    renderWeekGlanceView();
     renderHabitsSection();
     renderListsSection();
     renderLongGoalsSection();
@@ -8094,6 +8178,7 @@
   document.getElementById('btnToday').onclick = () => switchView('today');
   document.getElementById('btnBlock').onclick = () => switchView('block');
   document.getElementById('btnList').onclick = () => switchView('list');
+  document.getElementById('btnWeek').onclick = () => switchView('weekglance');
 
   document.querySelectorAll('.bottom-nav-btn[data-section]').forEach(btn => {
     btn.onclick = () => switchSection(btn.dataset.section);
