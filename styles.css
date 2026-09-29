@@ -2108,34 +2108,39 @@
     padding: 3px 0;
     border-radius: 4px;
   }
-  .block-event{
-    background: var(--card);
-    border-left: 3px solid var(--accent-color, var(--accent));
-    border-radius: 8px;
-    padding: 8px 10px;
-    margin: 2px 2px 5px 6px;
+  /* Timed calendar events — blended into the tinted hour slot the same way
+     a fixed recurring block (Work, etc.) already is, via .fixed-slot-tag.
+     No card/background/border of its own — just text sitting on the tint,
+     not a separate square floating on top of it. */
+  .event-slot-tag{
+    padding: 4px 10px;
     cursor:pointer;
     display:flex;
     justify-content:space-between;
     align-items:flex-start;
     gap:8px;
-    transition: background .15s ease;
   }
-  .block-event:active{ background: var(--card-hover); }
-  .block-event .txt{
-    font-size: 14px;
-    line-height:1.35;
-    font-weight: 500;
+  .event-slot-label{
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 13px;
     color: var(--text);
   }
-  .block-event .time{
+  .event-slot-time{
     font-family: var(--font-mono);
-    font-size: 10px;
-    color: var(--text-soft);
-    margin-top:3px;
+    font-size: 9.5px;
+    color: var(--accent-color, var(--text-soft));
+    margin-top:2px;
   }
-  .block-event .del{
-    font-size: 16px;
+  .event-slot-notes{
+    font-size: 11.5px;
+    color: var(--text-soft);
+    margin-top:2px;
+    line-height: 1.35;
+  }
+  .event-slot-del{
+    flex: 0 0 auto;
+    font-size: 15px;
     color: var(--text-faint);
     background:none; border:none; cursor:pointer;
     padding: 0 2px;

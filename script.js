@@ -7070,14 +7070,14 @@
         hourItems.forEach(it => {
           const cat = catById[it.category] || CATEGORIES[0];
           const ev = document.createElement('div');
-          ev.className = 'block-event';
+          ev.className = 'event-slot-tag';
           ev.style.setProperty('--accent-color', cat.color);
-          ev.innerHTML = '<div><div class="txt"></div><div class="time"></div>' + (it.notes ? '<div class="event-notes"></div>' : '') + '</div><button class="del">×</button>';
-          ev.querySelector('.txt').textContent = it.text;
+          ev.innerHTML = '<div><div class="event-slot-label"></div><div class="event-slot-time"></div>' + (it.notes ? '<div class="event-slot-notes"></div>' : '') + '</div><button class="event-slot-del">×</button>';
+          ev.querySelector('.event-slot-label').textContent = it.text;
           const timeLabel = it.endTime ? (fmtTime(it.time) + '–' + fmtTime(it.endTime)) : fmtTime(it.time);
-          ev.querySelector('.time').textContent = timeLabel + ' · ' + cat.label;
-          if(it.notes) ev.querySelector('.event-notes').textContent = it.notes;
-          ev.querySelector('.del').onclick = (e) => { e.stopPropagation(); removeItem(day, it.id); };
+          ev.querySelector('.event-slot-time').textContent = timeLabel + ' · ' + cat.label;
+          if(it.notes) ev.querySelector('.event-slot-notes').textContent = it.notes;
+          ev.querySelector('.event-slot-del').onclick = (e) => { e.stopPropagation(); removeItem(day, it.id); };
           ev.addEventListener('click', () => openEditEventModal(it, day));
           slot.appendChild(ev);
         });
