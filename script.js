@@ -3251,12 +3251,12 @@
       save();
       renderAll();
     };
-    // Steps — a checklist broken off a Monthly/Yearly goal, one at a time
-    // or all at once, whichever way the person wants to plan it out.
-    // Daily/Weekly/Quarterly/Custom goals don't get this section; undone
-    // steps also surface up in the Weekly section (see
-    // renderActiveGoalsView) tagged with which goal they belong to.
-    if(tf === 'monthly' || tf === 'yearly'){
+    // Steps — a checklist broken off a Monthly/Quarterly/Yearly goal, one
+    // at a time or all at once, whichever way the person wants to plan it
+    // out. Daily/Weekly/Custom goals don't get this section; undone steps
+    // also surface up in the Weekly section (see renderActiveGoalsView)
+    // tagged with which goal they belong to.
+    if(tf === 'monthly' || tf === 'quarterly' || tf === 'yearly'){
       appendGoalStepsSection(card, g);
     }
     return card;
@@ -3351,19 +3351,21 @@
     const dailyGoals = byTf('daily');
     const weeklyGoals = byTf('weekly');
     const monthlyGoals = byTf('monthly');
+    const quarterlyGoals = byTf('quarterly');
     const yearlyGoals = byTf('yearly');
 
-    // Undone steps from Monthly/Yearly goals surface here too, so the
-    // Weekly section is everything actually worth looking at this week —
-    // not just goals whose own timeframe happens to be Weekly.
+    // Undone steps from Monthly/Quarterly/Yearly goals surface here too,
+    // so the Weekly section is everything actually worth looking at this
+    // week — not just goals whose own timeframe happens to be Weekly.
     const stepRows = [];
     monthlyGoals.forEach(g => (g.steps || []).forEach(s => { if(!s.done) stepRows.push({ step:s, goal:g, tfLabel:'Monthly' }); }));
+    quarterlyGoals.forEach(g => (g.steps || []).forEach(s => { if(!s.done) stepRows.push({ step:s, goal:g, tfLabel:'Quarterly' }); }));
     yearlyGoals.forEach(g => (g.steps || []).forEach(s => { if(!s.done) stepRows.push({ step:s, goal:g, tfLabel:'Yearly' }); }));
 
-    if(!dailyGoals.length && !weeklyGoals.length && !monthlyGoals.length && !yearlyGoals.length){
+    if(!dailyGoals.length && !weeklyGoals.length && !monthlyGoals.length && !quarterlyGoals.length && !yearlyGoals.length){
       const empty = document.createElement('div');
       empty.className = 'empty-note';
-      empty.textContent = 'Nothing active yet — tap + to add a daily, weekly, monthly, or yearly goal.';
+      empty.textContent = 'Nothing active yet — tap + to add a daily, weekly, monthly, quarterly, or yearly goal.';
       wrap.appendChild(empty);
       return;
     }
@@ -3387,6 +3389,7 @@
       stepRows.forEach(({ step, goal, tfLabel }) => wrap.appendChild(buildGoalStepRow(step, goal, tfLabel)));
     }
     addSection('Monthly', monthlyGoals, 'monthly');
+    addSection('Quarterly', quarterlyGoals, 'quarterly');
     addSection('Yearly', yearlyGoals, 'yearly');
   }
 
