@@ -2107,19 +2107,7 @@
     border-top: 1px solid var(--border);
     padding: 3px 0;
     border-radius: 4px;
-    position: relative;
   }
-  .hour-slot-tint{
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    border-radius: 4px;
-    overflow: hidden;
-    pointer-events: none;
-  }
-  .hour-slot-qseg{ flex:1; }
-  .hour-slot > *:not(.hour-slot-tint){ position: relative; z-index: 1; }
   /* Timed calendar events — blended into the tinted hour slot the same way
      a fixed recurring block (Work, etc.) already is, via .fixed-slot-tag.
      No card/background/border of its own — just text sitting on the tint,
