@@ -20,8 +20,10 @@
 
   // Quick-add presets — pre-filled events for recurring commitments where the
   // specific time/role varies week to week. Each can carry an endTime so the
-  // block view shades the full span, not just the start.
-  const PRESET_EVENTS = [
+  // block view shades the full span, not just the start. This is only the
+  // seed for a first install — state.presetEvents (Settings > Presets) is
+  // the live, user-editable list from here on.
+  const DEFAULT_PRESET_EVENTS = [
     { id:'quay-students-worship',  label:'Worship Team — Quay Students',      category:'faith', time:'16:45', endTime:'21:00', day:'Wed' },
     { id:'quay-students-crew',     label:'Crew Leader — Quay Students',       category:'faith', time:'18:00', endTime:'21:00', day:'Wed' },
     { id:'quay-ya-worship',        label:'Worship Team — Quay Young Adults',  category:'faith', time:'16:45', endTime:'21:00', day:'Thu' },
@@ -1741,6 +1743,7 @@
           if(!parsed.autoScheduleRules) parsed.autoScheduleRules = [];
           if(!parsed.tomorrowWakeTimes) parsed.tomorrowWakeTimes = {};
           if(!parsed.goalPrompts) parsed.goalPrompts = { lastDaily:null, lastWeekly:null, lastMonthly:null, lastYearly:null };
+          if(!parsed.presetEvents) parsed.presetEvents = DEFAULT_PRESET_EVENTS.map(p => Object.assign({}, p));
           if(parsed.longTermGoals && parsed.longTermGoals.length){
             const dStr = habitDayStr();
             const curPeriodKeys = { daily:dStr, weekly:realCurrentWeekStart(), monthly:dStr.slice(0,7), yearly:dStr.slice(0,4) };
@@ -1772,7 +1775,8 @@
       recurringTransactions: [],
       autoScheduleRules: [],
       tomorrowWakeTimes: {},
-      goalPrompts: { lastDaily:null, lastWeekly:null, lastMonthly:null, lastYearly:null }
+      goalPrompts: { lastDaily:null, lastWeekly:null, lastMonthly:null, lastYearly:null },
+      presetEvents: DEFAULT_PRESET_EVENTS.map(p => Object.assign({}, p))
     };
   }
   function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
@@ -5596,7 +5600,7 @@
     const menu = document.getElementById('catMenu');
     const rect = anchorEl.getBoundingClientRect();
     menu.style.setProperty('--chip-color', catById[catId].color);
-    const hasPresets = PRESET_EVENTS.some(p => p.category === catId);
+    const hasPresets = state.presetEvents.some(p => p.category === catId);
     document.getElementById('catMenuQuickAdd').style.display = hasPresets ? 'flex' : 'none';
     menu.classList.remove('hidden');
     const menuWidth = 200;
@@ -6285,7 +6289,7 @@
     function updatePresetShortcut(){
       const box = document.getElementById('evPresetShortcut');
       if(!box) return;
-      const hasPresets = PRESET_EVENTS.some(p => p.category === selectedCat);
+      const hasPresets = state.presetEvents.some(p => p.category === selectedCat);
       if(hasPresets){
         const c = catById[selectedCat];
         box.innerHTML = '<button class="preset-shortcut-btn">» Use a ' + escapeHtml(c.label) + ' preset instead</button>';
@@ -6395,7 +6399,7 @@
     const content = document.getElementById('modalContent');
     content.style.setProperty('--chip-color', cat.color);
 
-    const presets = PRESET_EVENTS.filter(p => p.category === catId);
+    const presets = state.presetEvents.filter(p => p.category === catId);
     const rowsHtml = presets.map(p => `
       <button class="preset-item" data-preset="${p.id}">
         <div class="preset-left">
@@ -6419,7 +6423,7 @@
     document.getElementById('presetClose').onclick = closeModal;
     content.querySelectorAll('.preset-item').forEach(btn => {
       btn.onclick = () => {
-        const preset = PRESET_EVENTS.find(p => p.id === btn.dataset.preset);
+        const preset = state.presetEvents.find(p => p.id === btn.dataset.preset);
         if(preset) addPresetEvent(preset);
       };
     });
@@ -7770,6 +7774,98 @@
       });
     }
     wrap.appendChild(autoChipWrap);
+
+    const presetSub = document.createElement('div');
+    presetSub.className = 'section-label';
+    presetSub.style.marginTop = '18px';
+    presetSub.textContent = 'Quick-Add Presets';
+    wrap.appendChild(presetSub);
+
+    const presetNote = document.createElement('div');
+    presetNote.className = 'settings-row-sub';
+    presetNote.style.margin = '0 0 10px';
+    presetNote.textContent = 'Shows as a shortcut when adding an event in that category — for recurring commitments whose exact time varies week to week.';
+    wrap.appendChild(presetNote);
+
+    const presetAddBtn = document.createElement('button');
+    presetAddBtn.className = 'preset-shortcut-btn';
+    presetAddBtn.textContent = '+ Add preset';
+    presetAddBtn.onclick = openAddPresetEventModal;
+    wrap.appendChild(presetAddBtn);
+
+    const presetChipWrap = document.createElement('div');
+    presetChipWrap.className = 'blocklist-chips';
+    presetChipWrap.style.marginTop = '10px';
+    if(!state.presetEvents.length){
+      presetChipWrap.innerHTML = '<div class="empty-note">No presets yet.</div>';
+    } else {
+      state.presetEvents.forEach(p => {
+        const cat = catById[p.category] || CATEGORIES[0];
+        const chip = document.createElement('div');
+        chip.className = 'blocklist-chip';
+        chip.innerHTML = `<span></span><button aria-label="Remove">×</button>`;
+        const timeLabel = fmtTime(p.time) + (p.endTime ? '–' + fmtTime(p.endTime) : '');
+        chip.querySelector('span').textContent = p.label + ' — ' + cat.label + ', ' + fullDayName(p.day) + ' ' + timeLabel;
+        chip.querySelector('button').onclick = () => {
+          state.presetEvents = state.presetEvents.filter(x => x.id !== p.id);
+          save();
+          renderAll();
+        };
+        presetChipWrap.appendChild(chip);
+      });
+    }
+    wrap.appendChild(presetChipWrap);
+  }
+
+  function openAddPresetEventModal(){
+    const overlay = document.getElementById('modalOverlay');
+    const content = document.getElementById('modalContent');
+    content.style.removeProperty('--chip-color');
+
+    const categoryOptionsHtml = CATEGORIES.map(c => '<option value="' + c.id + '">' + escapeHtml(c.label) + '</option>').join('');
+    const dayOptionsHtml = DAYS.map(d => '<option value="' + d + '">' + fullDayName(d) + '</option>').join('');
+
+    content.innerHTML = `
+      <div class="modal-handle"></div>
+      <div class="modal-title">Add preset</div>
+      <div class="modal-subtitle">Shows up as a quick-add shortcut when adding an event in this category</div>
+      <label>Label</label>
+      <input type="text" id="presetLabel" placeholder="e.g. Worship Team — Quay Students" maxlength="60">
+      <label>Category</label>
+      ${customSelectHtml('presetCategory', categoryOptionsHtml, CATEGORIES[0].id, 'Category')}
+      <label>Day of week</label>
+      ${customSelectHtml('presetDay', dayOptionsHtml, 'Sun', 'Day')}
+      <label>Start time</label>
+      ${customTimeHtml('presetStart', '09:00')}
+      <label>End time (optional)</label>
+      ${customTimeHtml('presetEnd', '', 'No end time')}
+      <div class="modal-actions">
+        <button class="cancel" id="presetAddCancel">Cancel</button>
+        <button class="save" id="presetAddSave">Save</button>
+      </div>
+    `;
+    overlay.classList.remove('hidden');
+    wireCustomSelect('presetCategory', categoryOptionsHtml, 'Category');
+    wireCustomSelect('presetDay', dayOptionsHtml, 'Day');
+    wireCustomTime('presetStart', {});
+    wireCustomTime('presetEnd', { allowClear:true, placeholder:'No end time' });
+
+    document.getElementById('presetAddCancel').onclick = () => { closeModal(); renderSettingsSection(); };
+    document.getElementById('presetAddSave').onclick = () => {
+      const label = document.getElementById('presetLabel').value.trim();
+      if(!label) return;
+      state.presetEvents.push({
+        id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
+        label,
+        category: document.getElementById('presetCategory').value,
+        day: document.getElementById('presetDay').value,
+        time: document.getElementById('presetStart').value || '09:00',
+        endTime: document.getElementById('presetEnd').value || null
+      });
+      save();
+      closeModal();
+      renderSettingsSection();
+    };
   }
 
   function openAddAutoRuleModal(){
