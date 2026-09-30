@@ -1586,6 +1586,15 @@
       'ex-pec-deck':           [{weight:110,reps:12},{weight:110,reps:12},{weight:110,reps:12}],
       'ex-cable-lat-raise':    [{weight:45,reps:15},{weight:45,reps:15},{weight:45,reps:15}],
     }, coachNotes: "Coach: Best complete chest session of the Fall Split. DB bench swept 95 clean — new PR territory, moving to 100. Cable press around, pec deck, and lateral raise all swept clean — all moving up. Incline one rep short on the last set — holding at 75, need a clean 10/10/10 before progressing. Post-workout stretch completed, good habit as the weights climb. 9.5/10." },
+
+    { date: '2026-09-29', exercises: {
+      'ex-bb-row':          [{weight:185,reps:6},{weight:185,reps:6},{weight:185,reps:5},{weight:185,reps:4}],
+      'ex-sa-lat-pulldown': [{weight:160,reps:10},{weight:160,reps:9},{weight:160,reps:9}],
+      'ex-low-row-machine': [{weight:210,reps:12},{weight:210,reps:12},{weight:210,reps:11}],
+      'ex-cable-row':       [{weight:160,reps:12},{weight:160,reps:12},{weight:160,reps:11}],
+      'ex-face-pull':       [{weight:115,reps:15},{weight:115,reps:15},{weight:115,reps:13}],
+      'ex-rear-delt-fly':   [{weight:95,reps:20},{weight:95,reps:19},{weight:95,reps:17}],
+    }, coachNotes: "Post-Workout Stretch (5 min):\nCat-Cow — 45 sec\nChild's Pose — 45 sec\nKnee-to-Chest Stretch — 30 sec each leg\nDoorway Lat Stretch — 30 sec each side\nThread the Needle — 30 sec each side\nSeated Spinal Twist — 30 sec each side\n\nCoach: Solid session across the board. Barbell row hit 6/6/5/4 at 185 lbs — entirely within the 4-6 rep target range, holding here until a clean 6/6/6/6 is hit before pushing further. SA lat pulldown, low row, and cable row all one rep short on the last set — same pattern as recent weeks, holding all three. Face pull two clean sets with fatigue on the third — holding. Rear delt fly at the top of the 15-20 range across all three sets — moving up to 100. 9/10." },
   ];
   function importFallSplitSessions(){
     if(!state.seedFlags) state.seedFlags = {};
