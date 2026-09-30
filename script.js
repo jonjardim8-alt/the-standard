@@ -6973,30 +6973,24 @@
     return weekly.concat(dated);
   }
 
-  function activeFixedBlocksForHours(){
-    const day = DAYS[activeDay];
-    const dates = weekDates();
-    const dateStr = toDateStr(dates[activeDay]);
-    return blocksForDate(day, dateStr).filter(b => {
-      if(state.workOff[b.id + '_' + dateStr]) return false;
-      if(!filterCats.has(b.category)) return false;
-      return true;
-    });
-  }
-
   function fmtTimeFromDate(d){
     const hh = String(d.getHours()).padStart(2,'0');
     const mm = String(d.getMinutes()).padStart(2,'0');
     return fmtTime(hh + ':' + mm);
   }
 
+  const TL_PX_PER_MIN = 1; // 60px/hour — exact, so 1 minute of time is always 1px
+  const TL_MIN_BLOCK_HEIGHT = 34; // floor so short events stay readable
+
   function updateNowLine(){
     const wrap = document.getElementById('blockView');
     if(!wrap) return;
+    const grid = wrap.querySelector('.timeline-grid');
     let line = document.getElementById('nowLine');
-    if(wrap.offsetParent === null){
-      // Blocks tab isn't visible right now — leave any existing line as-is,
-      // it'll be repositioned next time this tab becomes active.
+    if(wrap.offsetParent === null || !grid){
+      // Blocks tab isn't visible right now (or hasn't rendered yet) — leave
+      // any existing line as-is, it'll be repositioned next time this tab
+      // becomes active.
       return;
     }
 
@@ -7011,128 +7005,182 @@
       return;
     }
 
-    const row = wrap.querySelector('.hour-row[data-hour="' + hour + '"]');
-    if(!row){ if(line) line.remove(); return; }
-
-    const rowRect = row.getBoundingClientRect();
-    const wrapRect = wrap.getBoundingClientRect();
-    const top = (rowRect.top - wrapRect.top) + (min / 60) * rowRect.height;
+    const top = ((hour * 60 + min) - START_HOUR * 60) * TL_PX_PER_MIN;
 
     if(!line){
       line = document.createElement('div');
       line.id = 'nowLine';
       line.className = 'now-line';
       line.innerHTML = '<span class="now-dot"></span><span class="now-time"></span>';
-      wrap.appendChild(line);
+      grid.appendChild(line);
+    } else if(line.parentElement !== grid){
+      grid.appendChild(line);
     }
     line.style.top = top + 'px';
     line.querySelector('.now-time').textContent = fmtTimeFromDate(now);
   }
 
+  // Greedy sweep-line column assignment for genuinely overlapping blocks
+  // (rare — most days are sequential) — each overlapping cluster shares
+  // equal-width columns instead of visually colliding. `blocks` must
+  // already be sorted by start time and have numeric `_s`/`_e` (minutes).
+  function assignTimelineColumns(blocks){
+    let active = [];
+    let cluster = [];
+    let clusterCols = 0;
+    const flush = () => {
+      cluster.forEach(b => { b._colCount = clusterCols; });
+      cluster = [];
+      clusterCols = 0;
+    };
+    blocks.forEach(b => {
+      active = active.filter(a => a.end > b._s);
+      if(!active.length && cluster.length) flush();
+      const usedCols = new Set(active.map(a => a.col));
+      let col = 0;
+      while(usedCols.has(col)) col++;
+      b._col = col;
+      active.push({ end: b._e, col });
+      cluster.push(b);
+      clusterCols = Math.max(clusterCols, active.length);
+    });
+    flush();
+  }
+
+  // Hour-by-hour rows gave every event a fixed 60px-tall slot regardless of
+  // its real duration, so a 15-minute walk and a 3-hour work block looked
+  // identical and a 12:30 start couldn't be told apart from a 12:00 one.
+  // This instead lays the whole day out as one continuous timeline —
+  // TL_PX_PER_MIN pixels per real minute — with each fixed block/event
+  // absolutely positioned by its own exact start/duration, so the tint
+  // IS the event's own background (always perfectly aligned with its own
+  // text, unlike the quarter-hour attempt this replaced) rather than a
+  // separate layer underneath guessing where the text should sit.
   function renderBlockView(){
     const day = DAYS[activeDay];
     const dateStr = toDateStr(weekDates()[activeDay]);
     const items = visibleItems(day).slice().sort((a,b) => a.time.localeCompare(b.time));
-    const fixedBlocks = activeFixedBlocksForHours();
-    const spanItems = items.filter(it => it.endTime).map(it => ({ start: it.time, end: it.endTime, category: it.category }));
-    const allSpans = fixedBlocks.concat(spanItems);
-    // Unfiltered by on/off state (unlike fixedBlocks above, which excludes
-    // blocks already marked off so their tint disappears) — this is only
-    // used to find where to show the label+toggle, so an off block can
-    // still be found and restored.
+    // Unfiltered by on/off state — an off block still needs to render (so
+    // its Restore control stays reachable), it just skips the color tint.
     const allFixedBlocksToday = blocksForDate(day, dateStr).filter(b => filterCats.has(b.category));
 
     const wrap = document.getElementById('blockView');
     wrap.innerHTML = '';
 
+    const gridStartMin = START_HOUR * 60;
+    const totalMin = (END_HOUR - START_HOUR + 1) * 60;
+    const totalHeight = totalMin * TL_PX_PER_MIN;
+
+    const wrapEl = document.createElement('div');
+    wrapEl.className = 'timeline-wrap';
+
+    const labels = document.createElement('div');
+    labels.className = 'timeline-labels';
+    labels.style.height = totalHeight + 'px';
+
+    const grid = document.createElement('div');
+    grid.className = 'timeline-grid';
+    grid.style.height = totalHeight + 'px';
+
     for(let h = START_HOUR; h <= END_HOUR; h++){
-      const row = document.createElement('div');
-      row.className = 'hour-row';
-      row.dataset.hour = h;
+      const top = (h * 60 - gridStartMin) * TL_PX_PER_MIN;
+      const line = document.createElement('div');
+      line.className = 'tl-hour-line';
+      line.style.top = top + 'px';
+      grid.appendChild(line);
 
       const label = document.createElement('div');
-      label.className = 'hour-label' + (getEnergyLevel(h) === 'low' ? ' low-energy' : '');
+      label.className = 'tl-hour-label' + (getEnergyLevel(h) === 'low' ? ' low-energy' : '');
+      label.style.top = top + 'px';
       const ap = h >= 12 ? 'PM' : 'AM';
       let h12 = h % 12; if(h12 === 0) h12 = 12;
       label.textContent = h12 + ap;
-      row.appendChild(label);
-
-      const slot = document.createElement('div');
-      slot.className = 'hour-slot';
-
-      const hourStartMin = h * 60;
-      const hourEndMin = hourStartMin + 60;
-      const overlapping = allSpans.find(b => {
-        const bStart = timeToMin(b.start), bEnd = timeToMin(b.end);
-        return bStart < hourEndMin && bEnd > hourStartMin;
-      });
-      if(overlapping){
-        const color = catById[overlapping.category].color;
-        slot.style.background = 'color-mix(in srgb, ' + color + ' 35%, transparent)';
-        slot.style.borderTopColor = 'color-mix(in srgb, ' + color + ' 45%, var(--border))';
-      }
-
-      const hourStr = String(h).padStart(2,'0');
-      const hourItems = items.filter(it => it.time.startsWith(hourStr));
-
-      if(hourItems.length){
-        hourItems.forEach(it => {
-          const cat = catById[it.category] || CATEGORIES[0];
-          const ev = document.createElement('div');
-          ev.className = 'event-slot-tag';
-          ev.style.setProperty('--accent-color', cat.color);
-          ev.innerHTML = '<div><div class="event-slot-label"></div><div class="event-slot-time"></div>' + (it.notes ? '<div class="event-slot-notes"></div>' : '') + '</div><button class="event-slot-del">×</button>';
-          ev.querySelector('.event-slot-label').textContent = it.text;
-          const timeLabel = it.endTime ? (fmtTime(it.time) + '–' + fmtTime(it.endTime)) : fmtTime(it.time);
-          ev.querySelector('.event-slot-time').textContent = timeLabel + ' · ' + cat.label;
-          if(it.notes) ev.querySelector('.event-slot-notes').textContent = it.notes;
-          ev.querySelector('.event-slot-del').onclick = (e) => { e.stopPropagation(); removeItem(day, it.id); };
-          ev.addEventListener('click', () => openEditEventModal(it, day));
-          slot.appendChild(ev);
-        });
-      } else {
-        // A fixed/recurring block (Work, etc.) starting in this exact hour
-        // gets its label + Day off/Restore toggle instead of the usual
-        // "+" add button — shown once per block (its starting hour only),
-        // not repeated across every hour it spans.
-        const startingBlock = allFixedBlocksToday.find(b => {
-          const bStart = timeToMin(b.start);
-          return bStart >= hourStartMin && bStart < hourEndMin;
-        });
-        if(startingBlock){
-          const cat = catById[startingBlock.category];
-          const offKey = startingBlock.id + '_' + dateStr;
-          const isOff = !!state.workOff[offKey];
-          const tag = document.createElement('div');
-          tag.className = 'fixed-slot-tag' + (isOff ? ' off' : '');
-          tag.style.setProperty('--accent-color', cat.color);
-          tag.innerHTML = '<span class="fixed-slot-label"></span><button class="fixed-slot-toggle"></button>';
-          tag.querySelector('.fixed-slot-label').textContent = startingBlock.label;
-          const toggleBtn = tag.querySelector('.fixed-slot-toggle');
-          toggleBtn.textContent = isOff ? 'Restore' : 'Day off';
-          toggleBtn.onclick = () => {
-            if(isOff){ delete state.workOff[offKey]; } else { state.workOff[offKey] = true; }
-            save();
-            renderAll();
-          };
-          slot.appendChild(tag);
-        } else {
-          const addBtn = document.createElement('button');
-          addBtn.className = 'add-slot-btn';
-          addBtn.textContent = '+';
-          addBtn.onclick = () => {
-            openAddEventModal(null);
-            setTimeout(() => {
-              setCustomTimeValue('evTime', hourStr + ':00');
-            }, 60);
-          };
-          slot.appendChild(addBtn);
-        }
-      }
-
-      row.appendChild(slot);
-      wrap.appendChild(row);
+      labels.appendChild(label);
     }
+
+    // One unified list — fixed blocks and timed events both become plain
+    // {start,end,...} entries so they share the same placement/column pass.
+    const placed = [];
+    allFixedBlocksToday.forEach(b => {
+      const isOff = !!state.workOff[b.id + '_' + dateStr];
+      placed.push({ kind:'fixed', start:b.start, end:b.end, ref:b, category:b.category, off:isOff });
+    });
+    items.forEach(it => {
+      // A point event (no end time) still needs *some* height to be
+      // visible/tappable — 20 minutes' worth, not tied to any real data.
+      const end = it.endTime || minToTime(Math.min(timeToMin(it.time) + 20, gridStartMin + totalMin));
+      placed.push({ kind:'event', start: it.time, end, ref: it, category: it.category, hasEnd: !!it.endTime });
+    });
+
+    placed.forEach(p => {
+      p._s = Math.max(timeToMin(p.start), gridStartMin);
+      p._e = Math.min(timeToMin(p.end), gridStartMin + totalMin);
+    });
+    const visible = placed.filter(p => p._e > p._s).sort((a, b) => a._s - b._s || a._e - b._e);
+    assignTimelineColumns(visible);
+
+    visible.forEach(p => {
+      const top = (p._s - gridStartMin) * TL_PX_PER_MIN;
+      const height = Math.max((p._e - p._s) * TL_PX_PER_MIN, TL_MIN_BLOCK_HEIGHT);
+      const colWidth = 100 / p._colCount;
+      const cat = catById[p.category] || CATEGORIES[0];
+
+      const el = document.createElement('div');
+      el.className = 'tl-block';
+      el.style.top = top + 'px';
+      el.style.height = height + 'px';
+      el.style.left = (p._col * colWidth) + '%';
+      el.style.width = colWidth + '%';
+
+      if(p.kind === 'fixed'){
+        el.classList.add('tl-fixed');
+        if(p.off) el.classList.add('off');
+        el.style.setProperty('--accent-color', cat.color);
+        if(!p.off) el.style.background = 'color-mix(in srgb, ' + cat.color + ' 35%, transparent)';
+        el.innerHTML = '<span class="tl-fixed-label"></span><button class="tl-fixed-toggle"></button>';
+        el.querySelector('.tl-fixed-label').textContent = p.ref.label;
+        const offKey = p.ref.id + '_' + dateStr;
+        const toggleBtn = el.querySelector('.tl-fixed-toggle');
+        toggleBtn.textContent = p.off ? 'Restore' : 'Day off';
+        toggleBtn.onclick = (e) => {
+          e.stopPropagation();
+          if(p.off){ delete state.workOff[offKey]; } else { state.workOff[offKey] = true; }
+          save();
+          renderAll();
+        };
+      } else {
+        const it = p.ref;
+        el.classList.add('tl-event');
+        el.style.setProperty('--accent-color', cat.color);
+        el.style.background = 'color-mix(in srgb, ' + cat.color + ' 35%, transparent)';
+        el.innerHTML = '<div><div class="tl-event-label"></div><div class="tl-event-time"></div>' + (it.notes ? '<div class="tl-event-notes"></div>' : '') + '</div><button class="tl-event-del">×</button>';
+        el.querySelector('.tl-event-label').textContent = it.text;
+        const timeLabel = it.endTime ? (fmtTime(it.time) + '–' + fmtTime(it.endTime)) : fmtTime(it.time);
+        el.querySelector('.tl-event-time').textContent = timeLabel;
+        if(it.notes) el.querySelector('.tl-event-notes').textContent = it.notes;
+        el.querySelector('.tl-event-del').onclick = (e) => { e.stopPropagation(); removeItem(day, it.id); };
+        el.addEventListener('click', () => openEditEventModal(it, day));
+      }
+      grid.appendChild(el);
+    });
+
+    // Tap empty grid space to add an event at (roughly) that time — hour
+    // gridlines have pointer-events:none so a tap on one still reaches
+    // this; a tap on a block is its own element and never bubbles here.
+    grid.addEventListener('click', (e) => {
+      if(e.target !== grid) return;
+      const rect = grid.getBoundingClientRect();
+      const clickedMin = gridStartMin + (e.clientY - rect.top) / TL_PX_PER_MIN;
+      const snapped = Math.max(gridStartMin, Math.min(gridStartMin + totalMin - 15, Math.round(clickedMin / 15) * 15));
+      openAddEventModal(null);
+      setTimeout(() => {
+        setCustomTimeValue('evTime', pad2(Math.floor(snapped / 60)) + ':' + pad2(snapped % 60));
+      }, 60);
+    });
+
+    wrapEl.appendChild(labels);
+    wrapEl.appendChild(grid);
+    wrap.appendChild(wrapEl);
     requestAnimationFrame(updateNowLine);
   }
 

@@ -1832,45 +1832,6 @@
     font-size:15px; cursor:pointer; padding:0 2px; flex:0 0 auto;
   }
 
-  /* Fixed/recurring block (Work, etc.) on the hourly timeline — no
-     separate banner anymore, just a tinted background on its hours (see
-     #blockView .hour-slot) plus this compact label+toggle shown in the
-     block's starting hour only, so an 8-hour block doesn't repeat the
-     control on every row. */
-  .fixed-slot-tag{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:8px;
-    width:100%;
-    height:100%;
-    padding: 0 10px;
-  }
-  .fixed-slot-label{
-    font-family: var(--font-display);
-    font-weight: 600;
-    font-size: 13px;
-    color: var(--text);
-  }
-  .fixed-slot-tag.off .fixed-slot-label{ color: var(--text-faint); text-decoration: line-through; }
-  .fixed-slot-toggle{
-    flex: 0 0 auto;
-    font-family: var(--font-mono);
-    font-size: 9.5px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    padding: 5px 9px;
-    border-radius: 6px;
-    border: 1px solid var(--border);
-    background: var(--card);
-    color: var(--text-soft);
-    cursor: pointer;
-  }
-  .fixed-slot-tag.off .fixed-slot-toggle{
-    background: var(--accent-color, var(--accent));
-    border-color: var(--accent-color, var(--accent));
-    color: #fff;
-  }
 
   /* ---- Tasks (due date, no fixed time) ---- */
   #taskSection{ margin-bottom: 16px; }
@@ -2046,7 +2007,7 @@
   #blockView{ position: relative; }
   .now-line{
     position: absolute;
-    left: 46px; right: 0;
+    left: 0; right: 0;
     height: 0;
     border-top: 2px solid #FF5C5C;
     z-index: 6;
@@ -2086,59 +2047,98 @@
   .fb-log-btn.check.active{ background: var(--success); border-color: var(--success); color: #fff; }
   .fb-log-btn.xmark.active{ background: var(--error); border-color: var(--error); color: #fff; }
 
-  #blockView .hour-row{
-    display:grid;
-    grid-template-columns: 46px 1fr;
-    min-height:34px;
-  }
-  .hour-label{
+  /* Day timeline — the whole day laid out at a fixed pixels-per-minute
+     scale (see TL_PX_PER_MIN in script.js) instead of one same-height row
+     per hour, so a block's actual duration and start time are exactly
+     where they visually appear, down to the minute. */
+  .timeline-wrap{ display:flex; position:relative; }
+  .timeline-labels{ width:46px; flex:0 0 auto; position:relative; }
+  .tl-hour-label{
+    position:absolute;
+    right:10px;
+    transform: translateY(-6px);
     font-family: var(--font-mono);
     font-size: 10px;
     color: var(--text-faint);
-    padding-top: 4px;
-    text-align:right;
-    padding-right:10px;
     user-select:none;
   }
-  .hour-label.low-energy{
-    color: var(--warning);
+  .tl-hour-label.low-energy{ color: var(--warning); }
+  .timeline-grid{
+    flex:1;
+    min-width:0;
+    position:relative;
+    border-left: 1px solid var(--border);
   }
-  .hour-slot{
+  .tl-hour-line{
+    position:absolute;
+    left:0; right:0;
     border-top: 1px solid var(--border);
-    padding: 3px 0;
-    border-radius: 4px;
+    pointer-events:none;
   }
-  /* Timed calendar events — blended into the tinted hour slot the same way
-     a fixed recurring block (Work, etc.) already is, via .fixed-slot-tag.
-     No card/background/border of its own — just text sitting on the tint,
-     not a separate square floating on top of it. */
-  .event-slot-tag{
-    padding: 4px 10px;
+  .tl-block{
+    position:absolute;
+    box-sizing:border-box;
+    padding: 3px 8px;
+    border-radius: 4px;
+    overflow:hidden;
     cursor:pointer;
+  }
+  .tl-fixed{
     display:flex;
+    align-items:center;
     justify-content:space-between;
-    align-items:flex-start;
     gap:8px;
   }
-  .event-slot-label{
+  .tl-fixed-label{
     font-family: var(--font-display);
     font-weight: 600;
     font-size: 13px;
     color: var(--text);
   }
-  .event-slot-time{
+  .tl-fixed.off .tl-fixed-label{ color: var(--text-faint); text-decoration: line-through; }
+  .tl-fixed-toggle{
+    flex: 0 0 auto;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text-soft);
+    cursor: pointer;
+  }
+  .tl-fixed.off .tl-fixed-toggle{
+    background: var(--accent-color, var(--accent));
+    border-color: var(--accent-color, var(--accent));
+    color: #fff;
+  }
+  .tl-event{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:8px;
+  }
+  .tl-event-label{
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text);
+  }
+  .tl-event-time{
     font-family: var(--font-mono);
     font-size: 9.5px;
     color: var(--accent-color, var(--text-soft));
     margin-top:2px;
   }
-  .event-slot-notes{
+  .tl-event-notes{
     font-size: 11.5px;
     color: var(--text-soft);
     margin-top:2px;
     line-height: 1.35;
   }
-  .event-slot-del{
+  .tl-event-del{
     flex: 0 0 auto;
     font-size: 15px;
     color: var(--text-faint);
@@ -2146,17 +2146,6 @@
     padding: 0 2px;
     line-height:1;
   }
-  .add-slot-btn{
-    background:none; border:none;
-    color: var(--border);
-    font-size: 16px;
-    width:100%;
-    text-align:left;
-    padding: 4px 4px 4px 8px;
-    cursor:pointer;
-    font-family: var(--font-mono);
-  }
-  .hour-slot:hover .add-slot-btn{ color: var(--text-faint); }
 
   #listView{ display:none; }
   .list-item{
