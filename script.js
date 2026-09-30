@@ -3754,6 +3754,37 @@
   // from its scheduled slot, and one linked to a task category, which
   // pulls in up to 5 of that category's tasks (subTasks) as checkable
   // rows nested under it.
+  // Shared by the Dashboard's Today timeline and the Calendar's Today
+  // view — a Tomorrow-planned block linked to a habit becomes checkable
+  // wherever it's shown, not just from the Habits tab. Returns null for a
+  // block that isn't habit-linked (including one linked to a task
+  // category instead — that's a list of sub-items, handled separately).
+  function habitCheckFieldsForBlock(b, dateStr){
+    if(b.habitId && b.habitKind === 'daily'){
+      return {
+        done: isDailyGoalDone(b.habitId, dateStr),
+        weeklyCount: null,
+        onToggle: () => { toggleDailyGoal(b.habitId, dateStr); renderAll(); }
+      };
+    }
+    if(b.habitId && b.habitKind === 'weekly'){
+      const weeklyGoal = state.weeklyGoals.find(g => g.id === b.habitId);
+      if(weeklyGoal){
+        return {
+          done: !!b.weeklyMarkedDone,
+          weeklyCount: getWeeklyGoalCount(weeklyGoal, realCurrentWeekStart()) + '/' + weeklyGoal.target + ' this week',
+          onToggle: () => {
+            adjustWeeklyGoal(weeklyGoal, b.weeklyMarkedDone ? -1 : 1);
+            b.weeklyMarkedDone = !b.weeklyMarkedDone;
+            save();
+            renderAll();
+          }
+        };
+      }
+    }
+    return null;
+  }
+
   function buildTodayEntries(today){
     const todayDayAbbr = DAYS[new Date().getDay()];
     const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
@@ -3773,23 +3804,12 @@
         time:b.startTime, isNow, color:'#F2A93B', text:b.text,
         meta: fmtTime(b.startTime) + (b.endTime ? '–' + fmtTime(b.endTime) : '') + ' · Planned'
       };
-      if(b.habitId && b.habitKind === 'daily'){
+      const habitCheck = habitCheckFieldsForBlock(b, today);
+      if(habitCheck){
         entry.checkable = true;
-        entry.done = isDailyGoalDone(b.habitId, today);
-        entry.onToggle = () => { toggleDailyGoal(b.habitId, today); renderAll(); };
-      } else if(b.habitId && b.habitKind === 'weekly'){
-        const weeklyGoal = state.weeklyGoals.find(g => g.id === b.habitId);
-        if(weeklyGoal){
-          entry.checkable = true;
-          entry.done = !!b.weeklyMarkedDone;
-          entry.meta += ' · ' + getWeeklyGoalCount(weeklyGoal, realCurrentWeekStart()) + '/' + weeklyGoal.target + ' this week';
-          entry.onToggle = () => {
-            adjustWeeklyGoal(weeklyGoal, b.weeklyMarkedDone ? -1 : 1);
-            b.weeklyMarkedDone = !b.weeklyMarkedDone;
-            save();
-            renderAll();
-          };
-        }
+        entry.done = habitCheck.done;
+        entry.onToggle = habitCheck.onToggle;
+        if(habitCheck.weeklyCount) entry.meta += ' · ' + habitCheck.weeklyCount;
       } else if(b.taskCategory){
         const cat = catById[b.taskCategory];
         if(cat){
@@ -7332,6 +7352,38 @@
         row.querySelector('.task-txt').textContent = t.text;
         row.querySelector('.task-meta').textContent = cat.label + (t.subcategory ? ' · ' + t.subcategory : '');
         row.querySelector('.task-check').onclick = () => { setTaskDone(t, !t.done); save(); renderAll(); };
+        list.appendChild(row);
+      });
+      wrap.appendChild(list);
+    }
+
+    // Tomorrow-planned blocks linked to a habit — checkable right here
+    // instead of only from the Habits tab. Only meaningful for the real
+    // current day: tomorrowPlans exists per-date, but a linked block only
+    // ever represents "today's" occurrence of that habit once its day
+    // actually arrives (see habitCheckFieldsForBlock).
+    const plannedHabits = isReallyToday
+      ? (state.tomorrowPlans[dateStr] || [])
+          .map(b => ({ block: b, check: habitCheckFieldsForBlock(b, dateStr) }))
+          .filter(x => x.check)
+      : [];
+    if(plannedHabits.length){
+      const title = document.createElement('div');
+      title.className = 'task-section-title';
+      title.style.cursor = 'default';
+      title.innerHTML = '<span>Planned</span>';
+      wrap.appendChild(title);
+      const list = document.createElement('div');
+      list.className = 'task-list';
+      list.style.marginBottom = '16px';
+      plannedHabits.forEach(({ block, check }) => {
+        const row = document.createElement('div');
+        row.className = 'task-item' + (check.done ? ' done' : '');
+        row.style.setProperty('--accent-color', '#F2A93B');
+        row.innerHTML = '<button class="task-check">✓</button><div class="task-body"><div class="task-txt"></div><div class="task-meta"></div></div>';
+        row.querySelector('.task-txt').textContent = block.text;
+        row.querySelector('.task-meta').textContent = fmtTime(block.startTime) + (block.endTime ? '–' + fmtTime(block.endTime) : '') + (check.weeklyCount ? ' · ' + check.weeklyCount : '');
+        row.querySelector('.task-check').onclick = check.onToggle;
         list.appendChild(row);
       });
       wrap.appendChild(list);
