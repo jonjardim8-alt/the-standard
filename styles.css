@@ -1852,14 +1852,11 @@
     color: var(--text-soft);
     cursor: pointer;
   }
-  .sched-btn.primary{
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #14120B;
-    flex: 1;
-  }
   .sched-btn:active{ opacity: 0.85; }
 
+  /* .dur-list/.dur-row/.dur-key are shared with the Budget category-limits
+     modal (openCategoryBudgetsModal) — kept even though the task-duration
+     settings that originally introduced them are gone. */
   .dur-list{ display:flex; flex-direction:column; gap:6px; margin-bottom:8px; }
   .dur-row{
     display:flex;
@@ -1869,40 +1866,7 @@
     border-radius: 8px;
     padding: 8px 10px;
   }
-  .dur-row.dur-add-row{ background: transparent; border: 1px solid var(--border); }
   .dur-key{ flex:1; font-size:13.5px; color: var(--text); text-transform: capitalize; }
-  .dur-min{
-    width: 56px;
-    font-family: var(--font-mono);
-    font-size: 13px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 6px 6px;
-    background: var(--bg-elevated);
-    color: var(--text);
-    text-align:center;
-  }
-  .dur-unit{ font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); }
-  .dur-del{ background:none; border:none; color: var(--text-faint); font-size:16px; cursor:pointer; padding:0 2px; }
-  .dur-row input[type=text]{
-    font-family: var(--font-body);
-    font-size: 13px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 8px 10px;
-    background: var(--bg-elevated);
-    color: var(--text);
-  }
-  .dur-add-btn{
-    font-family: var(--font-mono);
-    font-size: 11px;
-    padding: 8px 12px;
-    border-radius: 6px;
-    border: none;
-    background: var(--accent);
-    color: #14120B;
-    cursor: pointer;
-  }
 
   .energy-list{ max-height: 50vh; overflow-y: auto; margin-top: 4px; }
   .energy-row{
@@ -1989,11 +1953,6 @@
     background:none; border:none; color: var(--text-faint);
     font-size:15px; cursor:pointer; padding:0 2px;
   }
-  .task-item .task-resched{
-    background:none; border:none; color: var(--text-soft);
-    font-size:15px; cursor:pointer; padding:0 4px;
-  }
-  .task-item .task-resched:active{ color: var(--accent); }
   .priority-dot{
     display:inline-block;
     width:6px; height:6px;

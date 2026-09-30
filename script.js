@@ -949,28 +949,6 @@
     { dueDate:'2026-12-07', text:'Final Exam' },
   ];
 
-  const DEFAULT_TASK_DURATIONS = {
-    'final exam': 120,
-    'exam': 90,
-    'unit test': 60,
-    'quiz': 20,
-    'homework': 60,
-    'smartbook': 15,
-    'adaptive assignment': 30,
-    'english videos': 20,
-    'challenge': 20,
-    'journal': 25,
-    'worksheet': 25,
-    'discussion board': 20,
-    'outline': 45,
-    'practice log': 15,
-    'test knowledge': 15,
-    'debate': 30,
-    'invention': 30,
-    'speech': 45,
-    '__default__': 30
-  };
-
   let state = load();
 
   function seedStatisticsTasks(){
@@ -1720,7 +1698,6 @@
           if(!parsed.healthLog) parsed.healthLog = {};
           if(!parsed.seedFlags) parsed.seedFlags = {};
           if(!parsed.datedEvents) parsed.datedEvents = {};
-          if(!parsed.taskDurations) parsed.taskDurations = Object.assign({}, DEFAULT_TASK_DURATIONS);
           if(!parsed.dailyGoals) parsed.dailyGoals = [];
           if(!parsed.weeklyGoals) parsed.weeklyGoals = [];
           if(!parsed.dailyGoalLog) parsed.dailyGoalLog = {};
@@ -1744,6 +1721,23 @@
           if(!parsed.tomorrowWakeTimes) parsed.tomorrowWakeTimes = {};
           if(!parsed.goalPrompts) parsed.goalPrompts = { lastDaily:null, lastWeekly:null, lastMonthly:null, lastYearly:null };
           if(!parsed.presetEvents) parsed.presetEvents = DEFAULT_PRESET_EVENTS.map(p => Object.assign({}, p));
+          // Auto-scheduling for tasks was removed — strip anything it had
+          // already placed on the calendar (datedEvents with a
+          // linkedTaskId) and clear the now-meaningless `scheduled` flag
+          // those tasks were carrying, so they just go back to being
+          // plain pending tasks. Self-limiting: nothing sets linkedTaskId
+          // anymore, so this is a no-op after the first load post-update.
+          if(parsed.datedEvents){
+            let strippedAny = false;
+            Object.keys(parsed.datedEvents).forEach(dateKey => {
+              const before = parsed.datedEvents[dateKey].length;
+              parsed.datedEvents[dateKey] = parsed.datedEvents[dateKey].filter(e => !e.linkedTaskId);
+              if(parsed.datedEvents[dateKey].length !== before) strippedAny = true;
+            });
+            if(strippedAny && parsed.tasks){
+              parsed.tasks.forEach(t => { delete t.scheduled; });
+            }
+          }
           if(parsed.longTermGoals && parsed.longTermGoals.length){
             const dStr = habitDayStr();
             const curPeriodKeys = { daily:dStr, weekly:realCurrentWeekStart(), monthly:dStr.slice(0,7), yearly:dStr.slice(0,4) };
@@ -1763,7 +1757,6 @@
     DAYS.forEach(d => items[d] = []);
     return {
       items, workOff: {}, tasks: [], healthLog: {}, seedFlags: {}, datedEvents: {},
-      taskDurations: Object.assign({}, DEFAULT_TASK_DURATIONS),
       dailyGoals: [], weeklyGoals: [], dailyGoalLog: {}, weeklyGoalLog: {},
       allDayEvents: [], lists: [], longTermGoals: [],
       fitnessSplit: null, workoutLogs: {}, budgetTransactions: [], categoryBudgetLimits: {},
@@ -1806,156 +1799,13 @@
       .sort((a, b) => a.start.localeCompare(b.start));
   }
 
-  /* ---------------- Auto-scheduling engine ---------------- */
-
-  // Matches task text against saved keyword->minutes rules. Longest keyword
-  // match wins (so "final exam" beats "exam"). Falls back to __default__.
-  function guessDurationMinutes(text){
-    const lower = text.toLowerCase();
-    let bestKey = null;
-    Object.keys(state.taskDurations).forEach(key => {
-      if(key === '__default__') return;
-      if(lower.includes(key.toLowerCase())){
-        if(!bestKey || key.length > bestKey.length) bestKey = key;
-      }
-    });
-    if(bestKey) return state.taskDurations[bestKey];
-    return state.taskDurations['__default__'] || 30;
-  }
-
-  // Returns [start,end] minute ranges already occupied on a given date —
-  // fixed recurring blocks (not marked off), weekly-recurring events, and
-  // already-placed dated events.
-  function getBusyRangesForDate(dateStr){
-    const dayAbbr = dayAbbrFromDateStr(dateStr);
-    const ranges = [];
-    blocksForDate(dayAbbr, dateStr).forEach(b => {
-      if(state.workOff[b.id + '_' + dateStr]) return;
-      ranges.push([timeToMin(b.start), timeToMin(b.end)]);
-    });
-    state.items[dayAbbr].forEach(it => {
-      const s = timeToMin(it.time);
-      const e = it.endTime ? timeToMin(it.endTime) : s + 30;
-      ranges.push([s, e]);
-    });
-    (state.datedEvents[dateStr] || []).forEach(it => {
-      const s = timeToMin(it.time);
-      const e = it.endTime ? timeToMin(it.endTime) : s + 30;
-      ranges.push([s, e]);
-    });
-    return ranges;
-  }
-
-  // First open slot of the given duration within the visible hour window,
-  // checked in 15-minute steps against the busy ranges.
-  // Capacity-aware scheduling: stored energy preference by hour (0-23),
-  // defaulting to 'medium' for anything not explicitly set.
+  // Capacity-aware energy levels — stored preference by hour (0-23),
+  // defaulting to 'medium' for anything not explicitly set. Feeds the
+  // Block view's low-energy hour labels and the Add/Edit Event modal's
+  // low-energy warning; task auto-scheduling (which also used to read
+  // this) was removed, this is standalone now.
   function getEnergyLevel(hour){
     return state.energyLevels[String(hour).padStart(2,'0')] || 'medium';
-  }
-
-  function rangeHasLowEnergy(startMin, endMin){
-    const startHour = Math.floor(startMin / 60);
-    const endHour = Math.ceil(endMin / 60);
-    for(let h = startHour; h < endHour; h++){
-      if(getEnergyLevel(h) === 'low') return true;
-    }
-    return false;
-  }
-
-  function findSlotForDuration(durationMin, busyRanges, avoidLowEnergy){
-    const windowEnd = (END_HOUR + 1) * 60;
-    for(let start = START_HOUR * 60; start + durationMin <= windowEnd; start += 15){
-      const end = start + durationMin;
-      const conflict = busyRanges.some(([s,e]) => start < e && end > s);
-      if(conflict) continue;
-      if(avoidLowEnergy && rangeHasLowEnergy(start, end)) continue;
-      return { start, end };
-    }
-    return null;
-  }
-
-  function findLinkedEvent(taskId){
-    for(const dateKey in state.datedEvents){
-      const found = state.datedEvents[dateKey].find(it => it.linkedTaskId === taskId);
-      if(found) return { dateStr: dateKey, event: found };
-    }
-    return null;
-  }
-
-  // Places pending, not-yet-scheduled tasks into open slots — tries the due
-  // date first, then up to 3 days earlier (never before today, never after
-  // the due date). Returns a summary for reporting back to the person.
-  const PRIORITY_ORDER = { high: 0, normal: 1, low: 2 };
-
-  // Tries to place a single task into an open slot. Mutates state.datedEvents
-  // and the task itself on success. Returns { placed, dateStr, duration } or
-  // { placed: false }. Does not save() — caller decides when to persist.
-  function attemptPlaceTask(t){
-    const today = todayStr();
-    const duration = guessDurationMinutes(t.text);
-    const dueDate = dateFromStr(t.dueDate);
-
-    // Search order: 2 days before due date, then 1 day before, then the
-    // due date itself, then keep stepping further back (3, 4, 5...) if
-    // none of those have room — capped so it doesn't search forever.
-    const MAX_LOOKBACK = 14;
-    const lookbackOrder = [2, 1, 0];
-    for(let extra = 3; extra <= MAX_LOOKBACK; extra++) lookbackOrder.push(extra);
-
-    const candidateDates = [];
-    for(const lookback of lookbackOrder){
-      const candidateDate = new Date(dueDate);
-      candidateDate.setDate(dueDate.getDate() - lookback);
-      const dateStr = toDateStr(candidateDate);
-      if(dateStr >= today) candidateDates.push(dateStr);
-    }
-
-    // Pass 1: respect low-energy windows — try every candidate date before
-    // ever placing something in one. Pass 2 (fallback): allow low-energy
-    // hours if nothing else was open anywhere.
-    for(const avoidLow of [true, false]){
-      for(const dateStr of candidateDates){
-        const busy = getBusyRangesForDate(dateStr);
-        const slot = findSlotForDuration(duration, busy, avoidLow);
-        if(slot){
-          if(!state.datedEvents[dateStr]) state.datedEvents[dateStr] = [];
-          state.datedEvents[dateStr].push({
-            id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
-            time: minToTime(slot.start),
-            endTime: minToTime(slot.end),
-            text: t.text,
-            category: t.category,
-            subcategory: t.subcategory,
-            linkedTaskId: t.id
-          });
-          t.scheduled = true;
-          return { placed: true, dateStr, duration, lowEnergy: !avoidLow && rangeHasLowEnergy(slot.start, slot.end) };
-        }
-      }
-    }
-    return { placed: false };
-  }
-
-  // Clears whatever slot a task currently has (if any) so it can be placed
-  // again — used by both the batch scheduler's "reset" path and the
-  // per-task Reschedule button.
-  function clearTaskSchedule(t){
-    const link = findLinkedEvent(t.id);
-    if(link) state.datedEvents[link.dateStr] = state.datedEvents[link.dateStr].filter(e => e.id !== link.event.id);
-    t.scheduled = false;
-  }
-
-  // Tasks due soon with nothing on the calendar for them yet — surfaced in
-  // the Weekly Review so conflicts show up before the day arrives.
-  function getAtRiskTasks(withinDays){
-    const today = todayStr();
-    const horizon = new Date();
-    horizon.setDate(horizon.getDate() + (withinDays || 7));
-    const horizonStr = toDateStr(horizon);
-    return state.tasks
-      .filter(t => !t.done && !t.scheduled && t.dueDate >= today && t.dueDate <= horizonStr)
-      .sort((a,b) => a.dueDate.localeCompare(b.dueDate));
   }
 
   /* ---------------- Health streaks & weekly stats (used by Weekly Review) ---------------- */
@@ -5396,139 +5246,6 @@
     save();
   }
 
-  function autoScheduleTasks(){
-    const today = todayStr();
-    const candidates = state.tasks
-      .filter(t => !t.done && !t.scheduled && t.dueDate >= today)
-      .sort((a,b) => {
-        const pa = PRIORITY_ORDER[a.priority] ?? 1;
-        const pb = PRIORITY_ORDER[b.priority] ?? 1;
-        if(pa !== pb) return pa - pb;
-        const pointsA = a.points ?? -1;
-        const pointsB = b.points ?? -1;
-        if(pointsA !== pointsB) return pointsB - pointsA; // higher points first
-        return a.dueDate.localeCompare(b.dueDate);
-      });
-
-    const scheduled = [];
-    const failed = [];
-
-    candidates.forEach(t => {
-      const result = attemptPlaceTask(t);
-      if(result.placed) scheduled.push({ task: t, dateStr: result.dateStr, duration: result.duration });
-      else failed.push(t);
-    });
-
-    save();
-    renderAll();
-    return { scheduled, failed };
-  }
-
-  function runAutoSchedule(){
-    const { scheduled, failed } = autoScheduleTasks();
-    const overlay = document.getElementById('modalOverlay');
-    const content = document.getElementById('modalContent');
-    content.style.removeProperty('--chip-color');
-
-    const scheduledHtml = scheduled.length ? scheduled.map(s => `
-      <div class="upcoming-item">
-        <div class="day">${s.dateStr === todayStr() ? 'Today' : fmtDate(s.dateStr)}</div>
-        <div style="flex:1">
-          <div class="txt">${escapeHtml(s.task.text)}</div>
-          <div class="fixed-tag">${s.duration} min</div>
-        </div>
-      </div>
-    `).join('') : '<div class="upcoming-empty">Nothing new to schedule.</div>';
-
-    const failedHtml = failed.length ? failed.map(t => `
-      <div class="upcoming-item">
-        <div class="day">${fmtDate(t.dueDate)}</div>
-        <div style="flex:1"><div class="txt">${escapeHtml(t.text)}</div></div>
-      </div>
-    `).join('') : '';
-
-    content.innerHTML = `
-      <div class="modal-handle"></div>
-      <div class="modal-title">Auto-schedule results</div>
-      <div class="modal-subtitle">${scheduled.length} scheduled${failed.length ? ', ' + failed.length + " couldn't fit" : ''}</div>
-      <div class="upcoming-section-title">Scheduled</div>
-      <div class="upcoming-list">${scheduledHtml}</div>
-      ${failed.length ? '<div class="upcoming-section-title">No open slot found</div><div class="upcoming-list">' + failedHtml + '</div>' : ''}
-      <div class="modal-actions">
-        <button class="cancel" id="schedResultClose" style="flex:1">Close</button>
-      </div>
-    `;
-    overlay.classList.remove('hidden');
-    document.getElementById('schedResultClose').onclick = closeModal;
-  }
-
-  function openDurationSettingsModal(){
-    const overlay = document.getElementById('modalOverlay');
-    const content = document.getElementById('modalContent');
-    content.style.removeProperty('--chip-color');
-    renderDurationSettingsModal();
-    overlay.classList.remove('hidden');
-  }
-
-  function renderDurationSettingsModal(){
-    const content = document.getElementById('modalContent');
-    const keys = Object.keys(state.taskDurations).filter(k => k !== '__default__').sort();
-    const rowsHtml = keys.map(k => `
-      <div class="dur-row" data-key="${escapeHtml(k)}">
-        <span class="dur-key">${escapeHtml(k)}</span>
-        <input type="number" class="dur-min" min="5" step="5" value="${state.taskDurations[k]}">
-        <span class="dur-unit">min</span>
-        <button class="dur-del">×</button>
-      </div>
-    `).join('');
-
-    content.innerHTML = `
-      <div class="modal-handle"></div>
-      <div class="modal-title">Task durations</div>
-      <div class="modal-subtitle">How long each type of task takes — used to size auto-scheduled blocks</div>
-      <div class="dur-list">${rowsHtml}</div>
-      <div class="dur-row dur-add-row">
-        <input type="text" id="durNewKey" placeholder="keyword, e.g. lab report" style="flex:1">
-        <input type="number" id="durNewMin" min="5" step="5" placeholder="min" style="width:60px">
-        <button class="dur-add-btn" id="durAddBtn">Add</button>
-      </div>
-      <label style="margin-top:16px">Default (when nothing matches)</label>
-      <input type="number" id="durDefault" min="5" step="5" value="${state.taskDurations['__default__'] || 30}">
-      <div class="modal-actions">
-        <button class="cancel" id="durClose" style="flex:1">Done</button>
-      </div>
-    `;
-
-    content.querySelectorAll('.dur-min').forEach(inp => {
-      inp.onchange = () => {
-        const key = inp.closest('.dur-row').dataset.key;
-        state.taskDurations[key] = Math.max(5, parseInt(inp.value, 10) || 5);
-        save();
-      };
-    });
-    content.querySelectorAll('.dur-del').forEach(btn => {
-      btn.onclick = () => {
-        const key = btn.closest('.dur-row').dataset.key;
-        delete state.taskDurations[key];
-        save();
-        renderDurationSettingsModal();
-      };
-    });
-    document.getElementById('durAddBtn').onclick = () => {
-      const key = document.getElementById('durNewKey').value.trim().toLowerCase();
-      const min = Math.max(5, parseInt(document.getElementById('durNewMin').value, 10) || 30);
-      if(!key) return;
-      state.taskDurations[key] = min;
-      save();
-      renderDurationSettingsModal();
-    };
-    document.getElementById('durDefault').onchange = (e) => {
-      state.taskDurations['__default__'] = Math.max(5, parseInt(e.target.value, 10) || 30);
-      save();
-    };
-    document.getElementById('durClose').onclick = closeModal;
-  }
-
   function openEnergySettingsModal(){
     const overlay = document.getElementById('modalOverlay');
     const content = document.getElementById('modalContent');
@@ -5556,7 +5273,7 @@
     content.innerHTML = `
       <div class="modal-handle"></div>
       <div class="modal-title">Energy levels</div>
-      <div class="modal-subtitle">Tap an hour to cycle High → Medium → Low. Auto-schedule avoids Low hours when it can, and adding something manually into one will give you a heads up.</div>
+      <div class="modal-subtitle">Tap an hour to cycle High → Medium → Low. Low hours are marked on the calendar, and adding something into one will give you a heads up.</div>
       <div class="energy-list">${rowsHtml.join('')}</div>
       <div class="modal-actions">
         <button class="cancel" id="energyClose" style="flex:1">Done</button>
@@ -6819,17 +6536,12 @@
         });
     }
 
-    // Scheduling controls
     const schedRow = document.createElement('div');
     schedRow.className = 'sched-row';
     schedRow.innerHTML = `
-      <button class="sched-btn primary" id="btnAutoSchedule">▶ Auto-schedule tasks</button>
-      <button class="sched-btn" id="btnDurations">⚙ Durations</button>
       <button class="sched-btn" id="btnEnergy">Energy</button>
     `;
     wrap.appendChild(schedRow);
-    schedRow.querySelector('#btnAutoSchedule').onclick = runAutoSchedule;
-    schedRow.querySelector('#btnDurations').onclick = openDurationSettingsModal;
     schedRow.querySelector('#btnEnergy').onclick = openEnergySettingsModal;
 
     // Sub-toggle: Today vs Upcoming
@@ -6889,8 +6601,7 @@
         const row = document.createElement('div');
         row.className = 'task-item' + (t.done ? ' done' : '');
         row.style.setProperty('--accent-color', cat.color);
-        const rescheduleBtnHtml = t.scheduled ? '<button class="task-resched" title="Reschedule">↻</button>' : '';
-        row.innerHTML = '<button class="task-check">✓</button><div class="task-body"><div class="task-txt"></div><div class="task-meta"></div>' + (t.notes ? '<div class="event-notes"></div>' : '') + '</div>' + rescheduleBtnHtml + '<button class="task-del">×</button>';
+        row.innerHTML = '<button class="task-check">✓</button><div class="task-body"><div class="task-txt"></div><div class="task-meta"></div>' + (t.notes ? '<div class="event-notes"></div>' : '') + '</div><button class="task-del">×</button>';
         const txtEl = row.querySelector('.task-txt');
         if(priority === 'high') txtEl.innerHTML = '<span class="priority-dot high"></span>' + escapeHtml(t.text);
         else if(priority === 'low') txtEl.innerHTML = '<span class="priority-dot low"></span>' + escapeHtml(t.text);
@@ -6903,13 +6614,6 @@
         if(t.points !== null && t.points !== undefined){
           metaText += (metaText ? ' · ' : '') + t.points + ' pts';
         }
-        if(t.scheduled){
-          const link = findLinkedEvent(t.id);
-          if(link){
-            const when = link.dateStr === todayStr() ? 'today' : fmtDate(link.dateStr);
-            metaText += (metaText ? ' · ' : '') + 'scheduled ' + when + ' ' + fmtTime(link.event.time);
-          }
-        }
         meta.textContent = metaText;
         if(overdue) meta.classList.add('overdue');
         row.querySelector('.task-check').onclick = () => {
@@ -6917,17 +6621,7 @@
           save();
           renderAll();
         };
-        const reschedBtn = row.querySelector('.task-resched');
-        if(reschedBtn){
-          reschedBtn.onclick = () => {
-            clearTaskSchedule(t);
-            attemptPlaceTask(t);
-            save();
-            renderAll();
-          };
-        }
         row.querySelector('.task-del').onclick = () => {
-          if(t.scheduled) clearTaskSchedule(t);
           state.tasks = state.tasks.filter(x => x.id !== t.id);
           save();
           renderAll();
