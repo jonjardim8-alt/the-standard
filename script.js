@@ -3817,7 +3817,11 @@
 
   // The full timeline — every entry, in order, with checkable sub-tasks
   // nested under a category-linked block. Used inside the Today pop-up.
-  function renderTodayTimelineRows(container, ordered){
+  // onAfterChange (optional): called after a checkbox toggle, in addition
+  // to whatever the toggle itself already does (toggleDailyGoal etc. each
+  // call renderAll()) — lets the Today pop-up refresh its own already-open
+  // content, since renderAll() alone doesn't touch an open modal's DOM.
+  function renderTodayTimelineRows(container, ordered, onAfterChange){
     const timeline = document.createElement('div');
     timeline.className = 'today-timeline';
     ordered.forEach(e => {
@@ -3833,7 +3837,10 @@
       `;
       row.querySelector('.today-timeline-text').textContent = e.text;
       row.querySelector('.today-timeline-meta').textContent = e.meta;
-      if(e.checkable) row.querySelector('.today-timeline-check').onclick = e.onToggle;
+      if(e.checkable) row.querySelector('.today-timeline-check').onclick = () => {
+        e.onToggle();
+        if(onAfterChange) onAfterChange();
+      };
       timeline.appendChild(row);
 
       if(e.subTasks && e.subTasks.length){
@@ -3850,7 +3857,10 @@
           `;
           subRow.querySelector('.today-timeline-text').textContent = st.text;
           subRow.querySelector('.today-timeline-meta').textContent = st.meta;
-          subRow.querySelector('.today-timeline-check').onclick = st.onToggle;
+          subRow.querySelector('.today-timeline-check').onclick = () => {
+            st.onToggle();
+            if(onAfterChange) onAfterChange();
+          };
           timeline.appendChild(subRow);
         });
       }
@@ -3941,15 +3951,22 @@
     }
 
     todayCard.onclick = () => {
-      openDashDetailModal('Today', (body) => {
-        if(!ordered.length){
+      openDashDetailModal('Today', (body, refresh) => {
+        // Recomputed fresh on every open/refresh rather than reusing the
+        // `ordered` captured when the dashboard itself last rendered —
+        // otherwise a checkbox tapped inside the open pop-up toggles the
+        // right habit (renderAll() below proves that) but the pop-up's
+        // own rows never visually update, since renderAll() doesn't touch
+        // an already-open modal's DOM.
+        const { ordered: freshOrdered } = buildTodayEntries(today);
+        if(!freshOrdered.length){
           const empty = document.createElement('div');
           empty.className = 'empty-note';
           empty.textContent = 'Nothing on your plate today.';
           body.appendChild(empty);
           return;
         }
-        renderTodayTimelineRows(body, ordered);
+        renderTodayTimelineRows(body, freshOrdered, refresh);
       });
     };
 
