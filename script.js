@@ -1711,7 +1711,6 @@
           if(!parsed.categoryBudgetLimits) parsed.categoryBudgetLimits = {};
           if(!parsed.projects) parsed.projects = [];
           if(!parsed.journalEntries) parsed.journalEntries = {};
-          if(!parsed.energyLevels) parsed.energyLevels = {};
           if(!parsed.scoreOptIn) parsed.scoreOptIn = { budget: false };
           if(!parsed.blockedSenders) parsed.blockedSenders = [];
           if(!parsed.birthdays) parsed.birthdays = [];
@@ -1760,7 +1759,7 @@
       dailyGoals: [], weeklyGoals: [], dailyGoalLog: {}, weeklyGoalLog: {},
       allDayEvents: [], lists: [], longTermGoals: [],
       fitnessSplit: null, workoutLogs: {}, budgetTransactions: [], categoryBudgetLimits: {},
-      projects: [], journalEntries: {}, energyLevels: {},
+      projects: [], journalEntries: {},
       scoreOptIn: { budget: false },
       blockedSenders: [],
       birthdays: [],
@@ -1797,15 +1796,6 @@
       .filter(b => !b.endDate || dateStr <= b.endDate)
       .filter(b => !(b.excludeDates && b.excludeDates.includes(dateStr)))
       .sort((a, b) => a.start.localeCompare(b.start));
-  }
-
-  // Capacity-aware energy levels — stored preference by hour (0-23),
-  // defaulting to 'medium' for anything not explicitly set. Feeds the
-  // Block view's low-energy hour labels and the Add/Edit Event modal's
-  // low-energy warning; task auto-scheduling (which also used to read
-  // this) was removed, this is standalone now.
-  function getEnergyLevel(hour){
-    return state.energyLevels[String(hour).padStart(2,'0')] || 'medium';
   }
 
   /* ---------------- Health streaks & weekly stats (used by Weekly Review) ---------------- */
@@ -5246,52 +5236,6 @@
     save();
   }
 
-  function openEnergySettingsModal(){
-    const overlay = document.getElementById('modalOverlay');
-    const content = document.getElementById('modalContent');
-    content.style.removeProperty('--chip-color');
-    renderEnergySettingsModal();
-    overlay.classList.remove('hidden');
-  }
-
-  const ENERGY_LEVELS = ['high', 'medium', 'low'];
-  const ENERGY_LABELS = { high:'High', medium:'Medium', low:'Low' };
-  const ENERGY_COLORS = { high:'var(--success)', medium:'var(--warning)', low:'var(--error)' };
-
-  function renderEnergySettingsModal(){
-    const content = document.getElementById('modalContent');
-    const rowsHtml = [];
-    for(let h = START_HOUR; h <= END_HOUR; h++){
-      const level = getEnergyLevel(h);
-      rowsHtml.push(`
-        <div class="energy-row" data-hour="${h}">
-          <span class="energy-hour">${fmtTime(minToTime(h*60))}</span>
-          <button class="energy-pill" style="--energy-color:${ENERGY_COLORS[level]}">${ENERGY_LABELS[level]}</button>
-        </div>
-      `);
-    }
-    content.innerHTML = `
-      <div class="modal-handle"></div>
-      <div class="modal-title">Energy levels</div>
-      <div class="modal-subtitle">Tap an hour to cycle High → Medium → Low. Low hours are marked on the calendar, and adding something into one will give you a heads up.</div>
-      <div class="energy-list">${rowsHtml.join('')}</div>
-      <div class="modal-actions">
-        <button class="cancel" id="energyClose" style="flex:1">Done</button>
-      </div>
-    `;
-    content.querySelectorAll('.energy-row').forEach(row => {
-      row.querySelector('.energy-pill').onclick = () => {
-        const hour = row.dataset.hour;
-        const current = getEnergyLevel(hour);
-        const nextIdx = (ENERGY_LEVELS.indexOf(current) + 1) % ENERGY_LEVELS.length;
-        state.energyLevels[String(hour).padStart(2,'0')] = ENERGY_LEVELS[nextIdx];
-        save();
-        renderEnergySettingsModal();
-      };
-    });
-    document.getElementById('energyClose').onclick = () => { closeModal(); renderAll(); };
-  }
-
   function escapeHtml(s){
     const d = document.createElement('div');
     d.textContent = s;
@@ -5972,7 +5916,6 @@
             ${customTimeHtml('evEndTime', '', 'No end time')}
           </div>
         </div>
-        <div id="evEnergyWarn" class="energy-warn" style="display:none">This is one of your low-energy hours</div>
         <div class="settings-row" style="margin-top:12px">
           <div>
             <div class="settings-row-label">Repeats weekly</div>
@@ -6010,7 +5953,7 @@
     wireCustomDate('evStartDate', {});
     wireCustomDate('evEndDate', {});
     wireCustomSelect('evBdayMonth', bdayMonthOptions, 'Month');
-    wireCustomTime('evTime', {}, () => checkEnergyWarn());
+    wireCustomTime('evTime', {});
     wireCustomTime('evEndTime', { allowClear:true, placeholder:'No end time' });
 
     let eventMode = 'timed'; // 'timed' | 'allday' | 'birthday'
@@ -6036,16 +5979,6 @@
       }
     }
     updatePresetShortcut();
-
-    const checkEnergyWarn = () => {
-      const warnBox = document.getElementById('evEnergyWarn');
-      if(!warnBox) return;
-      const timeVal = document.getElementById('evTime').value;
-      if(!timeVal){ warnBox.style.display = 'none'; return; }
-      const hour = parseInt(timeVal.split(':')[0], 10);
-      warnBox.style.display = getEnergyLevel(hour) === 'low' ? 'block' : 'none';
-    };
-    checkEnergyWarn();
 
     if(!catId){
       renderCategoryPickerInline('evCatPicker', selectedCat, (c) => {
@@ -6536,14 +6469,6 @@
         });
     }
 
-    const schedRow = document.createElement('div');
-    schedRow.className = 'sched-row';
-    schedRow.innerHTML = `
-      <button class="sched-btn" id="btnEnergy">Energy</button>
-    `;
-    wrap.appendChild(schedRow);
-    schedRow.querySelector('#btnEnergy').onclick = openEnergySettingsModal;
-
     // Sub-toggle: Today vs Upcoming
     const subToggle = document.createElement('div');
     subToggle.className = 'view-toggle';
@@ -6805,7 +6730,7 @@
       grid.appendChild(line);
 
       const label = document.createElement('div');
-      label.className = 'tl-hour-label' + (getEnergyLevel(h) === 'low' ? ' low-energy' : '');
+      label.className = 'tl-hour-label';
       label.style.top = top + 'px';
       const ap = h >= 12 ? 'PM' : 'AM';
       let h12 = h % 12; if(h12 === 0) h12 = 12;

@@ -1835,24 +1835,6 @@
 
   /* ---- Tasks (due date, no fixed time) ---- */
   #taskSection{ margin-bottom: 16px; }
-  .sched-row{
-    display:flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 14px;
-  }
-  .sched-btn{
-    font-family: var(--font-mono);
-    font-size: 11.5px;
-    letter-spacing: 0.03em;
-    padding: 10px 14px;
-    border-radius: 9px;
-    border: 1px solid var(--border);
-    background: var(--card);
-    color: var(--text-soft);
-    cursor: pointer;
-  }
-  .sched-btn:active{ opacity: 0.85; }
 
   /* .dur-list/.dur-row/.dur-key are shared with the Budget category-limits
      modal (openCategoryBudgetsModal) — kept even though the task-duration
@@ -1867,33 +1849,6 @@
     padding: 8px 10px;
   }
   .dur-key{ flex:1; font-size:13.5px; color: var(--text); text-transform: capitalize; }
-
-  .energy-list{ max-height: 50vh; overflow-y: auto; margin-top: 4px; }
-  .energy-row{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    padding: 7px 0;
-    border-bottom: 1px solid var(--border);
-  }
-  .energy-row:last-child{ border-bottom: none; }
-  .energy-hour{ font-family: var(--font-mono); font-size: 12.5px; color: var(--text-soft); }
-  .energy-pill{
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    padding: 5px 12px;
-    border-radius: 12px;
-    border: 1px solid var(--energy-color);
-    background: color-mix(in srgb, var(--energy-color) 16%, transparent);
-    color: var(--energy-color);
-    cursor: pointer;
-    min-width: 62px;
-  }
-  .energy-warn{
-    font-size: 11.5px;
-    color: var(--warning);
-    margin: -6px 0 10px;
-  }
 
   .task-section-title{
     font-family: var(--font-mono);
@@ -2021,7 +1976,6 @@
     color: var(--text-faint);
     user-select:none;
   }
-  .tl-hour-label.low-energy{ color: var(--warning); }
   .timeline-grid{
     flex:1;
     min-width:0;
