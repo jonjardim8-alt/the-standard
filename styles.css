@@ -1268,129 +1268,13 @@
   .dash-expand-row .drow-amt.over{ color:var(--error); }
   .dash-expand-body .task-item{ background: var(--bg-elevated); }
 
-  /* ---- Fitness ---- */
+  /* .fit-week-label name is a holdover from the removed Fitness tab — kept
+     because the Journal tab's streak line (renderJournalSection) reuses it. */
   .fit-week-label{
     font-family: var(--font-mono);
     font-size: 11px;
     color: var(--text-soft);
     margin-bottom: 12px;
-  }
-  .fit-day-tabs{
-    display:flex;
-    gap:2px;
-    overflow-x:auto;
-    scrollbar-width:none;
-    background: var(--bg-elevated);
-    border-radius: 12px;
-    padding: 4px;
-    margin-bottom: 16px;
-  }
-  .fit-day-tabs::-webkit-scrollbar{ display:none; }
-  .fit-day-tab{
-    flex: 1 0 auto;
-    min-width: 40px;
-    font-family: var(--font-mono);
-    font-size: 10px;
-    padding: 8px 4px 7px;
-    background: transparent;
-    border: none;
-    border-radius: 9px;
-    color: var(--text-soft);
-    cursor:pointer;
-    text-align:center;
-  }
-  .fit-day-tab .fdt-focus{ display:block; font-size:8.5px; color: var(--text-faint); margin-top:2px; text-transform:uppercase; }
-  .fit-day-tab.active{ background: var(--accent); color: #14120B; }
-  .fit-day-tab.active .fdt-focus{ color: #3A2F13; }
-  .fit-rest-note{
-    background: var(--card);
-    border-radius: 12px;
-    padding: 20px;
-    text-align:center;
-    font-family: var(--font-mono);
-    font-size: 13px;
-    color: var(--text-soft);
-  }
-  .fit-accessory-warn{
-    background: color-mix(in srgb, var(--warning) 14%, var(--card));
-    border-left: 3px solid var(--warning);
-    border-radius: 10px;
-    padding: 10px 13px;
-    font-size: 12.5px;
-    color: var(--text);
-    margin-bottom: 14px;
-  }
-  .fit-ex-card{
-    background: var(--card);
-    border-radius: 12px;
-    padding: 13px 14px;
-    margin-bottom: 10px;
-  }
-  .fit-ex-top{ display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:4px; }
-  .fit-ex-name{ font-size: 14.5px; font-weight:500; color: var(--text); }
-  .fit-ex-target{ font-family: var(--font-mono); font-size: 10px; color: var(--text-soft); margin-top:2px; }
-  .fit-ex-type{
-    font-family: var(--font-mono);
-    font-size: 8px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    padding: 2px 6px;
-    border-radius: 4px;
-    border: 1px solid var(--border);
-    color: var(--text-soft);
-    flex:0 0 auto;
-  }
-  .fit-ex-del{ background:none; border:none; color:var(--text-faint); font-size:15px; cursor:pointer; padding:0 2px; flex:0 0 auto; }
-  .fit-set-row{
-    display:flex; align-items:center; gap:8px;
-    margin-top: 8px;
-  }
-  .fit-set-label{ font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); width:34px; flex:0 0 auto; }
-  .fit-set-row input{
-    width: 64px;
-    font-family: var(--font-mono);
-    font-size: 13px;
-    border: 1px solid var(--border);
-    border-radius: 7px;
-    padding: 7px 8px;
-    background: var(--bg-elevated);
-    color: var(--text);
-    text-align:center;
-  }
-  .fit-set-row .fit-x{ color: var(--text-faint); font-size:11px; }
-  .fit-progression{
-    margin-top: 10px;
-    padding: 8px 10px;
-    border-radius: 8px;
-    font-family: var(--font-mono);
-    font-size: 11px;
-  }
-  .fit-progression.progress{ background: color-mix(in srgb, var(--success) 16%, transparent); color:var(--success); }
-  .fit-progression.hold{ background: color-mix(in srgb, var(--warning) 16%, transparent); color:var(--warning); }
-  .fit-progression.maintain{ background: color-mix(in srgb, var(--text-soft) 14%, transparent); color: var(--text-soft); }
-  .fit-progression.drop{ background: color-mix(in srgb, var(--error) 16%, transparent); color:var(--error); }
-  .fit-history{ font-family: var(--font-mono); font-size: 9.5px; color: var(--text-faint); margin-top:6px; }
-  .fit-coach-notes{ margin-top: 18px; }
-  .fit-coach-notes label{
-    display:block;
-    font-family: var(--font-mono);
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-faint);
-    margin-bottom: 6px;
-  }
-  .fit-coach-notes textarea{
-    width:100%;
-    font-family: var(--font-body);
-    font-size: 13px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 10px 12px;
-    background: var(--card);
-    color: var(--text);
-    resize: vertical;
-    min-height: 70px;
   }
 
   /* ---- More overflow sheet ---- */
@@ -1727,7 +1611,7 @@
   }
   .wg-empty{ font-size:11px; color: var(--text-faint); padding-left:7px; }
 
-  main, #calendarSection, #tasksSection, #habitsSection, #listsSection, #longGoalsSection, #dashboardSection, #fitnessSection, #budgetSection, #journalSection, #scoresSection, #settingsSection, #emailSection{ padding: 16px 18px 0; position:relative; z-index:1; }
+  main, #calendarSection, #tasksSection, #habitsSection, #listsSection, #longGoalsSection, #dashboardSection, #budgetSection, #journalSection, #scoresSection, #settingsSection, #emailSection{ padding: 16px 18px 0; position:relative; z-index:1; }
 
   #tabViewport{
     overflow-x: hidden;

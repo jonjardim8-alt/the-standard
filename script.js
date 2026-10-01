@@ -1365,257 +1365,6 @@
   }
   migrateGymHabitToManual();
 
-  // Fall Split — seeded once from what's known so far. Mon/Tue/Wed start
-  // with their named strength lift; the rest is left empty for the full
-  // split to be added via the Fitness tab's + button.
-  const DEFAULT_FITNESS_SPLIT = {
-    startDate: '2026-08-31',
-    endDate: '2026-10-19',
-    days: {
-      Mon: { focus:'Chest', exercises:[
-        { id:'ex-db-bench',          name:'DB Bench Press',       type:'strength',    sets:4, repMin:4,  repMax:6 },
-        { id:'ex-cable-press-around',name:'Cable Press Around',   type:'hypertrophy', sets:3, repMin:12, repMax:15 },
-        { id:'ex-incline-db-press',  name:'Incline DB Press',     type:'hypertrophy', sets:3, repMin:8,  repMax:10 },
-        { id:'ex-pec-deck',          name:'Pec Deck',             type:'hypertrophy', sets:3, repMin:10, repMax:12 },
-        { id:'ex-cable-lat-raise',   name:'Cable Lateral Raise',  type:'accessory',   sets:3, repMin:12, repMax:15 },
-        { id:'ex-bench-press',       name:'Bench Press',          type:'strength',    sets:3, repMin:6,  repMax:6 },
-        { id:'ex-pushups',           name:'Pushups',              type:'hypertrophy', sets:3, repMin:10, repMax:10 },
-        { id:'ex-db-lat-raise',      name:'DB Lat Raises',        type:'accessory',   sets:3, repMin:12, repMax:12 },
-        { id:'ex-tricep-pulldown',   name:'Tricep Pulldown',      type:'accessory',   sets:2, repMin:15, repMax:15 },
-      ]},
-      Tue: { focus:'Back', exercises:[
-        { id:'ex-bb-row',            name:'Barbell Row',          type:'strength',    sets:4, repMin:4,  repMax:6 },
-        { id:'ex-sa-lat-pulldown',   name:'SA Lat Pulldown',      type:'hypertrophy', sets:3, repMin:8,  repMax:10 },
-        { id:'ex-low-row-machine',   name:'Low Row Machine',      type:'hypertrophy', sets:3, repMin:10, repMax:12 },
-        { id:'ex-cable-row',         name:'Cable Row',            type:'hypertrophy', sets:3, repMin:10, repMax:12 },
-        { id:'ex-face-pull',         name:'Face Pull',            type:'accessory',   sets:3, repMin:12, repMax:15 },
-        { id:'ex-rear-delt-fly',     name:'Rear Delt Fly',        type:'accessory',   sets:3, repMin:15, repMax:20 },
-      ]},
-      Wed: { focus:'Legs', exercises:[
-        { id:'ex-pendulum-squat',    name:'Pendulum Squat',       type:'strength',    sets:4, repMin:4,  repMax:6 },
-        { id:'ex-bulgarian-split',   name:'Bulgarian Split Squat',type:'hypertrophy', sets:3, repMin:8,  repMax:8 },
-        { id:'ex-rdl',               name:'Romanian Deadlift',    type:'hypertrophy', sets:3, repMin:8,  repMax:10 },
-        { id:'ex-ham-curl',          name:'Hamstring Curl',       type:'hypertrophy', sets:3, repMin:10, repMax:12 },
-        { id:'ex-leg-extension',     name:'Leg Extension',        type:'hypertrophy', sets:3, repMin:12, repMax:15 },
-        { id:'ex-calf-raise',        name:'Calf Raise',           type:'hypertrophy', sets:3, repMin:10, repMax:15 },
-      ]},
-      Thu: { focus:'Arms', exercises:[
-        { id:'ex-oh-tricep-ext',     name:'Overhead Tricep Extension', type:'hypertrophy', sets:3, repMin:10, repMax:12 },
-        { id:'ex-cable-pushdown',    name:'Cable Pushdown',       type:'hypertrophy', sets:3, repMin:10, repMax:12 },
-        { id:'ex-cable-kickback',    name:'Cable Kickback',       type:'hypertrophy', sets:3, repMin:12, repMax:15 },
-        { id:'ex-ez-curl',           name:'EZ Bar Curl',          type:'hypertrophy', sets:3, repMin:8,  repMax:10 },
-        { id:'ex-hammer-curl',       name:'Hammer Curls',         type:'hypertrophy', sets:3, repMin:10, repMax:12 },
-        { id:'ex-cable-curl',        name:'Cable Curl',           type:'hypertrophy', sets:3, repMin:12, repMax:15 },
-      ]},
-      Fri: { focus:'Accessory', exercises:[
-        { id:'ex-machine-shoulder',  name:'Machine Shoulder Press', type:'accessory', sets:3, repMin:10, repMax:12 },
-        { id:'ex-cable-y-raise',     name:'Cable Y-Raise',        type:'accessory',   sets:3, repMin:15, repMax:15 },
-        { id:'ex-cable-crunch',      name:'Cable Crunch Machine', type:'accessory',   sets:3, repMin:12, repMax:15 },
-        { id:'ex-hanging-leg-raise', name:'Hanging Leg Raise',    type:'accessory',   sets:3, repMin:12, repMax:15 },
-        { id:'ex-db-shoulder-press', name:'DB Shoulder Press',    type:'accessory',   sets:3, repMin:10, repMax:12 },
-        { id:'ex-wrist-curl',        name:'Wrist Curls',          type:'accessory',   sets:2, repMin:15, repMax:15 },
-      ]},
-      Sat: { focus:'Rest', exercises:[] },
-      Sun: { focus:'Rest', exercises:[] },
-    }
-  };
-  function seedFitnessSplit(){
-    if(!state.seedFlags) state.seedFlags = {};
-    if(state.seedFlags.fitnessSplitSeeded) return;
-    if(!state.fitnessSplit) state.fitnessSplit = JSON.parse(JSON.stringify(DEFAULT_FITNESS_SPLIT));
-    state.seedFlags.fitnessSplitSeeded = true;
-    save();
-  }
-  seedFitnessSplit();
-
-  // Fall Split sessions pulled in from Notion as they get logged. Each
-  // entry is applied once and tracked by date in
-  // state.seedFlags.fallSplitImportedDates so re-running this on a later
-  // load only picks up newly-added entries.
-  const FALL_SPLIT_SESSIONS = [
-    { date: '2026-08-31', exercises: {
-      'ex-db-bench':           [{weight:90,reps:6},{weight:90,reps:6},{weight:90,reps:6},{weight:90,reps:6}],
-      'ex-cable-press-around': [{weight:65,reps:15},{weight:65,reps:15},{weight:65,reps:15}],
-      'ex-incline-db-press':   [{weight:75,reps:9},{weight:75,reps:8},{weight:75,reps:8}],
-      'ex-pec-deck':           [{weight:100,reps:12},{weight:100,reps:12},{weight:100,reps:12}],
-      'ex-cable-lat-raise':    [{weight:40,reps:15},{weight:40,reps:14},{weight:40,reps:''}],
-    }, coachNotes: "DB press was difficult but I hit the top range of each. Could tell my chest was tired during incline DB at the end of those sets. Pec deck felt solid at 100 lbs — could've maybe done 110 but probably wouldn't have swept 12s, so I didn't want to push it first week." },
-
-    { date: '2026-09-01', exercises: {
-      'ex-bb-row':          [{weight:135,reps:6},{weight:135,reps:6},{weight:145,reps:6},{weight:145,reps:6}],
-      'ex-sa-lat-pulldown': [{weight:155,reps:10},{weight:155,reps:10},{weight:155,reps:9}],
-      'ex-low-row-machine': [{weight:200,reps:12},{weight:200,reps:11},{weight:200,reps:10}],
-      'ex-cable-row':       [{weight:140,reps:12},{weight:140,reps:12},{weight:140,reps:11}],
-      'ex-face-pull':       [{weight:95,reps:15},{weight:95,reps:15},{weight:95,reps:15}],
-      'ex-rear-delt-fly':   [{weight:95,reps:20},{weight:95,reps:18},{weight:95,reps:15}],
-    }, coachNotes: "First two sets of barbell rows were with 135 lbs and the last two sets were with 145 lbs. I can definitely do 155 lbs next week. Did two sets of cable rows before low rows because someone was on the machine. Cable rows feel very good mind muscle connection wise.\n\nCoach: Strong Fall Split debut. Barbell row is a natural fit — bumping mid-session was the right call and 155 is confirmed for Week 2. Cable row mind-muscle connection is a great sign for long-term lat development. SA lat pulldown and rear delt fly both one rep short on the last set — that's the target to chase next week. Face pulls swept clean at 95, moving to 100. Full session completed, all 6 exercises logged. This is the standard." },
-
-    { date: '2026-09-02', exercises: {
-      'ex-pendulum-squat':  [{weight:185,reps:6},{weight:185,reps:6},{weight:185,reps:6},{weight:185,reps:6}],
-      'ex-bulgarian-split': [{weight:60,reps:8},{weight:60,reps:8},{weight:60,reps:8}],
-      'ex-rdl':             [{weight:170,reps:10},{weight:170,reps:10},{weight:170,reps:9}],
-      'ex-ham-curl':        [{weight:140,reps:12},{weight:140,reps:12},{weight:140,reps:10}],
-      'ex-leg-extension':   [{weight:165,reps:15},{weight:165,reps:15},{weight:165,reps:13}],
-      'ex-calf-raise':      [{weight:170,reps:15},{weight:170,reps:15},{weight:170,reps:15}],
-    }, coachNotes: "5 minute warmup on the bike. Can definitely move up to 195 lbs next with pendulum squats. Leaning more forward with bulgarians for this split to target glutes more.\n\nCoach: Best legs opening session of any block. Pendulum squat is a natural fit — smart bump to 185 and sweeping it clean confirms 195 for Week 2. Glute-focused BSS lean is a smart adjustment, keep it consistent. RDL one rep short on the last set — that's the target next week. Hamstring curl and leg extension both dropped on the last set at new/held weights — expected, just chase the full sweep. Calf raise swept clean, moving to 180. Bike warmup is a great habit, keep it every session. 9.5/10." },
-
-    { date: '2026-09-03', exercises: {
-      'ex-oh-tricep-ext':  [{weight:110,reps:12},{weight:110,reps:12},{weight:110,reps:10}],
-      'ex-cable-pushdown': [{weight:90,reps:12},{weight:90,reps:12},{weight:90,reps:10}],
-      'ex-cable-kickback': [{weight:20,reps:15},{weight:20,reps:14},{weight:20,reps:13}],
-      'ex-ez-curl':        [{weight:60,reps:10},{weight:60,reps:10},{weight:60,reps:10}],
-      'ex-hammer-curl':    [{weight:35,reps:10},{weight:35,reps:10},{weight:35,reps:9}],
-      'ex-cable-curl':     [{weight:50,reps:15},{weight:60,reps:15},{weight:70,reps:''}],
-    }, coachNotes: "I did cable overhead extensions because I'm working out at a different gym than usual today." },
-
-    { date: '2026-09-04', exercises: {
-      'ex-db-shoulder-press': [{weight:60,reps:12},{weight:60,reps:12},{weight:60,reps:12}],
-      'ex-cable-y-raise':     [{weight:15,reps:15},{weight:15,reps:15},{weight:15,reps:13}],
-      'ex-cable-crunch':      [{weight:70,reps:15},{weight:70,reps:15},{weight:70,reps:15}],
-      'ex-hanging-leg-raise': [{weight:0,reps:15},{weight:0,reps:15},{weight:0,reps:15}],
-      'ex-wrist-curl':        [{weight:15,reps:15},{weight:15,reps:1}],
-    }, coachNotes: "Had to do DB shoulder press because i went to my neighborhood gym because my regular gym was closed. Kept legs bent on leg raises because i dont have a strong enough core yet.\n\nCoach: Solid Fall Split accessory debut. DB shoulder press swept clean at 60 lbs — good neighborhood gym substitute, machine press at 100 lbs when back at regular gym. Cable Y-raise held at 15, chase 15/15/15 next week. Cable crunch started conservatively at 70 — smart, bumping to 80. Hanging leg raises swept with bent knees — correct approach, straight legs will come as core strengthens. Wrist curls swept clean at 15. Mobility completed. Full session done — this is the standard. 9/10." },
-
-    { date: '2026-09-07', exercises: {
-      'ex-db-bench':           [{weight:90,reps:6},{weight:90,reps:6},{weight:90,reps:6},{weight:90,reps:6}],
-      'ex-cable-press-around': [{weight:70,reps:15},{weight:70,reps:15},{weight:70,reps:13}],
-      'ex-incline-db-press':   [{weight:75,reps:10},{weight:75,reps:10},{weight:75,reps:8}],
-      'ex-pec-deck':           [{weight:110,reps:12},{weight:110,reps:12},{weight:110,reps:10}],
-      'ex-cable-lat-raise':    [{weight:40,reps:15},{weight:40,reps:15},{weight:40,reps:15}],
-    }, coachNotes: "My chest felt fried by the end of incline db press. Surprised i was able to do pec deck as well as i did." },
-
-    { date: '2026-09-08', exercises: {
-      'ex-bb-row':          [{weight:155,reps:6},{weight:155,reps:6},{weight:155,reps:6},{weight:155,reps:6}],
-      'ex-sa-lat-pulldown': [{weight:155,reps:10},{weight:155,reps:10},{weight:155,reps:9}],
-      'ex-low-row-machine': [{weight:200,reps:12},{weight:200,reps:12},{weight:200,reps:11}],
-      'ex-cable-row':       [{weight:150,reps:12},{weight:150,reps:12},{weight:150,reps:11}],
-      'ex-face-pull':       [{weight:100,reps:15},{weight:100,reps:15},{weight:100,reps:15}],
-      'ex-rear-delt-fly':   [{weight:95,reps:20},{weight:95,reps:18},{weight:95,reps:16}],
-    }, coachNotes: "Coach: Elite session. Barbell row swept 155 clean — biggest strength jump of the block so far, moving to 165. SA lat pulldown, low row, and cable row all one rep short on the last set — that's the theme to fix in Week 3. Face pull swept 100 clean, moving to 105. Rear delt fly completed all three sets within range — hold at 95 and tighten the last set. Full session, all 6 exercises logged. 9.5/10." },
-
-    { date: '2026-09-09', exercises: {
-      'ex-pendulum-squat':  [{weight:195,reps:6},{weight:195,reps:6},{weight:195,reps:6},{weight:195,reps:6}],
-      'ex-bulgarian-split': [{weight:65,reps:8},{weight:65,reps:8},{weight:65,reps:8}],
-      'ex-rdl':             [{weight:170,reps:10},{weight:170,reps:10},{weight:170,reps:10}],
-      'ex-ham-curl':        [{weight:140,reps:12},{weight:140,reps:12},{weight:140,reps:10}],
-      'ex-leg-extension':   [{weight:165,reps:15},{weight:165,reps:15},{weight:165,reps:14}],
-      'ex-calf-raise':      [{weight:180,reps:15},{weight:180,reps:15},{weight:180,reps:13}],
-    }, coachNotes: "Can definitely move up on pendulum. Struggled on split squats. Did one set of leg extensions before leg curls because someone was on the machine.\n\nCoach: One of the best legs sessions of any block. Pendulum squat swept 195 clean for the second week in a row — moving to 205, the strength scheme is delivering. BSS swept despite struggling — that's mental toughness, moving to 70. RDL finally hit 10/10/10 — best performance of any block, moving to 175. Hamstring curl dropped on last set again — same pattern, hold at 140 and fix that third set. Leg extension one rep short — hold at 165. Calf raise held up well at a big new weight — hold at 180, tighten the last set. Smart adaptation on leg extension when machine was taken. 9.5/10." },
-
-    { date: '2026-09-10', exercises: {
-      'ex-oh-tricep-ext':  [{weight:165,reps:12},{weight:165,reps:12},{weight:165,reps:12}],
-      'ex-cable-pushdown': [{weight:90,reps:12},{weight:90,reps:12},{weight:90,reps:11}],
-      'ex-cable-kickback': [{weight:25,reps:15},{weight:25,reps:15},{weight:25,reps:15}],
-      'ex-ez-curl':        [{weight:60,reps:10},{weight:60,reps:10},{weight:60,reps:10}],
-      'ex-hammer-curl':    [{weight:35,reps:12},{weight:35,reps:12},{weight:35,reps:11}],
-      'ex-cable-curl':     [{weight:65,reps:15},{weight:65,reps:15},{weight:65,reps:13}],
-    }, coachNotes: "Coach: Best arms session of the Fall Split. Back at home gym and it showed — overhead extension swept 165 clean, moving to 170. Cable pushdown one rep short on last set — hold at 90, fix the form first. Cable kickback swept clean, moving to 30. EZ bar curl swept clean for the second week — moving to 65. Hammer curls and cable curl both one rep short on last set — hold both, chase the full sweep. Full session completed, all 6 exercises logged. 9.5/10." },
-
-    { date: '2026-09-11', exercises: {
-      'ex-machine-shoulder':  [{weight:80,reps:12},{weight:80,reps:12},{weight:80,reps:12}],
-      'ex-cable-y-raise':     [{weight:15,reps:15},{weight:15,reps:15},{weight:15,reps:15}],
-      'ex-cable-crunch':      [{weight:80,reps:15},{weight:80,reps:15},{weight:80,reps:15}],
-      'ex-hanging-leg-raise': [{weight:0,reps:15},{weight:0,reps:15},{weight:0,reps:15}],
-      'ex-wrist-curl':        [{weight:15,reps:15},{weight:15,reps:15},{weight:15,reps:15}],
-    }, coachNotes: "Can go up 10 lbs on crunches.\n\nCoach: First perfect 10 of the Fall Split. Every exercise swept clean, mobility completed, full session logged. Machine shoulder press swept at 80 — moving to 90. Cable Y-raise swept, moving to 20. Cable crunch machine maxed the rep range — moving to 90 as you called. Hanging leg raises swept — try to straighten the legs next week. Wrist curls swept clean, moving to 20. This is the standard for accessory day. 10/10." },
-
-    { date: '2026-09-14', exercises: {
-      'ex-db-bench':           [{weight:95,reps:6},{weight:95,reps:6},{weight:95,reps:6},{weight:95,reps:6}],
-      'ex-cable-press-around': [{weight:70,reps:15},{weight:70,reps:15},{weight:70,reps:15}],
-      'ex-incline-db-press':   [{weight:75,reps:10},{weight:75,reps:10},{weight:75,reps:10}],
-      'ex-pec-deck':           [{weight:110,reps:12},{weight:110,reps:12},{weight:110,reps:12}],
-      'ex-cable-lat-raise':    [{weight:45,reps:15},{weight:45,reps:15},{weight:45,reps:''}],
-    }, coachNotes: "Maybe one more week with 95 lbs for flat db press as it was my first week. Still felt really good though. Can probably jump 10-15 lbs on pec deck." },
-
-    { date: '2026-09-15', exercises: {
-      'ex-bb-row':          [{weight:165,reps:6},{weight:165,reps:6},{weight:165,reps:6},{weight:165,reps:6}],
-      'ex-sa-lat-pulldown': [{weight:155,reps:10},{weight:155,reps:10},{weight:155,reps:9}],
-      'ex-low-row-machine': [{weight:200,reps:12},{weight:200,reps:12},{weight:200,reps:12}],
-      'ex-cable-row':       [{weight:150,reps:12},{weight:150,reps:12},{weight:150,reps:12}],
-      'ex-face-pull':       [{weight:105,reps:15},{weight:105,reps:15},{weight:105,reps:15}],
-      'ex-rear-delt-fly':   [{weight:95,reps:20},{weight:95,reps:20},{weight:95,reps:''}],
-    }, coachNotes: "Last 2 reps of last set of barbell rows were slightly cheated by some extra body motion. Nothing too crazy though still solid overall form. Did one set of cable rows before low row machine because someone was on it." },
-
-    { date: '2026-09-21', exercises: {
-      'ex-bench-press':        [{weight:225,reps:6},{weight:225,reps:6},{weight:225,reps:6}],
-      'ex-cable-press-around': [{weight:35,reps:15},{weight:35,reps:15},{weight:35,reps:15}],
-      'ex-incline-db-press':   [{weight:75,reps:10},{weight:75,reps:10},{weight:75,reps:10}],
-      'ex-pushups':            [{weight:0,reps:10},{weight:0,reps:10},{weight:0,reps:10}],
-      'ex-db-lat-raise':       [{weight:15,reps:12},{weight:15,reps:12},{weight:15,reps:12}],
-      'ex-tricep-pulldown':    [{weight:60,reps:15},{weight:60,reps:15}],
-    }, coachNotes: '' },
-
-    { date: '2026-09-22', exercises: {
-      'ex-bb-row':          [{weight:175,reps:6},{weight:175,reps:6},{weight:175,reps:6},{weight:175,reps:6}],
-      'ex-sa-lat-pulldown': [{weight:155,reps:10},{weight:155,reps:10},{weight:155,reps:10}],
-      'ex-low-row-machine': [{weight:205,reps:12},{weight:205,reps:12},{weight:205,reps:12}],
-      'ex-cable-row':       [{weight:155,reps:12},{weight:155,reps:12},{weight:155,reps:12}],
-      'ex-face-pull':       [{weight:110,reps:15},{weight:110,reps:15},{weight:110,reps:15}],
-      'ex-rear-delt-fly':   [{weight:95,reps:18},{weight:95,reps:15},{weight:95,reps:12}],
-    }, coachNotes: '' },
-
-    { date: '2026-09-23', exercises: {
-      'ex-pendulum-squat':  [{weight:205,reps:6},{weight:205,reps:6},{weight:205,reps:6},{weight:205,reps:6}],
-      'ex-bulgarian-split': [{weight:70,reps:8},{weight:70,reps:8},{weight:70,reps:8}],
-    }, coachNotes: "I wasn’t feeling the best and I’m going to Disney tonight so I'll be doing a lot of moving so I decided to cut it short and just do pendulum and bulgarian" },
-
-    { date: '2026-09-28', exercises: {
-      'ex-db-bench':           [{weight:95,reps:6},{weight:95,reps:6},{weight:95,reps:6},{weight:95,reps:6}],
-      'ex-cable-press-around': [{weight:70,reps:15},{weight:70,reps:15},{weight:70,reps:15}],
-      'ex-incline-db-press':   [{weight:75,reps:10},{weight:75,reps:10},{weight:75,reps:9}],
-      'ex-pec-deck':           [{weight:110,reps:12},{weight:110,reps:12},{weight:110,reps:12}],
-      'ex-cable-lat-raise':    [{weight:45,reps:15},{weight:45,reps:15},{weight:45,reps:15}],
-    }, coachNotes: "Coach: Best complete chest session of the Fall Split. DB bench swept 95 clean — new PR territory, moving to 100. Cable press around, pec deck, and lateral raise all swept clean — all moving up. Incline one rep short on the last set — holding at 75, need a clean 10/10/10 before progressing. Post-workout stretch completed, good habit as the weights climb. 9.5/10." },
-
-    { date: '2026-09-29', exercises: {
-      'ex-bb-row':          [{weight:185,reps:6},{weight:185,reps:6},{weight:185,reps:5},{weight:185,reps:4}],
-      'ex-sa-lat-pulldown': [{weight:160,reps:10},{weight:160,reps:9},{weight:160,reps:9}],
-      'ex-low-row-machine': [{weight:210,reps:12},{weight:210,reps:12},{weight:210,reps:11}],
-      'ex-cable-row':       [{weight:160,reps:12},{weight:160,reps:12},{weight:160,reps:11}],
-      'ex-face-pull':       [{weight:115,reps:15},{weight:115,reps:15},{weight:115,reps:13}],
-      'ex-rear-delt-fly':   [{weight:95,reps:20},{weight:95,reps:19},{weight:95,reps:17}],
-    }, coachNotes: "Post-Workout Stretch (5 min):\nCat-Cow — 45 sec\nChild's Pose — 45 sec\nKnee-to-Chest Stretch — 30 sec each leg\nDoorway Lat Stretch — 30 sec each side\nThread the Needle — 30 sec each side\nSeated Spinal Twist — 30 sec each side\n\nCoach: Solid session across the board. Barbell row hit 6/6/5/4 at 185 lbs — entirely within the 4-6 rep target range, holding here until a clean 6/6/6/6 is hit before pushing further. SA lat pulldown, low row, and cable row all one rep short on the last set — same pattern as recent weeks, holding all three. Face pull two clean sets with fatigue on the third — holding. Rear delt fly at the top of the 15-20 range across all three sets — moving up to 100. 9/10." },
-
-    { date: '2026-09-30', exercises: {
-      'ex-pendulum-squat':  [{weight:215,reps:6},{weight:215,reps:6},{weight:215,reps:6},{weight:215,reps:6}],
-      'ex-bulgarian-split': [{weight:75,reps:8},{weight:75,reps:8},{weight:75,reps:8}],
-      'ex-rdl':             [{weight:175,reps:10},{weight:175,reps:10},{weight:175,reps:10}],
-      'ex-ham-curl':        [{weight:140,reps:12},{weight:140,reps:12},{weight:140,reps:12}],
-      'ex-leg-extension':   [{weight:165,reps:15},{weight:165,reps:15},{weight:165,reps:15}],
-      'ex-calf-raise':      [{weight:180,reps:15},{weight:180,reps:15},{weight:180,reps:15}],
-    }, coachNotes: "Post-Workout Stretch (5 min):\nCouch Stretch — 30 sec each leg\nStanding Quad Stretch — 30 sec each leg\nStanding Hamstring Stretch — 30 sec each leg\nFigure-4 Glute Stretch — 30 sec each leg\nWall Calf Stretch — 30 sec each leg\nChild's Pose — 30 sec\n\nCoach: Perfect session, every exercise swept clean. Pendulum squat hit 215 clean — moving to 225. BSS, RDL, hamstring curl, leg extension, and calf raise all swept too — all moving up. Second perfect 10 of the Fall Split. This is what a fully dialed-in session looks like. 10/10." },
-  ];
-  function importFallSplitSessions(){
-    if(!state.seedFlags) state.seedFlags = {};
-    if(!state.seedFlags.fallSplitImportedDates) state.seedFlags.fallSplitImportedDates = {};
-    if(!state.seedFlags.fallSplitDaysReset && state.fitnessSplit){
-      state.fitnessSplit.days = JSON.parse(JSON.stringify(DEFAULT_FITNESS_SPLIT.days));
-      state.seedFlags.fallSplitDaysReset = true;
-    }
-    let changed = false;
-    FALL_SPLIT_SESSIONS.forEach(session => {
-      if(state.seedFlags.fallSplitImportedDates[session.date]) return;
-      if(!state.workoutLogs[session.date]) state.workoutLogs[session.date] = { exercises: {} };
-      state.workoutLogs[session.date].exercises = Object.assign(state.workoutLogs[session.date].exercises || {}, session.exercises);
-      state.workoutLogs[session.date].coachNotes = session.coachNotes;
-      state.seedFlags.fallSplitImportedDates[session.date] = true;
-      changed = true;
-    });
-    if(changed) save();
-  }
-  importFallSplitSessions();
-
-  function markSaturdayRest(){
-    if(!state.seedFlags) state.seedFlags = {};
-    if(state.seedFlags.saturdayRestSet) return;
-    if(state.fitnessSplit && state.fitnessSplit.days){
-      state.fitnessSplit.days.Sat = { focus:'Rest', exercises:[] };
-    }
-    state.seedFlags.saturdayRestSet = true;
-    save();
-  }
-  markSaturdayRest();
-
   seedBudgetTransactions();
   importHistoricalBudgetTransactions();
   seedSeptemberBudgetLimits();
@@ -1625,7 +1374,7 @@
   let weekAnchor = startOfWeek(new Date());
   let activeDay = new Date().getDay();
   let view = 'block';
-  let currentSection = 'dashboard'; // 'dashboard' | 'calendar' | 'tasks' | 'lists' | 'habits' | 'longgoals' | 'fitness'
+  let currentSection = 'dashboard'; // 'dashboard' | 'calendar' | 'tasks' | 'lists' | 'habits' | 'longgoals'
   let filterCats = new Set(CATEGORIES.map(c => c.id));
   let menuOpenForCat = null;
   let taskSubView = 'today'; // 'today' | 'upcoming'
@@ -1688,8 +1437,6 @@
           if(!parsed.allDayEvents) parsed.allDayEvents = [];
           if(!parsed.lists) parsed.lists = [];
           if(!parsed.longTermGoals) parsed.longTermGoals = [];
-          if(!parsed.fitnessSplit) parsed.fitnessSplit = null;
-          if(!parsed.workoutLogs) parsed.workoutLogs = {};
           if(!parsed.budgetTransactions) parsed.budgetTransactions = [];
           if(!parsed.categoryBudgetLimits) parsed.categoryBudgetLimits = {};
           if(!parsed.journalEntries) parsed.journalEntries = {};
@@ -1740,7 +1487,7 @@
       items, workOff: {}, tasks: [], healthLog: {}, seedFlags: {}, datedEvents: {},
       dailyGoals: [], weeklyGoals: [], dailyGoalLog: {}, weeklyGoalLog: {},
       allDayEvents: [], lists: [], longTermGoals: [],
-      fitnessSplit: null, workoutLogs: {}, budgetTransactions: [], categoryBudgetLimits: {},
+      budgetTransactions: [], categoryBudgetLimits: {},
       journalEntries: {},
       scoreOptIn: { budget: false },
       blockedSenders: [],
@@ -3808,7 +3555,6 @@
       const s = computeScores();
       const cards = [
         { key:'core',    title:'Core productivity', note:'Habits, tasks, and weekly goals — last 7 days.' },
-        { key:'fitness', title:'Fitness',            note:'Workout days with real reps logged — last 7 days.' },
         { key:'journal', title:'Journal',            note:'Days with a journal entry — last 7 days.' },
         { key:'budget',  title:'Budget',             note:'Days within category limits this month.' },
       ];
@@ -4018,278 +3764,6 @@
     `;
     tile.onclick = () => openDashDetailModal(opts.title, opts.renderBody);
     return tile;
-  }
-
-  /* ---------------- Fitness ---------------- */
-
-  let fitnessSelectedDay = DAYS[new Date().getDay()];
-  const EXERCISE_TYPES = [
-    { id:'strength',    label:'Strength' },
-    { id:'hypertrophy', label:'Hypertrophy' },
-    { id:'accessory',   label:'Accessory' },
-  ];
-
-  function currentSplitWeekNumber(){
-    if(!state.fitnessSplit) return null;
-    const start = dateFromStr(state.fitnessSplit.startDate);
-    const now = new Date(); now.setHours(0,0,0,0);
-    const daysIn = Math.floor((now - start) / 86400000);
-    if(daysIn < 0) return 0; // hasn't started yet
-    return Math.min(8, Math.floor(daysIn / 7) + 1);
-  }
-
-  // Most recent logged sets for a given exercise, most-recent-first.
-  function getExerciseHistory(exerciseId, beforeDateStr){
-    const dates = Object.keys(state.workoutLogs)
-      .filter(d => !beforeDateStr || d < beforeDateStr)
-      .sort((a,b) => b.localeCompare(a));
-    const history = [];
-    dates.forEach(d => {
-      const log = state.workoutLogs[d];
-      if(log && log.exercises && log.exercises[exerciseId] && log.exercises[exerciseId].length){
-        history.push({ date: d, sets: log.exercises[exerciseId] });
-      }
-    });
-    return history;
-  }
-
-  // Applies the exact rules from the coaching prompt:
-  // progress when the rep target is fully swept; hold when the last set
-  // drops significantly; drop weight after a layoff or repeated failure.
-  function getProgressionSuggestion(exercise, sets, exerciseId){
-    const logged = sets.filter(s => s.reps !== null && s.reps !== undefined && s.reps !== '');
-    if(!logged.length) return null;
-
-    const repMin = exercise.repMin, repMax = exercise.repMax;
-    const allHitTop = logged.length >= exercise.sets && logged.every(s => Number(s.reps) >= repMax);
-    const lastSet = logged[logged.length - 1];
-    const significantDrop = Number(lastSet.reps) < (repMin - 1);
-
-    // Layoff check: more than 10 days since this exercise was last logged.
-    const history = getExerciseHistory(exerciseId, todayStr());
-    if(history.length){
-      const lastDate = dateFromStr(history[0].date);
-      const daysSince = Math.floor((new Date() - lastDate) / 86400000);
-      if(daysSince > 10){
-        return { verdict:'drop', text:'Layoff of ' + daysSince + '+ days — drop weight to ease back in.' };
-      }
-      // Two failed sessions in a row (both missed repMin somewhere)
-      const lastFailed = history[0].sets.some(s => Number(s.reps) < repMin);
-      const thisFailed = logged.some(s => Number(s.reps) < repMin);
-      if(lastFailed && thisFailed){
-        return { verdict:'drop', text:'Missed rep target two sessions running — drop weight ~10%.' };
-      }
-    }
-
-    if(allHitTop) return { verdict:'progress', text:'Full rep target swept — add weight next session.' };
-    if(significantDrop) return { verdict:'hold', text:'Last set dropped off — hold this weight next session.' };
-    return { verdict:'maintain', text:'Repeat this weight next session.' };
-  }
-
-  function renderFitnessSection(){
-    const wrap = document.getElementById('fitnessContent');
-    wrap.innerHTML = '';
-
-    if(!state.fitnessSplit){
-      wrap.innerHTML = '<div class="empty-note">No split set up yet.</div>';
-      return;
-    }
-
-    const weekNum = currentSplitWeekNumber();
-    const weekLabelText = weekNum === 0 ? 'Starts ' + fmtDate(state.fitnessSplit.startDate)
-      : weekNum > 8 ? 'Split complete'
-      : 'Fall Split — Week ' + weekNum + ' of 8';
-    const wl = document.createElement('div');
-    wl.className = 'fit-week-label';
-    wl.textContent = weekLabelText;
-    wrap.appendChild(wl);
-
-    // Day selector
-    const tabs = document.createElement('div');
-    tabs.className = 'fit-day-tabs';
-    DAYS.forEach(d => {
-      const day = state.fitnessSplit.days[d];
-      const btn = document.createElement('button');
-      btn.className = 'fit-day-tab' + (d === fitnessSelectedDay ? ' active' : '');
-      btn.innerHTML = d + '<span class="fdt-focus">' + escapeHtml(day ? day.focus : '') + '</span>';
-      btn.onclick = () => { fitnessSelectedDay = d; renderFitnessSection(); };
-      tabs.appendChild(btn);
-    });
-    wrap.appendChild(tabs);
-
-    const dayPlan = state.fitnessSplit.days[fitnessSelectedDay];
-    const dateStr = (() => {
-      // Map the selected weekday onto the real current week's date, so
-      // logging always applies to an actual calendar date.
-      const now = new Date();
-      const sunday = new Date(now); sunday.setDate(now.getDate() - now.getDay());
-      const idx = DAYS.indexOf(fitnessSelectedDay);
-      const d = new Date(sunday); d.setDate(sunday.getDate() + idx);
-      return toDateStr(d);
-    })();
-
-    if(!dayPlan || dayPlan.focus === 'Rest'){
-      const rest = document.createElement('div');
-      rest.className = 'fit-rest-note';
-      rest.textContent = 'Rest day.';
-      wrap.appendChild(rest);
-      return;
-    }
-
-    if(!state.workoutLogs[dateStr]) state.workoutLogs[dateStr] = { exercises:{}, coachNotes:'' };
-    const log = state.workoutLogs[dateStr];
-
-    // Accessory-skip flag — non-negotiable per the coaching rules.
-    const hasAccessoryPlanned = dayPlan.exercises.some(ex => ex.type === 'accessory');
-    const hasAccessoryLogged = dayPlan.exercises.some(ex => ex.type === 'accessory' && log.exercises[ex.id] && log.exercises[ex.id].some(s => s.reps));
-    if(hasAccessoryPlanned && !hasAccessoryLogged){
-      const warn = document.createElement('div');
-      warn.className = 'fit-accessory-warn';
-      warn.textContent = 'Accessory work not logged yet — non-negotiable, don\'t skip it.';
-      wrap.appendChild(warn);
-    }
-
-    if(!dayPlan.exercises.length){
-      const empty = document.createElement('div');
-      empty.className = 'empty-note';
-      empty.textContent = 'No exercises added for ' + fullDayName(fitnessSelectedDay) + ' yet — tap + to add one.';
-      wrap.appendChild(empty);
-    }
-
-    dayPlan.exercises.forEach(ex => {
-      if(!log.exercises[ex.id]) log.exercises[ex.id] = Array.from({length: ex.sets}, () => ({ weight:'', reps:'' }));
-      // If the plan's set count grew since last logged, pad it out.
-      while(log.exercises[ex.id].length < ex.sets) log.exercises[ex.id].push({ weight:'', reps:'' });
-
-      const card = document.createElement('div');
-      card.className = 'fit-ex-card';
-      const typeLabel = EXERCISE_TYPES.find(t => t.id === ex.type)?.label || ex.type;
-      card.innerHTML = `
-        <div class="fit-ex-top">
-          <div>
-            <div class="fit-ex-name">${escapeHtml(ex.name)}</div>
-            <div class="fit-ex-target">${ex.sets}×${ex.repMin}–${ex.repMax}</div>
-          </div>
-          <span class="fit-ex-type">${escapeHtml(typeLabel)}</span>
-          <button class="fit-ex-del">×</button>
-        </div>
-      `;
-      card.querySelector('.fit-ex-del').onclick = () => {
-        state.fitnessSplit.days[fitnessSelectedDay].exercises = dayPlan.exercises.filter(x => x.id !== ex.id);
-        save();
-        renderFitnessSection();
-      };
-
-      const history = getExerciseHistory(ex.id, dateStr);
-      if(history.length){
-        const h = document.createElement('div');
-        h.className = 'fit-history';
-        h.textContent = 'Last: ' + history[0].sets.map(s => (s.weight||'—') + '×' + (s.reps||'—')).join(', ') + ' (' + fmtDate(history[0].date) + ')';
-        card.appendChild(h);
-      }
-
-      log.exercises[ex.id].forEach((setEntry, i) => {
-        const row = document.createElement('div');
-        row.className = 'fit-set-row';
-        row.innerHTML = `
-          <span class="fit-set-label">Set ${i+1}</span>
-          <input type="number" placeholder="lbs" step="2.5" class="fit-weight">
-          <span class="fit-x">×</span>
-          <input type="number" placeholder="reps" class="fit-reps">
-        `;
-        row.querySelector('.fit-weight').value = setEntry.weight;
-        row.querySelector('.fit-reps').value = setEntry.reps;
-        row.querySelector('.fit-weight').addEventListener('change', (e) => {
-          setEntry.weight = e.target.value;
-          save();
-        });
-        row.querySelector('.fit-reps').addEventListener('change', (e) => {
-          setEntry.reps = e.target.value;
-          save();
-          renderFitnessSection();
-        });
-        card.appendChild(row);
-      });
-
-      const suggestion = getProgressionSuggestion(ex, log.exercises[ex.id], ex.id);
-      if(suggestion){
-        const tag = document.createElement('div');
-        tag.className = 'fit-progression ' + suggestion.verdict;
-        tag.textContent = suggestion.text;
-        card.appendChild(tag);
-      }
-
-      wrap.appendChild(card);
-    });
-
-    const notesBox = document.createElement('div');
-    notesBox.className = 'fit-coach-notes';
-    notesBox.innerHTML = '<label>Coach notes (paste your rating/feedback here)</label><textarea placeholder="e.g. 8/10 — bench felt strong, rows were shaky on set 3…"></textarea>';
-    notesBox.querySelector('textarea').value = log.coachNotes || '';
-    notesBox.querySelector('textarea').addEventListener('blur', (e) => {
-      log.coachNotes = e.target.value.trim();
-      save();
-    });
-    wrap.appendChild(notesBox);
-  }
-
-  function openAddExerciseModal(){
-    const overlay = document.getElementById('modalOverlay');
-    const content = document.getElementById('modalContent');
-    content.style.removeProperty('--chip-color');
-    let exType = 'hypertrophy';
-
-    content.innerHTML = `
-      <div class="modal-handle"></div>
-      <div class="modal-title">Add exercise — ${escapeHtml(fullDayName(fitnessSelectedDay))}</div>
-      <label>Name</label>
-      <input type="text" id="exName" placeholder="e.g. Lateral Raise" maxlength="50">
-      <label>Type</label>
-      <div class="cat-picker" id="exTypePicker"></div>
-      <label>Sets</label>
-      <input type="number" id="exSets" min="1" step="1" value="3">
-      <label>Rep range</label>
-      <div class="add-row1">
-        <input type="number" id="exRepMin" min="1" step="1" value="8" style="width:70px">
-        <span style="align-self:center; color:var(--text-faint)">to</span>
-        <input type="number" id="exRepMax" min="1" step="1" value="12" style="width:70px">
-      </div>
-      <div class="modal-actions">
-        <button class="cancel" id="exCancel">Cancel</button>
-        <button class="save" id="exSave">Save</button>
-      </div>
-    `;
-    overlay.classList.remove('hidden');
-
-    const renderTypePicker = () => {
-      const box = document.getElementById('exTypePicker');
-      box.innerHTML = '';
-      EXERCISE_TYPES.forEach(t => {
-        const opt = document.createElement('button');
-        opt.className = 'cat-option' + (exType === t.id ? ' selected' : '');
-        opt.textContent = t.label;
-        opt.onclick = () => { exType = t.id; renderTypePicker(); };
-        box.appendChild(opt);
-      });
-    };
-    renderTypePicker();
-
-    document.getElementById('exCancel').onclick = closeModal;
-    document.getElementById('exSave').onclick = () => {
-      const name = document.getElementById('exName').value.trim();
-      if(!name) return;
-      const sets = Math.max(1, parseInt(document.getElementById('exSets').value, 10) || 3);
-      const repMin = Math.max(1, parseInt(document.getElementById('exRepMin').value, 10) || 8);
-      const repMax = Math.max(repMin, parseInt(document.getElementById('exRepMax').value, 10) || 12);
-      state.fitnessSplit.days[fitnessSelectedDay].exercises.push({
-        id: 'ex-' + Date.now() + '-' + Math.random().toString(36).slice(2,7),
-        name, type: exType, sets, repMin, repMax
-      });
-      save();
-      closeModal();
-      renderAll();
-    };
-    setTimeout(() => document.getElementById('exName').focus(), 50);
   }
 
   /* ---------------- Budget ---------------- */
@@ -6699,14 +6173,13 @@
   }
 
   // Icon markup follows the brand guideline's custom set (2px stroke,
-  // rounded joins, outline treatment; bold stroke for Fitness/Budget).
+  // rounded joins, outline treatment; bold stroke for Budget).
   // Scores/Email/Settings aren't in the guideline's defined set, so
   // those three are drawn to match its conventions rather than left as
   // mismatched leftover glyphs.
   const OVERFLOW_SECTIONS = [
     { id:'lists',     icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="4.5" cy="6" r="1.3" fill="currentColor" stroke="none"/><path d="M9 6h11"/><circle cx="4.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><path d="M9 12h11"/><circle cx="4.5" cy="18" r="1.3" fill="currentColor" stroke="none"/><path d="M9 18h11"/></svg>', label:'Lists' },
     { id:'longgoals', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg>', label:'Goals' },
-    { id:'fitness',   icon:'<svg viewBox="0 0 24 24"><rect x="2" y="9.4" width="3.4" height="5.2" rx="1.4" fill="currentColor"/><rect x="18.6" y="9.4" width="3.4" height="5.2" rx="1.4" fill="currentColor"/><rect x="6" y="11" width="12" height="2" rx="1" fill="currentColor"/><rect x="6.6" y="7.4" width="2.8" height="9.2" rx="1.4" fill="currentColor"/><rect x="14.6" y="7.4" width="2.8" height="9.2" rx="1.4" fill="currentColor"/></svg>', label:'Fitness' },
     { id:'budget',    icon:'<svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="4" x2="12" y2="18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M16.5 7.2c-.9-1.6-2.7-2.5-4.5-2.5c-2.5 0-4.5 1.3-4.5 3.1c0 4 8.8 2 8.8 6c0 1.9-2 3.2-4.5 3.2c-1.9 0-3.7-.9-4.6-2.4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>', label:'Budget' },
     { id:'journal',   icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.2c-2-1.5-5-2-9-1.5v13c4-.5 7 0 9 1.5c2-1.5 5-2 9-1.5v-13c-4-.5-7 0-9 1.5z"/><path d="M12 6.2v13"/></svg>', label:'Journal' },
     { id:'scores',    icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19V11"/><path d="M12 19V5"/><path d="M19 19V14"/></svg>', label:'Scores' },
@@ -6721,8 +6194,8 @@
      Each category is a 0-100 rating: for each of the last 7 days we work
      out a 0-100 "how much of what was possible got done" value, then
      average those across the window (days where a category genuinely
-     doesn't apply — e.g. a fitness rest day, or a day with zero tasks
-     due — are left out of that category's average rather than counted
+     doesn't apply — e.g. a day with zero tasks due, or no weekly goals
+     set — are left out of that category's average rather than counted
      as a 0, so idle days don't unfairly tank the score). A category with
      no applicable days at all (e.g. no habits ever added) returns score
      null and the UI shows "–" instead of a number. Overall is the average
@@ -6775,18 +6248,6 @@
     return parts.reduce((s,v) => s + v, 0) / parts.length;
   }
 
-  // Fitness: 100 if that day's split called for a workout and one was
-  // logged, 0 if it called for one and nothing was logged. Rest days (and
-  // days before any split existed) don't apply and are excluded.
-  function fitnessDayScore(dateStr){
-    const dayAbbr = dayAbbrFromDateStr(dateStr);
-    const plan = state.fitnessSplit && state.fitnessSplit.days ? state.fitnessSplit.days[dayAbbr] : null;
-    if(!plan || !plan.exercises || !plan.exercises.length) return null;
-    const log = state.workoutLogs[dateStr];
-    const hasRealSet = !!(log && Object.values(log.exercises || {}).some(sets => sets.some(s => s.reps)));
-    return hasRealSet ? 100 : 0;
-  }
-
   // Journal: every day is eligible, so this one's never excluded.
   function journalDayScore(dateStr){
     const entry = state.journalEntries[dateStr];
@@ -6815,16 +6276,14 @@
     const limitedCats = budgetOptedIn ? Object.keys(state.categoryBudgetLimits) : [];
 
     const core    = averageOrNull(dates.map(coreDayScore));
-    const fitness = averageOrNull(dates.map(fitnessDayScore));
     const journal = averageOrNull(dates.map(journalDayScore));
     const budget  = budgetOptedIn ? averageOrNull(dates.map(d => budgetDayScore(d, limitedCats))) : null;
 
-    const overall = averageOrNull([core, fitness, journal, budget]);
+    const overall = averageOrNull([core, journal, budget]);
 
     return {
       overall: { score: overall },
       core:    { score: core },
-      fitness: { score: fitness },
       journal: { score: journal },
       budget:  { score: budget, optedIn: budgetOptedIn },
     };
@@ -6854,7 +6313,6 @@
 
     const cards = [
       { key:'core',    accent:'#5B8DEF', title:'Core productivity', note:'Habits checked off, tasks done vs. due, weekly goals hit — last 7 days.' },
-      { key:'fitness', accent:'#3CBF8C', title:'Fitness', note:'Split workout days with real reps logged — last 7 days, rest days excluded.' },
       { key:'journal', accent:'#B18CF2', title:'Journal', note:'Days with a journal entry written — last 7 days.' },
       { key:'budget',  accent:'#F2A93B', title:'Budget', note:'Days within your category limits so far this month — last 7 days.' },
     ];
@@ -7562,7 +7020,6 @@
     document.getElementById('tabViewport').style.display = isPrimary ? 'block' : 'none';
     document.getElementById('listsSection').style.display = section === 'lists' ? 'block' : 'none';
     document.getElementById('longGoalsSection').style.display = section === 'longgoals' ? 'block' : 'none';
-    document.getElementById('fitnessSection').style.display = section === 'fitness' ? 'block' : 'none';
     document.getElementById('budgetSection').style.display = section === 'budget' ? 'block' : 'none';
     document.getElementById('journalSection').style.display = section === 'journal' ? 'block' : 'none';
     document.getElementById('scoresSection').style.display = section === 'scores' ? 'block' : 'none';
@@ -7605,7 +7062,6 @@
     renderHabitsSection();
     renderListsSection();
     renderLongGoalsSection();
-    renderFitnessSection();
     renderBudgetSection();
     renderJournalSection();
     renderScoresSection();
@@ -7641,14 +7097,13 @@
     else if(currentSection === 'lists') openAddListModal();
     else if(currentSection === 'habits') openAddHabitModal();
     else if(currentSection === 'longgoals') openAddLongGoalModal();
-    else if(currentSection === 'fitness') openAddExerciseModal();
     else if(currentSection === 'budget') openAddTransactionModal();
   };
 
   (function setupSwipeNav(){
     const track = document.getElementById('tabTrack');
     const viewport = document.getElementById('tabViewport');
-    const EDGE_EXCLUDE_SELECTOR = '.day-tabs, .legend, .fit-day-tabs, .cat-picker';
+    const EDGE_EXCLUDE_SELECTOR = '.day-tabs, .legend, .cat-picker';
     let startX = 0, startY = 0, dragging = false, locked = false, baseIdx = 0;
 
     function isBlocked(target){
