@@ -1575,6 +1575,15 @@
       'ex-face-pull':       [{weight:115,reps:15},{weight:115,reps:15},{weight:115,reps:13}],
       'ex-rear-delt-fly':   [{weight:95,reps:20},{weight:95,reps:19},{weight:95,reps:17}],
     }, coachNotes: "Post-Workout Stretch (5 min):\nCat-Cow — 45 sec\nChild's Pose — 45 sec\nKnee-to-Chest Stretch — 30 sec each leg\nDoorway Lat Stretch — 30 sec each side\nThread the Needle — 30 sec each side\nSeated Spinal Twist — 30 sec each side\n\nCoach: Solid session across the board. Barbell row hit 6/6/5/4 at 185 lbs — entirely within the 4-6 rep target range, holding here until a clean 6/6/6/6 is hit before pushing further. SA lat pulldown, low row, and cable row all one rep short on the last set — same pattern as recent weeks, holding all three. Face pull two clean sets with fatigue on the third — holding. Rear delt fly at the top of the 15-20 range across all three sets — moving up to 100. 9/10." },
+
+    { date: '2026-09-30', exercises: {
+      'ex-pendulum-squat':  [{weight:215,reps:6},{weight:215,reps:6},{weight:215,reps:6},{weight:215,reps:6}],
+      'ex-bulgarian-split': [{weight:75,reps:8},{weight:75,reps:8},{weight:75,reps:8}],
+      'ex-rdl':             [{weight:175,reps:10},{weight:175,reps:10},{weight:175,reps:10}],
+      'ex-ham-curl':        [{weight:140,reps:12},{weight:140,reps:12},{weight:140,reps:12}],
+      'ex-leg-extension':   [{weight:165,reps:15},{weight:165,reps:15},{weight:165,reps:15}],
+      'ex-calf-raise':      [{weight:180,reps:15},{weight:180,reps:15},{weight:180,reps:15}],
+    }, coachNotes: "Post-Workout Stretch (5 min):\nCouch Stretch — 30 sec each leg\nStanding Quad Stretch — 30 sec each leg\nStanding Hamstring Stretch — 30 sec each leg\nFigure-4 Glute Stretch — 30 sec each leg\nWall Calf Stretch — 30 sec each leg\nChild's Pose — 30 sec\n\nCoach: Perfect session, every exercise swept clean. Pendulum squat hit 215 clean — moving to 225. BSS, RDL, hamstring curl, leg extension, and calf raise all swept too — all moving up. Second perfect 10 of the Fall Split. This is what a fully dialed-in session looks like. 10/10." },
   ];
   function importFallSplitSessions(){
     if(!state.seedFlags) state.seedFlags = {};
