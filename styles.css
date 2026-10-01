@@ -1832,8 +1832,8 @@
   }
   .tl-fixed{
     display:flex;
-    align-items:center;
     justify-content:space-between;
+    align-items:flex-start;
     gap:8px;
   }
   .tl-fixed-label{
@@ -1841,6 +1841,12 @@
     font-weight: 600;
     font-size: 13px;
     color: var(--text);
+  }
+  .tl-fixed-time{
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    color: var(--accent-color, var(--text-soft));
+    margin-top:2px;
   }
   .tl-fixed.off .tl-fixed-label{ color: var(--text-faint); text-decoration: line-through; }
   .tl-fixed-toggle{

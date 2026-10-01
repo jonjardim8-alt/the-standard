@@ -5916,8 +5916,9 @@
         if(p.off) el.classList.add('off');
         el.style.setProperty('--accent-color', cat.color);
         if(!p.off) el.style.background = 'color-mix(in srgb, ' + cat.color + ' 35%, transparent)';
-        el.innerHTML = '<span class="tl-fixed-label"></span><button class="tl-fixed-toggle"></button>';
+        el.innerHTML = '<div><div class="tl-fixed-label"></div><div class="tl-fixed-time"></div></div><button class="tl-fixed-toggle"></button>';
         el.querySelector('.tl-fixed-label').textContent = p.ref.label;
+        el.querySelector('.tl-fixed-time').textContent = fmtTime(p.ref.start) + '–' + fmtTime(p.ref.end);
         const offKey = p.ref.id + '_' + dateStr;
         const toggleBtn = el.querySelector('.tl-fixed-toggle');
         toggleBtn.textContent = p.off ? 'Restore' : 'Day off';
