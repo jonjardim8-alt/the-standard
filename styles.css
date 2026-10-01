@@ -1539,36 +1539,11 @@
     padding:0;
   }
 
-  /* ---- Projects ---- */
-  .proj-card{
-    background: var(--card);
-    border-radius: 12px;
-    padding: 14px 15px;
-    margin-bottom: 12px;
-    border-left: 3px solid var(--accent-color, var(--accent));
-  }
-  .proj-card-top{ display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
-  .proj-name-row{ display:flex; align-items:center; gap:6px; }
-  .proj-pin-btn{ background:none; border:none; color: var(--text-faint); font-size:13px; cursor:pointer; padding:0; }
-  .proj-pin-btn.pinned{ color: var(--gold); }
-  .proj-name{ font-family: var(--font-display); font-weight:700; font-size: 16px; color: var(--text); }
-  .proj-status{
-    font-family: var(--font-mono);
-    font-size: 8.5px;
-    text-transform: uppercase;
-    padding: 2px 7px;
-    border-radius: 10px;
-    border: 1px solid var(--border);
-    color: var(--text-soft);
-    flex:0 0 auto;
-  }
-  .proj-status.active{ color:var(--success); border-color:var(--success); }
-  .proj-status.on-hold{ color:var(--warning); border-color:var(--warning); }
-  .proj-status.completed{ color: var(--accent); border-color: var(--accent); }
+  /* .proj-desc/.proj-section-label/.proj-task-*/.proj-mini-del/.proj-add-row
+     were introduced by the Projects tab (now removed) but are shared with
+     the Goals tab's Steps checklist (appendGoalStepsSection) and other
+     places — kept even though Projects itself is gone. */
   .proj-desc{ font-size: 12.5px; color: var(--text-soft); margin-top:4px; }
-  .proj-del{ background:none; border:none; color:var(--text-faint); font-size:15px; cursor:pointer; padding:0 2px; flex:0 0 auto; }
-  .proj-progress{ margin: 10px 0 4px; }
-  .proj-progress-label{ font-family: var(--font-mono); font-size: 9.5px; color: var(--text-faint); margin-bottom:4px; }
   .proj-section-label{
     font-family: var(--font-mono);
     font-size: 9.5px;
@@ -1577,11 +1552,11 @@
     color: var(--text-faint);
     margin: 12px 0 6px;
   }
-  .proj-task-row, .proj-milestone-row{
+  .proj-task-row{
     display:flex; align-items:center; gap:8px;
     padding: 5px 0;
   }
-  .proj-task-check, .proj-milestone-check{
+  .proj-task-check{
     width:17px; height:17px; border-radius:5px;
     border: 1.5px solid var(--text-soft);
     background:transparent; color:transparent;
@@ -1589,12 +1564,11 @@
     display:flex; align-items:center; justify-content:center;
     flex:0 0 auto;
   }
-  .proj-task-row.done .proj-task-check, .proj-milestone-row.done .proj-milestone-check{
+  .proj-task-row.done .proj-task-check{
     background: var(--accent-color, var(--accent)); border-color: var(--accent-color, var(--accent)); color:#fff;
   }
-  .proj-task-text, .proj-milestone-text{ flex:1; font-size: 13px; color: var(--text); }
-  .proj-task-row.done .proj-task-text, .proj-milestone-row.done .proj-milestone-text{ color: var(--text-faint); text-decoration:line-through; }
-  .proj-milestone-date{ font-family: var(--font-mono); font-size: 9.5px; color: var(--text-soft); }
+  .proj-task-text{ flex:1; font-size: 13px; color: var(--text); }
+  .proj-task-row.done .proj-task-text{ color: var(--text-faint); text-decoration:line-through; }
   .proj-mini-del{ background:none; border:none; color: var(--text-faint); font-size:13px; cursor:pointer; }
   .proj-add-row{ display:flex; gap:6px; margin-top:6px; }
   .proj-add-row input{
@@ -1617,30 +1591,6 @@
     background: var(--accent-color, var(--accent));
     color: #fff;
     cursor:pointer;
-  }
-  .proj-notes textarea{
-    width:100%;
-    font-family: var(--font-body);
-    font-size: 12.5px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 10px;
-    background: var(--bg-elevated);
-    color: var(--text);
-    resize: vertical;
-    min-height: 50px;
-    margin-top: 6px;
-  }
-  .proj-goal-link select{
-    width:100%;
-    font-family: var(--font-body);
-    font-size: 12.5px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 9px;
-    background: var(--bg-elevated);
-    color: var(--text);
-    margin-top: 6px;
   }
 
   .review-health-row{ margin-bottom: 14px; }
@@ -1777,7 +1727,7 @@
   }
   .wg-empty{ font-size:11px; color: var(--text-faint); padding-left:7px; }
 
-  main, #calendarSection, #tasksSection, #habitsSection, #listsSection, #longGoalsSection, #dashboardSection, #fitnessSection, #budgetSection, #projectsSection, #journalSection, #scoresSection, #settingsSection, #emailSection{ padding: 16px 18px 0; position:relative; z-index:1; }
+  main, #calendarSection, #tasksSection, #habitsSection, #listsSection, #longGoalsSection, #dashboardSection, #fitnessSection, #budgetSection, #journalSection, #scoresSection, #settingsSection, #emailSection{ padding: 16px 18px 0; position:relative; z-index:1; }
 
   #tabViewport{
     overflow-x: hidden;

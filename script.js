@@ -1620,32 +1620,6 @@
   importHistoricalBudgetTransactions();
   seedSeptemberBudgetLimits();
 
-  // "The Standard" — this app itself, as a project. Also migrates the
-  // pre-existing "Work on backend" task so it appears grouped under this
-  // project instead of sitting flat under Personal.
-  function seedStandardProject(){
-    if(!state.seedFlags) state.seedFlags = {};
-    if(state.seedFlags.standardProjectSeeded) return;
-    if(!state.projects.some(p => p.id === 'proj-the-standard')){
-      state.projects.push({
-        id: 'proj-the-standard',
-        name: 'The Standard',
-        category: 'personal',
-        description: 'Building this all-in-one app',
-        dueDate: null,
-        status: 'active',
-        pinned: true,
-        milestones: [],
-        notes: '',
-        goalId: null
-      });
-    }
-    const backendTask = state.tasks.find(t => t.text === 'Work on backend for schedule app' && t.category === 'personal' && !t.projectId);
-    if(backendTask) backendTask.projectId = 'proj-the-standard';
-    state.seedFlags.standardProjectSeeded = true;
-    save();
-  }
-  seedStandardProject();
   seedJournalHabit();
 
   let weekAnchor = startOfWeek(new Date());
@@ -1718,7 +1692,6 @@
           if(!parsed.workoutLogs) parsed.workoutLogs = {};
           if(!parsed.budgetTransactions) parsed.budgetTransactions = [];
           if(!parsed.categoryBudgetLimits) parsed.categoryBudgetLimits = {};
-          if(!parsed.projects) parsed.projects = [];
           if(!parsed.journalEntries) parsed.journalEntries = {};
           if(!parsed.scoreOptIn) parsed.scoreOptIn = { budget: false };
           if(!parsed.blockedSenders) parsed.blockedSenders = [];
@@ -1768,7 +1741,7 @@
       dailyGoals: [], weeklyGoals: [], dailyGoalLog: {}, weeklyGoalLog: {},
       allDayEvents: [], lists: [], longTermGoals: [],
       fitnessSplit: null, workoutLogs: {}, budgetTransactions: [], categoryBudgetLimits: {},
-      projects: [], journalEntries: {},
+      journalEntries: {},
       scoreOptIn: { budget: false },
       blockedSenders: [],
       birthdays: [],
@@ -2334,7 +2307,7 @@
     if(action.action === 'add_task'){
       const text = (action.text || '').toString().trim();
       if(!text) return { ok:false, message:'No task text there.' };
-      state.tasks.push({ id:newId(), text, category:action.category, subcategory:'', dueDate:action.dueDate, priority:action.priority, points:0, notes:'', projectId:null, done:false });
+      state.tasks.push({ id:newId(), text, category:action.category, subcategory:'', dueDate:action.dueDate, priority:action.priority, points:0, notes:'', done:false });
       save();
       return { ok:true, message:'Added task: ' + text };
     }
@@ -2662,9 +2635,9 @@
   }
 
   // Everything already committed for a given date — fixed recurring blocks
-  // (not marked off), weekly-recurring events, one-off dated events, tasks
-  // due, and project milestones due. Read-only preview for the Tomorrow
-  // modal's auto-pull section — none of this is editable from there.
+  // (not marked off), weekly-recurring events, one-off dated events, and
+  // tasks due. Read-only preview for the Tomorrow modal's auto-pull
+  // section — none of this is editable from there.
   function tomorrowCommitments(dateStr){
     const dayAbbr = dayAbbrFromDateStr(dateStr);
     const events = [];
@@ -2677,12 +2650,8 @@
     events.sort((a,b) => timeToMin(a.time) - timeToMin(b.time));
 
     const tasksDue = state.tasks.filter(t => !t.done && t.dueDate === dateStr);
-    const milestonesDue = [];
-    state.projects.forEach(p => (p.milestones || []).forEach(m => {
-      if(!m.done && m.targetDate === dateStr) milestonesDue.push({ text:m.name, project:p.name });
-    }));
 
-    return { events, tasksDue, milestonesDue };
+    return { events, tasksDue };
   }
 
   // Finds the latest end time (HH:MM) among a date's calendar commitments
@@ -2751,8 +2720,8 @@
     if(!state.tomorrowPlans[dateStr]) state.tomorrowPlans[dateStr] = [];
     const wakeTime = state.tomorrowWakeTimes[dateStr] || '';
     const blocks = state.tomorrowPlans[dateStr].slice().sort((a,b) => timeToMin(a.startTime) - timeToMin(b.startTime));
-    const { events, tasksDue, milestonesDue } = tomorrowCommitments(dateStr);
-    const hasCommitments = events.length || tasksDue.length || milestonesDue.length;
+    const { events, tasksDue } = tomorrowCommitments(dateStr);
+    const hasCommitments = events.length || tasksDue.length;
 
     const commitmentsHtml = hasCommitments ? `
       <div class="section-label" style="margin:14px 0 8px">Already committed</div>
@@ -2767,12 +2736,6 @@
           <div class="tomorrow-block-row" style="opacity:0.7">
             <div class="tomorrow-block-time">Due</div>
             <div style="flex:1;min-width:0"><div class="tomorrow-block-text">${escapeHtml(t.text)}</div></div>
-          </div>
-        `).join('')}
-        ${milestonesDue.map(m => `
-          <div class="tomorrow-block-row" style="opacity:0.7">
-            <div class="tomorrow-block-time">Milestone</div>
-            <div style="flex:1;min-width:0"><div class="tomorrow-block-text">${escapeHtml(m.text)}</div><div class="proj-desc">${escapeHtml(m.project)}</div></div>
           </div>
         `).join('')}
       </div>
@@ -4829,269 +4792,6 @@
     setTimeout(() => document.getElementById('txnAmount').focus(), 50);
   }
 
-  /* ---------------- Projects ---------------- */
-
-  const PROJECT_STATUSES = [
-    { id:'active',    label:'Active' },
-    { id:'on-hold',   label:'On Hold' },
-    { id:'completed', label:'Completed' },
-    { id:'archived',  label:'Archived' },
-  ];
-
-  let collapsedProjects = new Set();
-
-  function getProjectTasks(projectId){
-    return state.tasks.filter(t => t.projectId === projectId);
-  }
-
-  function getProjectProgress(project){
-    const tasks = getProjectTasks(project.id);
-    const milestones = project.milestones || [];
-    const total = tasks.length + milestones.length;
-    if(!total) return null;
-    const done = tasks.filter(t => t.done).length + milestones.filter(m => m.done).length;
-    return { done, total, pct: Math.round((done / total) * 100) };
-  }
-
-  function renderProjectsSection(){
-    const wrap = document.getElementById('projectsContent');
-    wrap.innerHTML = '';
-
-    if(!state.projects.length){
-      wrap.innerHTML = '<div class="empty-note">No projects yet — tap + to start one.</div>';
-      return;
-    }
-
-    const sorted = state.projects.slice().sort((a,b) => {
-      if(!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
-      const statusOrder = { active:0, 'on-hold':1, completed:2, archived:3 };
-      return (statusOrder[a.status] ?? 1) - (statusOrder[b.status] ?? 1);
-    });
-
-    sorted.forEach(project => {
-      const cat = catById[project.category] || CATEGORIES[0];
-      const collapsed = collapsedProjects.has(project.id);
-      const progress = getProjectProgress(project);
-      // Declared here (not inside the `if(!collapsed)` block below) so
-      // they're still in scope for the wireCustomSelect/wireCustomDate
-      // calls after wrap.appendChild(card) — those calls are harmless
-      // no-ops when collapsed, since the elements they'd wire don't exist.
-      const goalLinkId = 'goalLink-' + project.id;
-      const msDateId = 'msDate-' + project.id;
-      const goalOptionsHtml = '<option value="">None</option>'
-        + state.longTermGoals.map(g => '<option value="' + g.id + '">' + escapeHtml(g.name) + ' (' + g.timeframe + ')</option>').join('');
-
-      const card = document.createElement('div');
-      card.className = 'proj-card';
-      card.style.setProperty('--accent-color', cat.color);
-
-      const top = document.createElement('div');
-      top.className = 'proj-card-top';
-      top.innerHTML = `
-        <div class="proj-header-click" style="flex:1; cursor:pointer;">
-          <div class="proj-name-row">
-            <button class="proj-pin-btn${project.pinned ? ' pinned' : ''}">${project.pinned ? '★' : '☆'}</button>
-            <span class="proj-name">${escapeHtml(project.name)}</span>
-            <span class="proj-status ${project.status}">${PROJECT_STATUSES.find(s=>s.id===project.status)?.label || project.status}</span>
-          </div>
-          ${project.description ? '<div class="proj-desc">' + escapeHtml(project.description) + '</div>' : ''}
-        </div>
-        <button class="proj-del">×</button>
-      `;
-      top.querySelector('.proj-pin-btn').onclick = (e) => {
-        e.stopPropagation();
-        project.pinned = !project.pinned;
-        save();
-        renderProjectsSection();
-      };
-      top.querySelector('.proj-del').onclick = (e) => {
-        e.stopPropagation();
-        state.projects = state.projects.filter(p => p.id !== project.id);
-        save();
-        renderAll();
-      };
-      top.querySelector('.proj-header-click').addEventListener('click', () => {
-        if(collapsedProjects.has(project.id)) collapsedProjects.delete(project.id);
-        else collapsedProjects.add(project.id);
-        renderProjectsSection();
-      });
-      card.appendChild(top);
-
-      if(progress){
-        const pbox = document.createElement('div');
-        pbox.className = 'proj-progress';
-        pbox.innerHTML = `
-          <div class="proj-progress-label">${progress.done}/${progress.total} complete</div>
-          <div class="progress-bar-outer"><div class="progress-bar-inner" style="width:${progress.pct}%; background:${cat.color}"></div></div>
-        `;
-        card.appendChild(pbox);
-      }
-
-      if(!collapsed){
-        // Tasks
-        const taskLabel = document.createElement('div');
-        taskLabel.className = 'proj-section-label';
-        taskLabel.textContent = 'Tasks';
-        card.appendChild(taskLabel);
-
-        const tasks = getProjectTasks(project.id);
-        tasks.forEach(t => {
-          const row = document.createElement('div');
-          row.className = 'proj-task-row' + (t.done ? ' done' : '');
-          row.innerHTML = '<button class="proj-task-check">✓</button><span class="proj-task-text"></span><button class="proj-mini-del">×</button>';
-          row.querySelector('.proj-task-text').textContent = t.text;
-          row.querySelector('.proj-task-check').onclick = () => { t.done = !t.done; save(); renderAll(); };
-          row.querySelector('.proj-mini-del').onclick = () => {
-            state.tasks = state.tasks.filter(x => x.id !== t.id);
-            save();
-            renderAll();
-          };
-          card.appendChild(row);
-        });
-
-        const taskAddRow = document.createElement('div');
-        taskAddRow.className = 'proj-add-row';
-        taskAddRow.innerHTML = '<input type="text" placeholder="Add a task…" maxlength="70"><button>Add</button>';
-        const taskInput = taskAddRow.querySelector('input');
-        const addTask = () => {
-          const text = taskInput.value.trim();
-          if(!text) return;
-          state.tasks.push({
-            id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
-            text, category: project.category, subcategory:'', dueDate: todayStr(),
-            priority:'normal', points:null, notes:'', projectId: project.id, done:false
-          });
-          save();
-          renderAll();
-        };
-        taskAddRow.querySelector('button').onclick = addTask;
-        taskInput.addEventListener('keydown', e => { if(e.key === 'Enter') addTask(); });
-        card.appendChild(taskAddRow);
-
-        // Milestones
-        const msLabel = document.createElement('div');
-        msLabel.className = 'proj-section-label';
-        msLabel.textContent = 'Milestones';
-        card.appendChild(msLabel);
-
-        (project.milestones || []).forEach(m => {
-          const row = document.createElement('div');
-          row.className = 'proj-milestone-row' + (m.done ? ' done' : '');
-          row.innerHTML = '<button class="proj-milestone-check">✓</button><span class="proj-milestone-text"></span>'
-            + (m.targetDate ? '<span class="proj-milestone-date">' + fmtDate(m.targetDate) + '</span>' : '')
-            + '<button class="proj-mini-del">×</button>';
-          row.querySelector('.proj-milestone-text').textContent = m.name;
-          row.querySelector('.proj-milestone-check').onclick = () => { m.done = !m.done; save(); renderAll(); };
-          row.querySelector('.proj-mini-del').onclick = () => {
-            project.milestones = project.milestones.filter(x => x.id !== m.id);
-            save();
-            renderAll();
-          };
-          card.appendChild(row);
-        });
-
-        const msAddRow = document.createElement('div');
-        msAddRow.className = 'proj-add-row';
-        msAddRow.innerHTML = '<input type="text" placeholder="Add a milestone…" maxlength="60">' + customDateHtml(msDateId, '', 'Date') + '<button>Add</button>';
-        const msTextInput = msAddRow.querySelector('input[type=text]');
-        const msDateInput = msAddRow.querySelector('#' + msDateId);
-        const addMilestone = () => {
-          const name = msTextInput.value.trim();
-          if(!name) return;
-          if(!project.milestones) project.milestones = [];
-          project.milestones.push({ id: Date.now() + '-' + Math.random().toString(36).slice(2,7), name, targetDate: msDateInput.value || null, done:false });
-          save();
-          renderAll();
-        };
-        msAddRow.querySelector('button').onclick = addMilestone;
-        msTextInput.addEventListener('keydown', e => { if(e.key === 'Enter') addMilestone(); });
-        card.appendChild(msAddRow);
-
-        // Goal link — wired up below, after this card is actually appended
-        // to the document (getElementById can't find it before then).
-        const goalBox = document.createElement('div');
-        goalBox.className = 'proj-goal-link';
-        goalBox.innerHTML = '<div class="proj-section-label">Linked goal</div>' + customSelectHtml(goalLinkId, goalOptionsHtml, project.goalId || '', 'None');
-        card.appendChild(goalBox);
-
-        // Notes
-        const notesBox = document.createElement('div');
-        notesBox.className = 'proj-notes';
-        notesBox.innerHTML = '<div class="proj-section-label">Notes</div><textarea placeholder="Updates, decisions, context…"></textarea>';
-        notesBox.querySelector('textarea').value = project.notes || '';
-        notesBox.querySelector('textarea').addEventListener('blur', (e) => {
-          project.notes = e.target.value.trim();
-          save();
-        });
-        card.appendChild(notesBox);
-
-        // Status changer
-        const statusRow = document.createElement('div');
-        statusRow.className = 'cat-picker';
-        statusRow.style.marginTop = '12px';
-        PROJECT_STATUSES.forEach(s => {
-          const btn = document.createElement('button');
-          btn.className = 'cat-option' + (project.status === s.id ? ' selected' : '');
-          btn.textContent = s.label;
-          btn.onclick = () => { project.status = s.id; save(); renderProjectsSection(); };
-          statusRow.appendChild(btn);
-        });
-        card.appendChild(statusRow);
-      }
-
-      wrap.appendChild(card);
-      wireCustomSelect(goalLinkId, goalOptionsHtml, 'Linked goal', (newValue) => {
-        project.goalId = newValue || null;
-        save();
-      });
-      wireCustomDate(msDateId, { allowClear:true, placeholder:'Date' });
-    });
-  }
-
-  function openAddProjectModal(){
-    const overlay = document.getElementById('modalOverlay');
-    const content = document.getElementById('modalContent');
-    content.style.removeProperty('--chip-color');
-    let selectedCat = 'personal';
-
-    content.innerHTML = `
-      <div class="modal-handle"></div>
-      <div class="modal-title">New project</div>
-      <label>Name</label>
-      <input type="text" id="projName" placeholder="e.g. The Standard" maxlength="60">
-      <label>Category</label>
-      <div class="cat-picker" id="projCatPicker"></div>
-      <label>Description (optional)</label>
-      <textarea id="projDesc" placeholder="What is this project?" rows="2"></textarea>
-      <label>Due date (optional)</label>
-      ${customDateHtml('projDue', '', 'None')}
-      <div class="modal-actions">
-        <button class="cancel" id="projCancel">Cancel</button>
-        <button class="save" id="projSave">Save</button>
-      </div>
-    `;
-    overlay.classList.remove('hidden');
-    wireCustomDate('projDue', { allowClear:true, placeholder:'None' });
-    renderCategoryPickerInline('projCatPicker', selectedCat, (c) => { selectedCat = c; });
-
-    document.getElementById('projCancel').onclick = closeModal;
-    document.getElementById('projSave').onclick = () => {
-      const name = document.getElementById('projName').value.trim();
-      if(!name) return;
-      state.projects.push({
-        id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
-        name, category: selectedCat,
-        description: document.getElementById('projDesc').value.trim(),
-        dueDate: document.getElementById('projDue').value || null,
-        status: 'active', pinned: false, milestones: [], notes: '', goalId: null
-      });
-      save();
-      closeModal();
-      renderAll();
-    };
-    setTimeout(() => document.getElementById('projName').focus(), 50);
-  }
-
   /* ---------------- Journal ---------------- */
 
   const JOURNAL_PROMPTS = [
@@ -5500,30 +5200,14 @@
   }
 
   // Call once right after the HTML from customSelectHtml() is in the DOM.
-  // onChange (optional) fires immediately on pick, for the handful of
-  // selects that aren't behind a Save button (e.g. the Projects goal link).
+  // onChange (optional) fires immediately on pick, for selects that aren't
+  // behind a Save button.
   function wireCustomSelect(id, optionsHtml, title, onChange){
     const trigger = document.getElementById(id + 'Trigger');
     if(!trigger) return;
     trigger._optionsHtml = optionsHtml;
     trigger._onChange = onChange;
     trigger.onclick = () => openCustomSelectPicker(id, trigger._optionsHtml, title, trigger._onChange);
-  }
-
-  // For selects whose options depend on other in-modal state (only
-  // taskProject today, which depends on the chosen category) — updates the
-  // options a picker will show next time it's opened, and resets the
-  // current value/label since the old value may no longer be valid.
-  function updateCustomSelectOptions(id, optionsHtml, newValue, placeholder){
-    const hiddenInput = document.getElementById(id);
-    const trigger = document.getElementById(id + 'Trigger');
-    if(!hiddenInput || !trigger) return;
-    hiddenInput.value = newValue ?? '';
-    trigger._optionsHtml = optionsHtml;
-    const label = labelForValue(optionsHtml, hiddenInput.value);
-    const labelEl = trigger.querySelector('.custom-select-label');
-    labelEl.textContent = label || placeholder || 'Select';
-    labelEl.classList.toggle('placeholder', !label);
   }
 
   function openCustomSelectPicker(id, optionsHtml, title, onChange){
@@ -6130,12 +5814,6 @@
     const catPickerHtml = catId ? '' : '<label>Category</label><div class="cat-picker" id="taskCatPicker"></div>';
     const titleDotHtml = catId ? '<span class="sw" style="background:'+cat.color+'"></span>' : '';
 
-    function projectOptionsHtml(forCat){
-      const opts = state.projects.filter(p => p.category === forCat);
-      if(!opts.length) return '<option value="">None</option>';
-      return '<option value="">None</option>' + opts.map(p => '<option value="' + p.id + '">' + escapeHtml(p.name) + '</option>').join('');
-    }
-
     content.innerHTML = `
       <div class="modal-handle"></div>
       <div class="modal-title">${titleDotHtml}Add task</div>
@@ -6145,8 +5823,6 @@
         <label>Class</label>
         <input type="text" id="taskClass" list="classSuggestions" placeholder="e.g. Biology 101">
       </div>
-      <label>Project (optional)</label>
-      ${customSelectHtml('taskProject', projectOptionsHtml(selectedCat), '', 'None')}
       <label>Due date</label>
       ${customDateHtml('taskDue', todayStr())}
       <label>What is it?</label>
@@ -6163,7 +5839,6 @@
       </div>
     `;
     overlay.classList.remove('hidden');
-    wireCustomSelect('taskProject', projectOptionsHtml(selectedCat), 'Project');
     wireCustomDate('taskDue', {});
     let modalPriority = 'normal';
     renderPriorityPicker('taskPriorityPicker', modalPriority, (p) => { modalPriority = p; });
@@ -6173,7 +5848,6 @@
         selectedCat = c;
         content.style.setProperty('--chip-color', catById[c].color);
         document.getElementById('taskClassField').style.display = c === 'school' ? 'block' : 'none';
-        updateCustomSelectOptions('taskProject', projectOptionsHtml(c), '', 'None');
       });
     }
 
@@ -6186,8 +5860,7 @@
       const pointsRaw = document.getElementById('taskPoints').value;
       const points = pointsRaw !== '' ? Math.max(0, parseFloat(pointsRaw) || 0) : null;
       const notes = document.getElementById('taskNotes').value.trim();
-      const projectId = document.getElementById('taskProject').value || null;
-      state.tasks.push({ id: Date.now() + '-' + Math.random().toString(36).slice(2,7), text, category: selectedCat, subcategory, dueDate, priority: modalPriority, points, notes, projectId, done:false });
+      state.tasks.push({ id: Date.now() + '-' + Math.random().toString(36).slice(2,7), text, category: selectedCat, subcategory, dueDate, priority: modalPriority, points, notes, done:false });
       save();
       closeModal();
       renderAll();
@@ -6504,9 +6177,9 @@
   }
 
   // Shared by the Tasks tab and the Dashboard's "Due Today" card — renders
-  // tasks grouped into collapsible category/project sections. onCollapseChange
-  // is called just for the (cheap) collapse toggle; check/delete/reschedule
-  // always trigger a full renderAll() since those affect other tabs too.
+  // tasks grouped into collapsible category sections. onCollapseChange is
+  // called just for the (cheap) collapse toggle; check/delete always
+  // trigger a full renderAll() since those affect other tabs too.
   function renderGroupedTaskList(wrap, tasks, onCollapseChange){
     const groups = groupTasksBySection(tasks);
 
@@ -6575,26 +6248,9 @@
       const inCat = tasks.filter(t => t.category === cat.id);
       if(!inCat.length) return;
 
-      const withProject = inCat.filter(t => t.projectId);
-      const withoutProject = inCat.filter(t => !t.projectId);
-
-      // Project-linked tasks get their own "[Category] — [Project]" header,
-      // same visual pattern as School's per-class grouping, but works for
-      // any category.
-      const byProject = {};
-      withProject.forEach(t => {
-        if(!byProject[t.projectId]) byProject[t.projectId] = [];
-        byProject[t.projectId].push(t);
-      });
-      Object.keys(byProject).forEach(pid => {
-        const project = state.projects.find(p => p.id === pid);
-        const label = cat.label + ' — ' + (project ? project.name : 'Deleted project');
-        sections.push({ label, color: cat.color, items: byProject[pid] });
-      });
-
       if(cat.id === 'school'){
         const bySub = {};
-        withoutProject.forEach(t => {
+        inCat.forEach(t => {
           const key = t.subcategory && t.subcategory.trim() ? t.subcategory.trim() : 'General';
           if(!bySub[key]) bySub[key] = [];
           bySub[key].push(t);
@@ -6606,8 +6262,8 @@
         }).forEach(sub => {
           sections.push({ label: cat.label + ' — ' + sub, color: cat.color, items: bySub[sub] });
         });
-      } else if(withoutProject.length){
-        sections.push({ label: cat.label, color: cat.color, items: withoutProject });
+      } else {
+        sections.push({ label: cat.label, color: cat.color, items: inCat });
       }
     });
     return sections;
@@ -7052,7 +6708,6 @@
     { id:'longgoals', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg>', label:'Goals' },
     { id:'fitness',   icon:'<svg viewBox="0 0 24 24"><rect x="2" y="9.4" width="3.4" height="5.2" rx="1.4" fill="currentColor"/><rect x="18.6" y="9.4" width="3.4" height="5.2" rx="1.4" fill="currentColor"/><rect x="6" y="11" width="12" height="2" rx="1" fill="currentColor"/><rect x="6.6" y="7.4" width="2.8" height="9.2" rx="1.4" fill="currentColor"/><rect x="14.6" y="7.4" width="2.8" height="9.2" rx="1.4" fill="currentColor"/></svg>', label:'Fitness' },
     { id:'budget',    icon:'<svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="4" x2="12" y2="18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M16.5 7.2c-.9-1.6-2.7-2.5-4.5-2.5c-2.5 0-4.5 1.3-4.5 3.1c0 4 8.8 2 8.8 6c0 1.9-2 3.2-4.5 3.2c-1.9 0-3.7-.9-4.6-2.4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>', label:'Budget' },
-    { id:'projects',  icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 6.5a1.5 1.5 0 0 1 1.5-1.5h5l2 2.5h8a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>', label:'Projects' },
     { id:'journal',   icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.2c-2-1.5-5-2-9-1.5v13c4-.5 7 0 9 1.5c2-1.5 5-2 9-1.5v-13c-4-.5-7 0-9 1.5z"/><path d="M12 6.2v13"/></svg>', label:'Journal' },
     { id:'scores',    icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19V11"/><path d="M12 19V5"/><path d="M19 19V14"/></svg>', label:'Scores' },
     { id:'email',     icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M4 7l8 6l8-6"/></svg>', label:'Email' },
@@ -7909,7 +7564,6 @@
     document.getElementById('longGoalsSection').style.display = section === 'longgoals' ? 'block' : 'none';
     document.getElementById('fitnessSection').style.display = section === 'fitness' ? 'block' : 'none';
     document.getElementById('budgetSection').style.display = section === 'budget' ? 'block' : 'none';
-    document.getElementById('projectsSection').style.display = section === 'projects' ? 'block' : 'none';
     document.getElementById('journalSection').style.display = section === 'journal' ? 'block' : 'none';
     document.getElementById('scoresSection').style.display = section === 'scores' ? 'block' : 'none';
     document.getElementById('emailSection').style.display = section === 'email' ? 'block' : 'none';
@@ -7953,7 +7607,6 @@
     renderLongGoalsSection();
     renderFitnessSection();
     renderBudgetSection();
-    renderProjectsSection();
     renderJournalSection();
     renderScoresSection();
     renderEmailSection();
@@ -7990,7 +7643,6 @@
     else if(currentSection === 'longgoals') openAddLongGoalModal();
     else if(currentSection === 'fitness') openAddExerciseModal();
     else if(currentSection === 'budget') openAddTransactionModal();
-    else if(currentSection === 'projects') openAddProjectModal();
   };
 
   (function setupSwipeNav(){
