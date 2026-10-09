@@ -46,685 +46,6 @@
   ];
   const catById = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
 
-  // Matches the categories + Type field from the connected Google Form
-  // exactly, so entries stay consistent with the existing sheet.
-  const BUDGET_TYPE_COLORS = { expense:'var(--error)', income:'var(--success)', neutral:'#5B8DEF' };
-  const BUDGET_CATEGORIES = [
-    { id:'gas',             label:'Gas',              type:'expense' },
-    { id:'tithes',          label:'Tithes',           type:'expense' },
-    { id:'car-maintenance', label:'Car Maintenance',  type:'expense' },
-    { id:'groceries',       label:'Groceries',        type:'expense' },
-    { id:'dining-out',      label:'Dining Out',       type:'expense' },
-    { id:'coffee-drinks',   label:'Coffee/Drinks',    type:'expense' },
-    { id:'hygiene',         label:'Hygiene',          type:'expense' },
-    { id:'golf',            label:'Golf',             type:'expense' },
-    { id:'subscriptions',   label:'Subscriptions',    type:'expense' },
-    { id:'vacation',        label:'Vacation',         type:'expense' },
-    { id:'clothing',        label:'Clothing',         type:'expense' },
-    { id:'misc',            label:'Misc',             type:'expense' },
-    { id:'emergency-fund',  label:'Emergency Fund',   type:'neutral' },
-    { id:'lego-fund',       label:'Lego Fund',        type:'neutral' },
-    { id:'travel-fund',     label:'Travel Fund',      type:'neutral' },
-    { id:'tattoo',          label:'Tattoo',           type:'neutral' },
-    { id:'investing',       label:'Investing',        type:'neutral' },
-    { id:'card-payments',   label:'Card Payments',    type:'neutral' },
-    { id:'paycheck',        label:'Paycheck',         type:'income' },
-    { id:'other-income',    label:'Other Income',     type:'income' },
-  ];
-  const budgetCatById = Object.fromEntries(BUDGET_CATEGORIES.map(c => [c.id, c]));
-  const BUDGET_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1TgbaM_zrRQRZyMsSHmdwid0c1wRK1QkkG_cdl6ZBnyE/edit?usp=sharing';
-  const BUDGET_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfcShLhQSfCbCMAXRG1i0mzT6B9DrAL9gSf7nx2A9_fgDGxYg/viewform?usp=sharing';
-
-  // Jan–Jun 2026 transaction history imported from the person's existing
-  // Google Sheet (Transaction Form Responses tab). Seeded once.
-  const SEED_BUDGET_TRANSACTIONS = [
-    { date:'2026-06-10', description:'fresh kitchen', amount:15.45, category:'dining-out' },
-    { date:'2026-06-09', description:'gas', amount:20.0, category:'gas' },
-    { date:'2026-06-09', description:'food popstroke', amount:16.19, category:'dining-out' },
-    { date:'2026-06-09', description:'trex', amount:56.17, category:'dining-out' },
-    { date:'2026-06-09', description:'deodorant', amount:41.5, category:'hygiene' },
-    { date:'2026-06-08', description:'culvers', amount:9.04, category:'dining-out' },
-    { date:'2026-06-08', description:'uniqlo', amount:79.77, category:'clothing' },
-    { date:'2026-06-08', description:'shoes', amount:73.45, category:'clothing' },
-    { date:'2026-06-08', description:'axum', amount:7.39, category:'coffee-drinks' },
-    { date:'2026-06-08', description:'madelines', amount:2.45, category:'dining-out' },
-    { date:'2026-06-06', description:'publix', amount:10.09, category:'groceries' },
-    { date:'2026-06-04', description:'insurance claim money', amount:2500.0, category:'other-income' },
-    { date:'2026-06-04', description:'gas', amount:40.0, category:'gas' },
-    { date:'2026-06-04', description:'millers', amount:18.96, category:'dining-out' },
-    { date:'2026-06-03', description:'icee', amount:16.27, category:'coffee-drinks' },
-    { date:'2026-06-03', description:'paycheck', amount:109.89, category:'paycheck' },
-    { date:'2026-06-02', description:'chipotle', amount:13.31, category:'dining-out' },
-    { date:'2026-06-02', description:'tithes', amount:163.61, category:'tithes' },
-    { date:'2026-06-01', description:'4rivers', amount:17.01, category:'dining-out' },
-    { date:'2026-05-31', description:'interest', amount:5.23, category:'other-income' },
-    { date:'2026-05-31', description:'magoos', amount:7.44, category:'dining-out' },
-    { date:'2026-05-30', description:'braden\'s hat', amount:45.0, category:'clothing' },
-    { date:'2026-05-30', description:'gas', amount:40.0, category:'gas' },
-    { date:'2026-05-29', description:'ajs', amount:12.64, category:'dining-out' },
-    { date:'2026-05-29', description:'walgreens', amount:7.33, category:'misc' },
-    { date:'2026-05-29', description:'vocal lessons', amount:200.0, category:'misc' },
-    { date:'2026-05-29', description:'chick', amount:11.13, category:'dining-out' },
-    { date:'2026-05-28', description:'pop and icee', amount:20.85, category:'coffee-drinks' },
-    { date:'2026-05-27', description:'money to pay for dads bill', amount:404.77, category:'other-income' },
-    { date:'2026-05-27', description:'wendys', amount:9.68, category:'dining-out' },
-    { date:'2026-05-27', description:'paycheck', amount:798.3, category:'paycheck' },
-    { date:'2026-05-27', description:'dads bill', amount:400.0, category:'misc' },
-    { date:'2026-05-27', description:'rileys gift', amount:24.5, category:'misc' },
-    { date:'2026-05-26', description:'publix', amount:15.27, category:'misc' },
-    { date:'2026-05-25', description:'Kfc', amount:14.25, category:'dining-out' },
-    { date:'2026-05-24', description:'clogs', amount:53.35, category:'clothing' },
-    { date:'2026-05-24', description:'claude', amount:20.0, category:'subscriptions' },
-    { date:'2026-05-24', description:'panda', amount:13.42, category:'dining-out' },
-    { date:'2026-05-24', description:'taco bell', amount:8.0, category:'dining-out' },
-    { date:'2026-05-23', description:'pre workout', amount:4.0, category:'coffee-drinks' },
-    { date:'2026-05-23', description:'gas', amount:40.0, category:'gas' },
-    { date:'2026-05-21', description:'deductible on car', amount:2500.0, category:'car-maintenance' },
-    { date:'2026-05-21', description:'uber', amount:21.99, category:'misc' },
-    { date:'2026-05-21', description:'corona', amount:17.51, category:'misc' },
-    { date:'2026-05-20', description:'levi paying for tickets', amount:120.0, category:'other-income' },
-    { date:'2026-05-20', description:'switchfoot tickets', amount:120.66, category:'misc' },
-    { date:'2026-05-19', description:'chick fila', amount:6.69, category:'dining-out' },
-    { date:'2026-05-18', description:'target shirt', amount:42.77, category:'clothing' },
-    { date:'2026-05-18', description:'rokkas', amount:24.83, category:'dining-out' },
-    { date:'2026-05-18', description:'foxtail 20 for 20', amount:20.0, category:'coffee-drinks' },
-    { date:'2026-05-18', description:'dogsitting', amount:150.0, category:'other-income' },
-    { date:'2026-05-17', description:'huey magoos', amount:11.7, category:'dining-out' },
-    { date:'2026-05-16', description:'chick fil a', amount:5.42, category:'dining-out' },
-    { date:'2026-05-16', description:'gas', amount:30.45, category:'gas' },
-    { date:'2026-05-16', description:'seven made', amount:8.89, category:'coffee-drinks' },
-    { date:'2026-05-16', description:'whole enchilada', amount:15.41, category:'dining-out' },
-    { date:'2026-05-16', description:'five guys', amount:17.14, category:'dining-out' },
-    { date:'2026-05-15', description:'chick fil a', amount:5.85, category:'dining-out' },
-    { date:'2026-05-15', description:'Publix for dad', amount:15.68, category:'misc' },
-    { date:'2026-05-15', description:'Cigars', amount:17.58, category:'misc' },
-    { date:'2026-05-15', description:'Haircut', amount:45.5, category:'hygiene' },
-    { date:'2026-05-15', description:'fingerprinting', amount:17.5, category:'misc' },
-    { date:'2026-05-14', description:'Gators', amount:8.93, category:'dining-out' },
-    { date:'2026-05-13', description:'poly food', amount:14.15, category:'dining-out' },
-    { date:'2026-05-13', description:'chick fila', amount:7.66, category:'dining-out' },
-    { date:'2026-05-13', description:'paychekc', amount:835.66, category:'paycheck' },
-    { date:'2026-05-13', description:'chipotke', amount:3.35, category:'dining-out' },
-    { date:'2026-05-12', description:'spotify', amount:7.88, category:'subscriptions' },
-    { date:'2026-05-12', description:'chipotle', amount:12.41, category:'dining-out' },
-    { date:'2026-05-12', description:'tax return', amount:96.01, category:'other-income' },
-    { date:'2026-05-11', description:'coke', amount:10.21, category:'misc' },
-    { date:'2026-05-10', description:'paid back for car pick up', amount:790.0, category:'other-income' },
-    { date:'2026-05-08', description:'uber', amount:14.38, category:'misc' },
-    { date:'2026-05-08', description:'mcdonalds', amount:10.39, category:'dining-out' },
-    { date:'2026-05-08', description:'curl cream', amount:23.38, category:'hygiene' },
-    { date:'2026-05-08', description:'picking car up for dad', amount:766.92, category:'misc' },
-    { date:'2026-05-08', description:'toothbrush heads', amount:14.99, category:'hygiene' },
-    { date:'2026-05-08', description:'chick fil a', amount:2.02, category:'dining-out' },
-    { date:'2026-05-08', description:'chipotle', amount:9.53, category:'dining-out' },
-    { date:'2026-05-08', description:'shampoo and toothbrush heads', amount:45.16, category:'hygiene' },
-    { date:'2026-05-08', description:'paid back for car registration', amount:385.63, category:'other-income' },
-    { date:'2026-05-08', description:'mcdonalds', amount:7.33, category:'dining-out' },
-    { date:'2026-05-06', description:'clermont national food', amount:15.4, category:'dining-out' },
-    { date:'2026-05-06', description:'chick fil a', amount:4.46, category:'dining-out' },
-    { date:'2026-05-06', description:'cultivo', amount:8.08, category:'coffee-drinks' },
-    { date:'2026-05-05', description:'vanguard', amount:99.31, category:'investing' },
-    { date:'2026-05-05', description:'village point', amount:150.0, category:'other-income' },
-    { date:'2026-05-04', description:'gas', amount:29.8, category:'gas' },
-    { date:'2026-05-04', description:'foxtail', amount:8.28, category:'coffee-drinks' },
-    { date:'2026-05-03', description:'tithes', amount:197.98, category:'tithes' },
-    { date:'2026-05-03', description:'dad paying me back', amount:235.63, category:'other-income' },
-    { date:'2026-05-03', description:'LEGOS', amount:181.03, category:'misc' },
-    { date:'2026-05-02', description:'levi\'s gift', amount:50.13, category:'misc' },
-    { date:'2026-04-30', description:'interest', amount:6.58, category:'other-income' },
-    { date:'2026-04-30', description:'millers', amount:22.51, category:'dining-out' },
-    { date:'2026-04-29', description:'paycheck', amount:500.35, category:'paycheck' },
-    { date:'2026-04-28', description:'dmv payment', amount:230.0, category:'misc' },
-    { date:'2026-04-27', description:'gas', amount:25.82, category:'gas' },
-    { date:'2026-04-27', description:'deeply', amount:8.52, category:'coffee-drinks' },
-    { date:'2026-04-27', description:'fresh kitchen', amount:11.99, category:'dining-out' },
-    { date:'2026-04-27', description:'A LIST', amount:27.68, category:'subscriptions' },
-    { date:'2026-04-26', description:'panda', amount:13.42, category:'dining-out' },
-    { date:'2026-04-26', description:'icee', amount:9.36, category:'coffee-drinks' },
-    { date:'2026-04-25', description:'chick fil a', amount:8.92, category:'dining-out' },
-    { date:'2026-04-24', description:'baco bell', amount:7.22, category:'dining-out' },
-    { date:'2026-04-24', description:'chilis', amount:29.21, category:'dining-out' },
-    { date:'2026-04-24', description:'claude', amount:20.0, category:'subscriptions' },
-    { date:'2026-04-22', description:'CORONA', amount:30.0, category:'misc' },
-    { date:'2026-04-22', description:'mcdonalds', amount:10.6, category:'dining-out' },
-    { date:'2026-04-22', description:'cava', amount:13.74, category:'dining-out' },
-    { date:'2026-04-21', description:'panda', amount:15.76, category:'dining-out' },
-    { date:'2026-04-19', description:'huey', amount:18.72, category:'dining-out' },
-    { date:'2026-04-18', description:'deeply', amount:7.46, category:'coffee-drinks' },
-    { date:'2026-04-18', description:'papi smash', amount:19.16, category:'dining-out' },
-    { date:'2026-04-18', description:'gas', amount:47.79, category:'gas' },
-    { date:'2026-04-18', description:'popcorn!', amount:22.86, category:'dining-out' },
-    { date:'2026-04-16', description:'Ralphs', amount:11.43, category:'coffee-drinks' },
-    { date:'2026-04-16', description:'Book', amount:21.3, category:'misc' },
-    { date:'2026-04-16', description:'Dr p', amount:3.47, category:'coffee-drinks' },
-    { date:'2026-04-16', description:'nike brazil longsleeve', amount:100.0, category:'clothing' },
-    { date:'2026-04-16', description:'bagels', amount:21.99, category:'dining-out' },
-    { date:'2026-04-16', description:'luggage check', amount:20.0, category:'vacation' },
-    { date:'2026-04-15', description:'drinks', amount:13.0, category:'coffee-drinks' },
-    { date:'2026-04-15', description:'los tacos', amount:12.63, category:'dining-out' },
-    { date:'2026-04-15', description:'flight home', amount:29.99, category:'vacation' },
-    { date:'2026-04-15', description:'h&m', amount:24.99, category:'clothing' },
-    { date:'2026-04-15', description:'joes', amount:16.87, category:'dining-out' },
-    { date:'2026-04-15', description:'deo', amount:8.96, category:'hygiene' },
-    { date:'2026-04-15', description:'uniqlo', amount:29.9, category:'clothing' },
-    { date:'2026-04-15', description:'shake shack', amount:19.36, category:'dining-out' },
-    { date:'2026-04-15', description:'subway fares', amount:23.75, category:'vacation' },
-    { date:'2026-04-15', description:'coke in airport', amount:4.44, category:'coffee-drinks' },
-    { date:'2026-04-15', description:'vocal lessons', amount:200.0, category:'misc' },
-    { date:'2026-04-15', description:'NEW YORK hotel and broadway show', amount:206.0, category:'vacation' },
-    { date:'2026-04-15', description:'paycheck', amount:756.29, category:'paycheck' },
-    { date:'2026-04-15', description:'chatgpt', amount:20.0, category:'subscriptions' },
-    { date:'2026-04-14', description:'puttshack', amount:30.0, category:'vacation' },
-    { date:'2026-04-14', description:'ice cream', amount:11.77, category:'coffee-drinks' },
-    { date:'2026-04-13', description:'dinner for robbie', amount:34.0, category:'misc' },
-    { date:'2026-04-13', description:'dinner', amount:34.04, category:'dining-out' },
-    { date:'2026-04-13', description:'spotify', amount:7.88, category:'subscriptions' },
-    { date:'2026-04-13', description:'bike rental', amount:3.13, category:'vacation' },
-    { date:'2026-04-13', description:'breakfast', amount:11.0, category:'dining-out' },
-    { date:'2026-04-13', description:'coffee', amount:8.33, category:'coffee-drinks' },
-    { date:'2026-04-13', description:'tickets for nates showcase', amount:35.7, category:'misc' },
-    { date:'2026-04-13', description:'coffee', amount:7.38, category:'coffee-drinks' },
-    { date:'2026-04-12', description:'portillos', amount:23.3, category:'dining-out' },
-    { date:'2026-04-11', description:'taco bell', amount:10.94, category:'dining-out' },
-    { date:'2026-04-11', description:'chipotle for dad', amount:13.91, category:'dining-out' },
-    { date:'2026-04-11', description:'chipotle', amount:10.0, category:'dining-out' },
-    { date:'2026-04-10', description:'amazon purchase', amount:224.29, category:'misc' },
-    { date:'2026-04-10', description:'deo', amount:36.72, category:'hygiene' },
-    { date:'2026-04-09', description:'chipotle for mom', amount:11.02, category:'misc' },
-    { date:'2026-04-09', description:'gift bag', amount:3.72, category:'misc' },
-    { date:'2026-04-09', description:'millers for ot', amount:28.5, category:'dining-out' },
-    { date:'2026-04-09', description:'millers', amount:29.0, category:'dining-out' },
-    { date:'2026-04-07', description:'water', amount:21.57, category:'misc' },
-    { date:'2026-04-07', description:'chipotle', amount:9.96, category:'dining-out' },
-    { date:'2026-04-06', description:'huey', amount:10.73, category:'dining-out' },
-    { date:'2026-04-05', description:'panda', amount:15.77, category:'dining-out' },
-    { date:'2026-04-04', description:'gas', amount:48.09, category:'gas' },
-    { date:'2026-04-04', description:'shake and brownie', amount:9.12, category:'coffee-drinks' },
-    { date:'2026-04-03', description:'Ice cream', amount:5.42, category:'coffee-drinks' },
-    { date:'2026-04-02', description:'Break', amount:0.79, category:'dining-out' },
-    { date:'2026-04-02', description:'Tip money', amount:20.0, category:'other-income' },
-    { date:'2026-04-02', description:'Money from dad', amount:135.0, category:'other-income' },
-    { date:'2026-04-01', description:'Interest esrned', amount:6.11, category:'other-income' },
-    { date:'2026-04-01', description:'Paycheck', amount:717.68, category:'paycheck' },
-    { date:'2026-04-01', description:'Cigars', amount:27.6, category:'misc' },
-    { date:'2026-03-31', description:'Coffee', amount:7.16, category:'coffee-drinks' },
-    { date:'2026-03-28', description:'food during weekend', amount:65.49, category:'dining-out' },
-    { date:'2026-03-28', description:'gass', amount:33.15, category:'gas' },
-    { date:'2026-03-27', description:'coffee and drinks', amount:23.86, category:'coffee-drinks' },
-    { date:'2026-03-26', description:'textbook', amount:176.7, category:'misc' },
-    { date:'2026-03-25', description:'charging dads car', amount:19.92, category:'misc' },
-    { date:'2026-03-24', description:'a list', amount:1.05, category:'subscriptions' },
-    { date:'2026-03-24', description:'package shipment for dad', amount:72.55, category:'misc' },
-    { date:'2026-03-24', description:'chipotle', amount:9.32, category:'dining-out' },
-    { date:'2026-03-23', description:'gassy', amount:44.57, category:'gas' },
-    { date:'2026-03-22', description:'deodorant', amount:14.9, category:'hygiene' },
-    { date:'2026-03-22', description:'final say hoodie', amount:49.3, category:'clothing' },
-    { date:'2026-03-22', description:'arizona', amount:1.12, category:'coffee-drinks' },
-    { date:'2026-03-22', description:'culvers', amount:13.72, category:'dining-out' },
-    { date:'2026-03-22', description:'chipotle', amount:9.96, category:'dining-out' },
-    { date:'2026-03-20', description:'blizzard', amount:5.34, category:'coffee-drinks' },
-    { date:'2026-03-20', description:'moes', amount:12.77, category:'dining-out' },
-    { date:'2026-03-20', description:'oil change', amount:102.7, category:'car-maintenance' },
-    { date:'2026-03-20', description:'haircut', amount:45.5, category:'hygiene' },
-    { date:'2026-03-18', description:'march tithes', amount:227.59, category:'tithes' },
-    { date:'2026-03-18', description:'paycheck', amount:1246.88, category:'paycheck' },
-    { date:'2026-03-18', description:'brainrot', amount:24.99, category:'subscriptions' },
-    { date:'2026-03-17', description:'Chilis', amount:27.19, category:'dining-out' },
-    { date:'2026-03-17', description:'gas', amount:48.0, category:'gas' },
-    { date:'2026-03-17', description:'food', amount:6.15, category:'dining-out' },
-    { date:'2026-03-17', description:'lobos', amount:7.4, category:'coffee-drinks' },
-    { date:'2026-03-16', description:'helping lisa move', amount:100.0, category:'other-income' },
-    { date:'2026-03-16', description:'coffee', amount:4.46, category:'coffee-drinks' },
-    { date:'2026-03-16', description:'chatgpt', amount:20.0, category:'subscriptions' },
-    { date:'2026-03-15', description:'whata shake', amount:6.79, category:'coffee-drinks' },
-    { date:'2026-03-14', description:'whoopie cake', amount:3.18, category:'dining-out' },
-    { date:'2026-03-14', description:'gas', amount:35.82, category:'gas' },
-    { date:'2026-03-14', description:'foxtail', amount:7.16, category:'coffee-drinks' },
-    { date:'2026-03-14', description:'mickey ds', amount:13.29, category:'dining-out' },
-    { date:'2026-03-13', description:'tuition', amount:333.18, category:'misc' },
-    { date:'2026-03-13', description:'breaky', amount:0.09, category:'dining-out' },
-    { date:'2026-03-12', description:'new gym tag', amount:3.0, category:'misc' },
-    { date:'2026-03-12', description:'spotify', amount:7.88, category:'subscriptions' },
-    { date:'2026-03-11', description:'breaky', amount:0.09, category:'dining-out' },
-    { date:'2026-03-09', description:'gas', amount:41.92, category:'gas' },
-    { date:'2026-03-09', description:'food', amount:9.36, category:'dining-out' },
-    { date:'2026-03-09', description:'API qzip', amount:143.76, category:'clothing' },
-    { date:'2026-03-08', description:'maple street', amount:11.7, category:'dining-out' },
-    { date:'2026-03-04', description:'Paycheck', amount:1026.63, category:'paycheck' },
-    { date:'2026-03-03', description:'Chipyole', amount:9.43, category:'dining-out' },
-    { date:'2026-03-02', description:'Gas', amount:32.8, category:'gas' },
-    { date:'2026-03-01', description:'chipotle', amount:11.5, category:'dining-out' },
-    { date:'2026-02-28', description:'Food', amount:0.68, category:'dining-out' },
-    { date:'2026-02-27', description:'Groceries', amount:51.54, category:'groceries' },
-    { date:'2026-02-27', description:'New hampers', amount:40.0, category:'misc' },
-    { date:'2026-02-27', description:'Panera', amount:14.25, category:'dining-out' },
-    { date:'2026-02-27', description:'Jhills diaper and wipes party', amount:29.37, category:'misc' },
-    { date:'2026-02-26', description:'Dad paying me back', amount:53.0, category:'other-income' },
-    { date:'2026-02-26', description:'TRIPLE DIPPER', amount:22.99, category:'dining-out' },
-    { date:'2026-02-26', description:'Resume builder', amount:0.99, category:'misc' },
-    { date:'2026-02-26', description:'Tithes', amount:157.64, category:'tithes' },
-    { date:'2026-02-26', description:'Mickey ds', amount:7.13, category:'dining-out' },
-    { date:'2026-02-26', description:'Breakfast break', amount:0.3, category:'dining-out' },
-    { date:'2026-02-25', description:'Wake merch', amount:11.9, category:'clothing' },
-    { date:'2026-02-25', description:'Breakfast', amount:0.3, category:'dining-out' },
-    { date:'2026-02-24', description:'Oh hey', amount:6.92, category:'coffee-drinks' },
-    { date:'2026-02-24', description:'Gas', amount:35.06, category:'gas' },
-    { date:'2026-02-23', description:'break food', amount:0.09, category:'dining-out' },
-    { date:'2026-02-23', description:'huey', amount:10.73, category:'dining-out' },
-    { date:'2026-02-22', description:'drinks at tacos and tequila', amount:13.95, category:'coffee-drinks' },
-    { date:'2026-02-22', description:'tacos and tequila', amount:25.0, category:'dining-out' },
-    { date:'2026-02-22', description:'fries for the burches', amount:19.98, category:'misc' },
-    { date:'2026-02-19', description:'Millers', amount:26.3, category:'dining-out' },
-    { date:'2026-02-18', description:'Paycheck', amount:876.57, category:'paycheck' },
-    { date:'2026-02-18', description:'Percy jasckson set', amount:47.87, category:'misc' },
-    { date:'2026-02-17', description:'hot dogs for mom and dad', amount:52.04, category:'misc' },
-    { date:'2026-02-17', description:'cash deposit', amount:149.0, category:'other-income' },
-    { date:'2026-02-17', description:'Voice lessons', amount:200.0, category:'misc' },
-    { date:'2026-02-17', description:'oh hey coffee', amount:6.92, category:'coffee-drinks' },
-    { date:'2026-02-16', description:'gassy', amount:31.82, category:'gas' },
-    { date:'2026-02-16', description:'chat gpt', amount:20.0, category:'subscriptions' },
-    { date:'2026-02-15', description:'chips and queso', amount:10.49, category:'groceries' },
-    { date:'2026-02-15', description:'kingsmen', amount:15.0, category:'misc' },
-    { date:'2026-02-14', description:'lovebird', amount:13.27, category:'dining-out' },
-    { date:'2026-02-13', description:'haircut', amount:45.5, category:'hygiene' },
-    { date:'2026-02-12', description:'card interest', amount:16.08, category:'misc' },
-    { date:'2026-02-12', description:'parkig', amount:1.35, category:'misc' },
-    { date:'2026-02-12', description:'spotify', amount:6.75, category:'subscriptions' },
-    { date:'2026-02-10', description:'unite merch', amount:35.0, category:'clothing' },
-    { date:'2026-02-10', description:'craft and common coffee', amount:6.45, category:'coffee-drinks' },
-    { date:'2026-02-10', description:'craft and common sandwich', amount:9.0, category:'dining-out' },
-    { date:'2026-02-10', description:'kfc saucy', amount:14.25, category:'dining-out' },
-    { date:'2026-02-10', description:'quittr', amount:19.99, category:'subscriptions' },
-    { date:'2026-02-09', description:'audible?', amount:14.95, category:'misc' },
-    { date:'2026-02-09', description:'post gym milkshake', amount:5.21, category:'coffee-drinks' },
-    { date:'2026-02-08', description:'chipotle', amount:5.86, category:'dining-out' },
-    { date:'2026-02-05', description:'frosty', amount:4.46, category:'dining-out' },
-    { date:'2026-02-05', description:'Breaky', amount:0.09, category:'dining-out' },
-    { date:'2026-02-04', description:'candy for fundraising kids', amount:2.0, category:'misc' },
-    { date:'2026-02-04', description:'depop shipping bags', amount:20.0, category:'misc' },
-    { date:'2026-02-04', description:'sustain pedal', amount:9.05, category:'misc' },
-    { date:'2026-02-04', description:'paycheck', amount:699.81, category:'paycheck' },
-    { date:'2026-02-04', description:'groceries for mom', amount:77.0, category:'misc' },
-    { date:'2026-02-04', description:'poster board for depop', amount:2.0, category:'misc' },
-    { date:'2026-02-04', description:'Coffee', amount:1.92, category:'coffee-drinks' },
-    { date:'2026-02-03', description:'laundry freshener for mom', amount:20.2, category:'misc' },
-    { date:'2026-02-03', description:'depop thrifting', amount:20.14, category:'misc' },
-    { date:'2026-02-03', description:'mom paying me back', amount:40.0, category:'other-income' },
-    { date:'2026-02-02', description:'gloves and hand sanitizer for thrifting', amount:10.0, category:'misc' },
-    { date:'2026-02-02', description:'deodorant', amount:55.04, category:'hygiene' },
-    { date:'2026-02-02', description:'chilis', amount:22.99, category:'dining-out' },
-    { date:'2026-02-02', description:'Poker', amount:7.5, category:'other-income' },
-    { date:'2026-02-01', description:'interest', amount:4.14, category:'other-income' },
-    { date:'2026-02-01', description:'february tithes', amount:78.59, category:'tithes' },
-    { date:'2026-02-01', description:'Chipotle', amount:13.37, category:'dining-out' },
-    { date:'2026-02-01', description:'Gas', amount:31.85, category:'gas' },
-    { date:'2026-01-30', description:'millers', amount:34.78, category:'dining-out' },
-    { date:'2026-01-29', description:'Breaky', amount:0.09, category:'dining-out' },
-    { date:'2026-01-28', description:'parking ticket', amount:30.5, category:'misc' },
-    { date:'2026-01-28', description:'Tea and honey', amount:8.97, category:'groceries' },
-    { date:'2026-01-28', description:'Water', amount:33.0, category:'misc' },
-    { date:'2026-01-27', description:'korean garlic bread at haan', amount:8.98, category:'dining-out' },
-    { date:'2026-01-27', description:'haan coffee', amount:7.0, category:'coffee-drinks' },
-    { date:'2026-01-26', description:'gassy gas', amount:32.25, category:'gas' },
-    { date:'2026-01-24', description:'food at two towers', amount:25.45, category:'dining-out' },
-    { date:'2026-01-24', description:'icee at return of the king', amount:8.55, category:'coffee-drinks' },
-    { date:'2026-01-24', description:'panera with deca', amount:7.44, category:'dining-out' },
-    { date:'2026-01-23', description:'Post gym treat', amount:4.68, category:'coffee-drinks' },
-    { date:'2026-01-23', description:'', amount:0.09, category:'dining-out' },
-    { date:'2026-01-22', description:'lotr Tickets', amount:51.88, category:'misc' },
-    { date:'2026-01-21', description:'', amount:10.89, category:'dining-out' },
-    { date:'2026-01-21', description:'Dessert', amount:5.8, category:'dining-out' },
-    { date:'2026-01-21', description:'Paycheck', amount:601.85, category:'paycheck' },
-    { date:'2026-01-20', description:'Parking', amount:0.85, category:'misc' },
-    { date:'2026-01-20', description:'Bynx', amount:5.66, category:'coffee-drinks' },
-    { date:'2026-01-20', description:'Mom paid me back', amount:50.0, category:'other-income' },
-    { date:'2026-01-19', description:'Kaplan Refund', amount:49.0, category:'other-income' },
-    { date:'2026-01-19', description:'gassy', amount:31.86, category:'gas' },
-    { date:'2026-01-19', description:'lunch', amount:0.09, category:'dining-out' },
-    { date:'2026-01-18', description:'Publix for bible study lunch', amount:18.6, category:'dining-out' },
-    { date:'2026-01-18', description:'post wake baco bell', amount:6.59, category:'dining-out' },
-    { date:'2026-01-18', description:'pre kids starbs', amount:7.19, category:'coffee-drinks' },
-    { date:'2026-01-17', description:'Satuli', amount:8.51, category:'dining-out' },
-    { date:'2026-01-17', description:'foxtail wallet', amount:20.0, category:'coffee-drinks' },
-    { date:'2026-01-16', description:'movie refund', amount:30.88, category:'other-income' },
-    { date:'2026-01-16', description:'meds for mom', amount:35.48, category:'misc' },
-    { date:'2026-01-16', description:'starbs for mom', amount:10.22, category:'misc' },
-    { date:'2026-01-16', description:'bread for mom', amount:7.49, category:'misc' },
-    { date:'2026-01-16', description:'chipotle', amount:3.83, category:'dining-out' },
-    { date:'2026-01-15', description:'publix?', amount:20.42, category:'misc' },
-    { date:'2026-01-15', description:'kaplan 2x', amount:98.0, category:'misc' },
-    { date:'2026-01-15', description:'overdraft', amount:35.0, category:'misc' },
-    { date:'2026-01-14', description:'Coffee for Micah', amount:3.99, category:'misc' },
-    { date:'2026-01-14', description:'Deo and mouth wash', amount:5.36, category:'hygiene' },
-    { date:'2026-01-14', description:'Chatgpt', amount:20.0, category:'subscriptions' },
-    { date:'2026-01-14', description:'Macrofactor', amount:71.99, category:'subscriptions' },
-    { date:'2026-01-14', description:'Spotify', amount:6.75, category:'subscriptions' },
-    { date:'2026-01-14', description:'Deeply stroopwafel', amount:7.46, category:'coffee-drinks' },
-    { date:'2026-01-14', description:'Bread for mom', amount:7.49, category:'misc' },
-    { date:'2026-01-14', description:'Wednys for annaclaire', amount:11.66, category:'misc' },
-    { date:'2026-01-14', description:'Wendys', amount:12.0, category:'dining-out' },
-    { date:'2026-01-14', description:'Panda panda panda i got broads in atlanta', amount:10.97, category:'dining-out' },
-    { date:'2026-01-13', description:'Post work lunch', amount:4.21, category:'dining-out' },
-    { date:'2026-01-13', description:'Tix for bryan’s game', amount:9.0, category:'misc' },
-    { date:'2026-01-12', description:'Gassy gas', amount:30.4, category:'gas' },
-    { date:'2026-01-12', description:'Paying micah back for passion', amount:35.0, category:'vacation' },
-    { date:'2026-01-12', description:'Soup and juice for mom', amount:32.88, category:'misc' },
-    { date:'2026-01-12', description:'Rest of food', amount:0.68, category:'dining-out' },
-    { date:'2026-01-11', description:'Five guys for annaclaire', amount:18.0, category:'misc' },
-    { date:'2026-01-11', description:'Five guys', amount:18.18, category:'dining-out' },
-    { date:'2026-01-10', description:'Gas station drink', amount:6.39, category:'coffee-drinks' },
-    { date:'2026-01-10', description:'Gas money from AnnaClaire', amount:25.0, category:'other-income' },
-    { date:'2026-01-10', description:'Protein coffee', amount:7.19, category:'coffee-drinks' },
-    { date:'2026-01-10', description:'Gas', amount:27.22, category:'gas' },
-    { date:'2026-01-09', description:'Basically nothing', amount:0.09, category:'dining-out' },
-    { date:'2026-01-08', description:'Paycheck', amount:182.85, category:'paycheck' },
-    { date:'2026-01-07', description:'Coffee for annaclaire', amount:7.39, category:'misc' },
-    { date:'2026-01-07', description:'Henrique and Daniel’s gas money', amount:116.0, category:'other-income' },
-    { date:'2026-01-07', description:'Nate’s gas money', amount:58.0, category:'other-income' },
-    { date:'2026-01-07', description:'Passion roadtrip', amount:58.0, category:'gas' },
-    { date:'2026-01-07', description:'Food for mom', amount:10.69, category:'misc' },
-    { date:'2026-01-07', description:'Haircut', amount:45.0, category:'hygiene' },
-    { date:'2026-01-06', description:'Mom paying me back', amount:10.0, category:'other-income' },
-    { date:'2026-01-06', description:'Aldis', amount:74.13, category:'groceries' },
-    { date:'2026-01-04', description:'Gas station snacks', amount:5.65, category:'dining-out' },
-    { date:'2026-01-04', description:'Newks', amount:18.06, category:'dining-out' },
-    { date:'2026-01-03', description:'Whata', amount:16.42, category:'dining-out' },
-    { date:'2026-01-03', description:'In n out x2', amount:15.64, category:'dining-out' },
-    { date:'2026-01-03', description:'Coffee', amount:9.65, category:'coffee-drinks' },
-    { date:'2026-01-03', description:'Breakfast sandwich', amount:12.0, category:'dining-out' },
-    { date:'2026-01-02', description:'Coffee', amount:10.2, category:'coffee-drinks' },
-    { date:'2026-01-02', description:'JUMBO DOGS', amount:24.34, category:'dining-out' },
-    { date:'2026-01-02', description:'Iced coffee', amount:9.17, category:'coffee-drinks' },
-    { date:'2026-01-02', description:'Breakfast pretzel', amount:9.34, category:'dining-out' },
-    { date:'2026-01-02', description:'December tithes', amount:97.02, category:'tithes' },
-    { date:'2026-01-01', description:'Passion merch', amount:102.84, category:'clothing' },
-    { date:'2026-01-01', description:'Clear bag', amount:7.58, category:'misc' },
-    { date:'2026-01-01', description:'Hutchins!!', amount:41.51, category:'dining-out' },
-    { date:'2026-01-01', description:'Pens for journaling', amount:5.27, category:'misc' },
-    { date:'2026-06-10', description:'mcdonalds', amount:8.17, category:'dining-out' },
-    { date:'2026-06-10', description:'gas', amount:10.0, category:'gas' },
-    { date:'2026-06-10', description:'foxtail', amount:3.13, category:'coffee-drinks' },
-    { date:'2026-06-11', description:'chick fil a', amount:15.71, category:'dining-out' },
-    { date:'2026-06-11', description:'hat', amount:15.0, category:'clothing' },
-    { date:'2026-06-11', description:'haircut', amount:45.5, category:'hygiene' },
-    { date:'2026-06-11', description:'gas', amount:38.55, category:'gas' },
-    { date:'2026-06-11', description:'krispy kreme', amount:16.49, category:'misc' },
-    { date:'2026-06-12', description:'ajs', amount:12.64, category:'dining-out' },
-    { date:'2026-06-13', description:'chick fil a', amount:12.77, category:'dining-out' },
-    { date:'2026-06-12', description:'chick fil a', amount:15.07, category:'dining-out' },
-  ];
-  function seedBudgetTransactions(){
-    if(!state.seedFlags) state.seedFlags = {};
-    if(state.seedFlags.budgetSeeded) return;
-    if(!state.budgetTransactions.length){
-      state.budgetTransactions = SEED_BUDGET_TRANSACTIONS.map(t => Object.assign({
-        id: Date.now() + '-' + Math.random().toString(36).slice(2,7)
-      }, t));
-    }
-    state.seedFlags.budgetSeeded = true;
-    save();
-  }
-
-  // June 10 – Sept 6, 2026 transaction history pulled from the person's bank
-  // export (via the Google Sheet/chat). Ten of these are the same
-  // real-world charges the SEED_BUDGET_TRANSACTIONS seed above already
-  // covers for June 10-13 with rougher hand-typed descriptions — those are
-  // skipped at import time by matching date+amount against what's already
-  // in state.budgetTransactions, so nothing gets double-counted.
-  const SEED_HISTORICAL_BUDGET_TRANSACTIONS = [
-    { date:'2026-09-06', description:'Chipotle Mexican Grill', amount:8.31, category:'dining-out' },
-    { date:'2026-09-04', description:'AJ\'s Pizza', amount:7.1, category:'dining-out' },
-    { date:'2026-09-04', description:'Chick-fil-A', amount:6.17, category:'dining-out' },
-    { date:'2026-09-03', description:'Just Salad', amount:26.41, category:'dining-out' },
-    { date:'2026-09-01', description:'Chipotle Mexican Grill', amount:14.0, category:'dining-out' },
-    { date:'2026-08-31', description:'Wingstop', amount:16.59, category:'dining-out' },
-    { date:'2026-08-28', description:'AJ\'s Pizza', amount:12.64, category:'dining-out' },
-    { date:'2026-08-27', description:'Chick-fil-A', amount:13.26, category:'dining-out' },
-    { date:'2026-08-27', description:'Chipotle Mexican Grill', amount:10.44, category:'dining-out' },
-    { date:'2026-08-25', description:'Chipotle Mexican Grill', amount:14.0, category:'dining-out' },
-    { date:'2026-08-25', description:'Jeremiahs Italian Ice', amount:3.82, category:'dining-out' },
-    { date:'2026-08-24', description:'Culver\'s', amount:17.75, category:'dining-out' },
-    { date:'2026-08-23', description:'Sushi Yama', amount:97.0, category:'dining-out' },
-    { date:'2026-08-21', description:'AJ\'s Pizza', amount:12.64, category:'dining-out' },
-    { date:'2026-08-21', description:'Chick-fil-A', amount:11.17, category:'dining-out' },
-    { date:'2026-08-21', description:'Kizuna Sushi Hibachi', amount:12.0, category:'dining-out' },
-    { date:'2026-08-21', description:'Twistee Treat', amount:4.91, category:'dining-out' },
-    { date:'2026-08-19', description:'McDonald\'s', amount:10.85, category:'dining-out' },
-    { date:'2026-08-18', description:'Chipotle Mexican Grill', amount:17.36, category:'dining-out' },
-    { date:'2026-08-17', description:'Chick-fil-A', amount:9.21, category:'dining-out' },
-    { date:'2026-08-16', description:'Chipotle Mexican Grill', amount:14.86, category:'dining-out' },
-    { date:'2026-08-14', description:'AJ\'s Pizza', amount:12.64, category:'dining-out' },
-    { date:'2026-08-14', description:'Whataburger', amount:16.82, category:'dining-out' },
-    { date:'2026-08-11', description:'Chick-fil-A', amount:14.64, category:'dining-out' },
-    { date:'2026-08-11', description:'Taco Bell', amount:2.13, category:'dining-out' },
-    { date:'2026-08-11', description:'Taco Bell', amount:2.13, category:'dining-out' },
-    { date:'2026-08-10', description:'Spoleto', amount:22.34, category:'dining-out' },
-    { date:'2026-08-05', description:'AJ\'s Pizza', amount:12.64, category:'dining-out' },
-    { date:'2026-08-04', description:'Mayday Ice Cream', amount:8.62, category:'dining-out' },
-    { date:'2026-08-04', description:'4Rivers WG', amount:17.01, category:'dining-out' },
-    { date:'2026-09-06', description:'CRAFT & COMMON 2', amount:29.15, category:'dining-out' },
-    { date:'2026-09-06', description:'Publix', amount:9.62, category:'groceries' },
-    { date:'2026-09-03', description:'Publix', amount:12.84, category:'groceries' },
-    { date:'2026-08-16', description:'Whole Foods', amount:42.96, category:'groceries' },
-    { date:'2026-09-03', description:'Quay Church', amount:85.0, category:'tithes' },
-    { date:'2026-08-29', description:'Quay Church', amount:192.17, category:'tithes' },
-    { date:'2026-09-06', description:'Congo River Golf & Explo', amount:40.44, category:'golf' },
-    { date:'2026-08-14', description:'Mercedes-Benz', amount:35.22, category:'car-maintenance' },
-    { date:'2026-08-14', description:'Mercedes-Benz', amount:16.71, category:'car-maintenance' },
-    { date:'2026-08-16', description:'EVgo', amount:20.31, category:'gas' },
-    { date:'2026-08-15', description:'Buc-ee\'s', amount:5.52, category:'gas' },
-    { date:'2026-08-14', description:'Buc-ee\'s', amount:1.37, category:'gas' },
-    { date:'2026-09-03', description:'7-Eleven', amount:43.93, category:'gas' },
-    { date:'2026-08-27', description:'7-Eleven', amount:40.36, category:'gas' },
-    { date:'2026-08-22', description:'7-Eleven', amount:44.06, category:'gas' },
-    { date:'2026-08-13', description:'7-Eleven', amount:40.0, category:'gas' },
-    { date:'2026-08-20', description:'Hebrews The Coffee', amount:8.56, category:'coffee-drinks' },
-    { date:'2026-08-10', description:'Starbucks', amount:16.99, category:'coffee-drinks' },
-    { date:'2026-08-20', description:'7-Eleven', amount:9.05, category:'coffee-drinks' },
-    { date:'2026-08-12', description:'Dr. Drips', amount:17.04, category:'coffee-drinks' },
-    { date:'2026-08-19', description:'CVS', amount:31.93, category:'hygiene' },
-    { date:'2026-08-11', description:'CVS', amount:17.56, category:'hygiene' },
-    { date:'2026-08-30', description:'Whoop', amount:9.57, category:'subscriptions' },
-    { date:'2026-08-24', description:'Anthropic', amount:20.0, category:'subscriptions' },
-    { date:'2026-08-11', description:'Spotify', amount:14.64, category:'subscriptions' },
-    { date:'2026-08-10', description:'Apple Subscription', amount:19.99, category:'subscriptions' },
-    { date:'2026-09-06', description:'Target', amount:5.34, category:'misc' },
-    { date:'2026-08-28', description:'AMC Theatres', amount:36.19, category:'misc' },
-    { date:'2026-08-25', description:'AMC Theatres', amount:29.81, category:'misc' },
-    { date:'2026-08-10', description:'Target', amount:14.99, category:'misc' },
-    { date:'2026-08-10', description:'ParkMobile', amount:0.85, category:'misc' },
-    { date:'2026-08-13', description:'Valencia Clg', amount:31.22, category:'misc' },
-    { date:'2026-08-15', description:'Valencia Clg', amount:45.0, category:'misc' },
-    { date:'2026-08-15', description:'Valencia Clg', amount:1095.36, category:'misc' },
-    { date:'2026-08-06', description:'Orofacial & Dental', amount:70.0, category:'misc' },
-    { date:'2026-08-20', description:'Venmo', amount:230.0, category:'misc' },
-    { date:'2026-08-17', description:'Zelle (sent)', amount:16.0, category:'misc' },
-    { date:'2026-08-15', description:'Plutoslides', amount:34.99, category:'misc' },
-    { date:'2026-08-13', description:'Menb', amount:9.2, category:'misc' },
-    { date:'2026-09-02', description:'ACH: STEWARDSHIP AMER', amount:280.4, category:'paycheck' },
-    { date:'2026-08-26', description:'ACH: STEWARDSHIP AMER', amount:280.42, category:'paycheck' },
-    { date:'2026-08-19', description:'ACH: STEWARDSHIP AMER', amount:280.41, category:'paycheck' },
-    { date:'2026-08-12', description:'ACH: STEWARDSHIP AMER', amount:308.41, category:'paycheck' },
-    { date:'2026-08-05', description:'ACH: STEWARDSHIP AMER', amount:280.41, category:'paycheck' },
-    { date:'2026-08-29', description:'Zelle (received)', amount:50.0, category:'other-income' },
-    { date:'2026-08-13', description:'Zelle (received)', amount:100.0, category:'other-income' },
-    { date:'2026-08-03', description:'Culver\'s', amount:13.09, category:'dining-out' },
-    { date:'2026-08-03', description:'Sizzlin Greens', amount:19.16, category:'dining-out' },
-    { date:'2026-08-02', description:'Huey Magoo\'s Chicken Tenders', amount:14.14, category:'dining-out' },
-    { date:'2026-08-01', description:'Hapeville Dwarf House', amount:29.0, category:'dining-out' },
-    { date:'2026-08-01', description:'Chick-fil-A', amount:16.69, category:'dining-out' },
-    { date:'2026-07-31', description:'Moe\'s Southwest Grill', amount:17.82, category:'dining-out' },
-    { date:'2026-07-31', description:'Chick-fil-A', amount:15.5, category:'dining-out' },
-    { date:'2026-07-31', description:'Dairy Queen', amount:16.31, category:'dining-out' },
-    { date:'2026-07-31', description:'AJ\'s Pizza', amount:12.64, category:'dining-out' },
-    { date:'2026-07-30', description:'Fk Winter Garden Emv', amount:12.25, category:'dining-out' },
-    { date:'2026-07-27', description:'Culver\'s', amount:16.18, category:'dining-out' },
-    { date:'2026-07-27', description:'Chipotle Mexican Grill', amount:10.01, category:'dining-out' },
-    { date:'2026-07-27', description:'Deeply Cafe & Bottle', amount:20.5, category:'dining-out' },
-    { date:'2026-07-25', description:'huey magoo\'s', amount:9.79, category:'dining-out' },
-    { date:'2026-07-21', description:'Chipotle Mexican Grill', amount:9.53, category:'dining-out' },
-    { date:'2026-07-21', description:'McDonald\'s', amount:9.14, category:'dining-out' },
-    { date:'2026-07-20', description:'Chick-fil-A', amount:16.01, category:'dining-out' },
-    { date:'2026-07-19', description:'Chipotle Mexican Grill', amount:14.0, category:'dining-out' },
-    { date:'2026-07-18', description:'Panda Express', amount:13.42, category:'dining-out' },
-    { date:'2026-07-14', description:'Baskin-Robbins', amount:9.47, category:'dining-out' },
-    { date:'2026-07-13', description:'Jimmy John\'s', amount:8.51, category:'dining-out' },
-    { date:'2026-07-03', description:'Blaze Pizza', amount:9.05, category:'dining-out' },
-    { date:'2026-06-30', description:'Seven Made', amount:7.49, category:'dining-out' },
-    { date:'2026-08-03', description:'Starbucks', amount:7.4, category:'coffee-drinks' },
-    { date:'2026-07-30', description:'Filigree Coffee', amount:17.59, category:'coffee-drinks' },
-    { date:'2026-07-21', description:'Foxtail Coffee Company', amount:2.02, category:'coffee-drinks' },
-    { date:'2026-07-08', description:'Foxtail Coffee Company', amount:20.0, category:'coffee-drinks' },
-    { date:'2026-08-01', description:'Buc-ee\'s', amount:5.71, category:'gas' },
-    { date:'2026-07-31', description:'ExxonMobil', amount:5.1, category:'gas' },
-    { date:'2026-07-30', description:'7-Eleven', amount:5.32, category:'gas' },
-    { date:'2026-07-27', description:'Wawa', amount:48.47, category:'gas' },
-    { date:'2026-07-24', description:'7-Eleven', amount:3.82, category:'gas' },
-    { date:'2026-07-21', description:'BP', amount:9.18, category:'gas' },
-    { date:'2026-07-20', description:'Publix', amount:360.0, category:'groceries' },
-    { date:'2026-07-25', description:'Walgreens', amount:16.69, category:'hygiene' },
-    { date:'2026-07-24', description:'CVS', amount:39.12, category:'hygiene' },
-    { date:'2026-07-23', description:'The Barber House', amount:45.5, category:'hygiene' },
-    { date:'2026-07-25', description:'H&M', amount:21.4, category:'clothing' },
-    { date:'2026-07-13', description:'Ross Dress for Less', amount:20.22, category:'clothing' },
-    { date:'2026-07-30', description:'Apple Subscription', amount:0.99, category:'subscriptions' },
-    { date:'2026-07-24', description:'Anthropic', amount:20.0, category:'subscriptions' },
-    { date:'2026-07-13', description:'Spotify', amount:14.64, category:'subscriptions' },
-    { date:'2026-07-08', description:'Audible', amount:14.95, category:'subscriptions' },
-    { date:'2026-06-30', description:'Amazon Prime Video', amount:6.77, category:'subscriptions' },
-    { date:'2026-06-30', description:'Amazon Prime Video', amount:2.24, category:'subscriptions' },
-    { date:'2026-07-03', description:'Quay Church', amount:262.05, category:'tithes' },
-    { date:'2026-07-27', description:'Target', amount:10.64, category:'misc' },
-    { date:'2026-07-25', description:'AMC Theatres', amount:29.81, category:'misc' },
-    { date:'2026-07-23', description:'3890 FTNESS CF DR PHILLIP', amount:74.54, category:'misc' },
-    { date:'2026-07-23', description:'WST400CHNLSD 414 CHANNELS', amount:45.0, category:'misc' },
-    { date:'2026-07-22', description:'Orofacial & Dental', amount:140.0, category:'misc' },
-    { date:'2026-07-18', description:'Plutoslides', amount:34.99, category:'misc' },
-    { date:'2026-07-14', description:'Venmo', amount:200.0, category:'misc' },
-    { date:'2026-07-12', description:'Target', amount:243.62, category:'misc' },
-    { date:'2026-08-02', description:'CSC ServiceWorks', amount:3.0, category:'misc' },
-    { date:'2026-07-06', description:'Mcgraw-hill Higher Ed', amount:151.42, category:'misc' },
-    { date:'2026-07-06', description:'Textbookxcom', amount:69.2, category:'misc' },
-    { date:'2026-07-10', description:'PNC Bank', amount:300.0, category:'misc' },
-    { date:'2026-07-10', description:'PNC Bank', amount:400.0, category:'misc' },
-    { date:'2026-07-06', description:'PNC Bank', amount:400.0, category:'misc' },
-    { date:'2026-07-30', description:'ACH: STEWARDSHIP AMER', amount:280.41, category:'paycheck' },
-    { date:'2026-07-15', description:'ACH: STEWARDSHIP AMER', amount:280.41, category:'paycheck' },
-    { date:'2026-07-08', description:'ACH: STEWARDSHIP AMER', amount:210.41, category:'paycheck' },
-    { date:'2026-07-01', description:'ACH: STEWARDSHIP AMER', amount:280.41, category:'paycheck' },
-    { date:'2026-07-24', description:'Zelle (received - Owen Treadwell)', amount:40.0, category:'other-income' },
-    { date:'2026-07-20', description:'Zelle (received - Ziggurat Co)', amount:360.0, category:'other-income' },
-    { date:'2026-07-05', description:'Zelle (received - Ziggurat Co)', amount:1500.0, category:'other-income' },
-    { date:'2026-07-05', description:'Zelle (received - Lisa Jardim Osborne)', amount:175.0, category:'other-income' },
-    { date:'2026-07-04', description:'Zelle (received - Leonardo Yoshioka)', amount:15.0, category:'other-income' },
-    { date:'2026-06-30', description:'Zelle (received - Evan Richman)', amount:10.0, category:'other-income' },
-    { date:'2026-07-01', description:'Zelle (received - Adriana Jardim)', amount:300.0, category:'other-income' },
-    { date:'2026-07-06', description:'Zelle (received - Tax Direct Incorporated)', amount:1908.0, category:'other-income' },
-    { date:'2026-07-03', description:'Valencia Refund', amount:1773.46, category:'other-income' },
-    { date:'2026-07-08', description:'McGraw-Hill refund', amount:151.42, category:'other-income' },
-    { date:'2026-06-29', description:'Culver\'s', amount:12.66, category:'dining-out' },
-    { date:'2026-06-28', description:'Planet Smoothie', amount:14.37, category:'dining-out' },
-    { date:'2026-06-28', description:'Whataburger', amount:15.35, category:'dining-out' },
-    { date:'2026-06-17', description:'Whataburger', amount:16.33, category:'dining-out' },
-    { date:'2026-06-16', description:'Blaze Pizza', amount:11.7, category:'dining-out' },
-    { date:'2026-06-15', description:'Smoothie King', amount:10.48, category:'dining-out' },
-    { date:'2026-06-15', description:'Culver\'s', amount:12.66, category:'dining-out' },
-    { date:'2026-06-14', description:'Agave Azul Windermer', amount:30.36, category:'dining-out' },
-    { date:'2026-06-13', description:'Cosa Nostra Cbg Nro', amount:14.97, category:'dining-out' },
-    { date:'2026-06-13', description:'Seven Made', amount:7.49, category:'dining-out' },
-    { date:'2026-06-13', description:'Sodie Doces Idrive', amount:85.66, category:'dining-out' },
-    { date:'2026-06-13', description:'Chick-fil-A', amount:11.41, category:'dining-out' },
-    { date:'2026-06-13', description:'Chick-fil-A', amount:7.65, category:'dining-out' },
-    { date:'2026-06-12', description:'AJ\'s Pizza', amount:12.64, category:'dining-out' },
-    { date:'2026-06-12', description:'Chick-fil-A', amount:15.07, category:'dining-out' },
-    { date:'2026-06-12', description:'Chick-fil-A', amount:12.77, category:'dining-out' },
-    { date:'2026-06-11', description:'Krispy Kreme', amount:16.49, category:'dining-out' },
-    { date:'2026-06-11', description:'Chick-fil-A', amount:15.71, category:'dining-out' },
-    { date:'2026-06-10', description:'McDonald\'s', amount:8.17, category:'dining-out' },
-    { date:'2026-06-28', description:'Starbucks', amount:13.12, category:'coffee-drinks' },
-    { date:'2026-06-15', description:'Starbucks', amount:13.74, category:'coffee-drinks' },
-    { date:'2026-06-17', description:'Buc-ee\'s', amount:4.53, category:'gas' },
-    { date:'2026-06-10', description:'Foxtail Coffee Company', amount:3.13, category:'coffee-drinks' },
-    { date:'2026-06-16', description:'Buc-ee\'s', amount:60.17, category:'gas' },
-    { date:'2026-06-16', description:'Buc-ee\'s', amount:14.13, category:'gas' },
-    { date:'2026-06-15', description:'Wawa', amount:12.55, category:'gas' },
-    { date:'2026-06-15', description:'7-Eleven', amount:41.41, category:'gas' },
-    { date:'2026-06-11', description:'7-Eleven', amount:38.55, category:'gas' },
-    { date:'2026-06-10', description:'7-Eleven', amount:10.0, category:'gas' },
-    { date:'2026-06-11', description:'The Barber House', amount:45.5, category:'hygiene' },
-    { date:'2026-06-21', description:'Anthropic', amount:20.0, category:'subscriptions' },
-    { date:'2026-06-12', description:'Spotify', amount:7.88, category:'subscriptions' },
-    { date:'2026-06-11', description:'Quay Church', amount:15.0, category:'tithes' },
-    { date:'2026-06-27', description:'Fast Fix Jewelry', amount:90.45, category:'misc' },
-    { date:'2026-06-26', description:'Amazon', amount:118.56, category:'misc' },
-    { date:'2026-06-26', description:'Orangecnty', amount:187.0, category:'misc' },
-    { date:'2026-06-26', description:'E-pay Tf', amount:3.5, category:'misc' },
-    { date:'2026-06-26', description:'AMC Theatres', amount:27.68, category:'misc' },
-    { date:'2026-06-20', description:'Plutoslides', amount:34.99, category:'misc' },
-    { date:'2026-06-24', description:'Zelle (sent - Nicolas)', amount:27.0, category:'misc' },
-    { date:'2026-06-13', description:'Walmart', amount:30.0, category:'misc' },
-    { date:'2026-06-11', description:'Venmo', amount:200.0, category:'misc' },
-    { date:'2026-06-15', description:'Uber', amount:13.95, category:'misc' },
-    { date:'2026-06-24', description:'ACH: STEWARDSHIP AMER', amount:210.41, category:'paycheck' },
-    { date:'2026-06-16', description:'ACH: STEWARDSHIP AMER', amount:272.73, category:'paycheck' },
-    { date:'2026-06-10', description:'ACH: STEWARDSHIP AMER', amount:269.91, category:'paycheck' },
-    { date:'2026-06-29', description:'Apple Cash (received)', amount:550.0, category:'other-income' },
-    { date:'2026-06-21', description:'Valencia Refund', amount:925.0, category:'other-income' },
-    { date:'2026-06-13', description:'Zelle (received - Adriana Jardim)', amount:90.0, category:'other-income' },
-  ];
-  function importHistoricalBudgetTransactions(){
-    if(!state.seedFlags) state.seedFlags = {};
-    if(state.seedFlags.historicalBudgetImported) return;
-    const existingKeys = new Set(state.budgetTransactions.map(t => t.date + '|' + t.amount + '|' + t.category));
-    // Two more real duplicates of the earlier informal seed don't line up on
-    // date+amount+category: a June 11 Krispy Kreme charge the old seed filed
-    // under 'misc' instead of 'dining-out', and a June 12/13 $12.77
-    // Chick-fil-A charge recorded a day apart between the two sources.
-    // Excluded by hand since they're the same real charges either way.
-    const KNOWN_DUPLICATE_KEYS = new Set([
-      '2026-06-11|16.49|dining-out',
-      '2026-06-12|12.77|dining-out',
-    ]);
-    SEED_HISTORICAL_BUDGET_TRANSACTIONS.forEach(t => {
-      const key = t.date + '|' + t.amount + '|' + t.category;
-      if(existingKeys.has(key) || KNOWN_DUPLICATE_KEYS.has(key)) return; // already covered by the informal June seed above
-      state.budgetTransactions.push(Object.assign({
-        id: Date.now() + '-' + Math.random().toString(36).slice(2,7)
-      }, t));
-    });
-    state.seedFlags.historicalBudgetImported = true;
-    save();
-  }
-
-  // September 2026 category budget limits — based on the Jun-Aug spending
-  // average per category, with Dining Out deliberately cut well below its
-  // ~$390/mo average. Car Maintenance, Misc, Tithes, and Vacation are left
-  // unset on purpose: too irregular/one-off (Misc, Car Maintenance,
-  // Vacation) or not a spending category to cap (Tithes). Only fills in a
-  // category that doesn't already have a limit, so it won't clobber
-  // anything set by hand in the app since.
-  const SEPTEMBER_BUDGET_LIMITS = {
-    'dining-out': 250,
-    'gas': 160,
-    'groceries': 150,
-    'hygiene': 85,
-    'clothing': 75,
-    'coffee-drinks': 55,
-    'subscriptions': 55,
-    'golf': 50,
-  };
-  function seedSeptemberBudgetLimits(){
-    if(!state.seedFlags) state.seedFlags = {};
-    if(state.seedFlags.septemberBudgetLimitsSeeded) return;
-    Object.keys(SEPTEMBER_BUDGET_LIMITS).forEach(catId => {
-      if(state.categoryBudgetLimits[catId] === undefined){
-        state.categoryBudgetLimits[catId] = SEPTEMBER_BUDGET_LIMITS[catId];
-      }
-    });
-    state.seedFlags.septemberBudgetLimitsSeeded = true;
-    save();
-  }
-
   // One-time seed data pulled from uploaded Statistics course assignments.
   // Only inserted once (tracked via state.seedFlags) so re-opening the app
   // doesn't duplicate them if you've since edited or deleted any.
@@ -1365,10 +686,6 @@
   }
   migrateGymHabitToManual();
 
-  seedBudgetTransactions();
-  importHistoricalBudgetTransactions();
-  seedSeptemberBudgetLimits();
-
   seedJournalHabit();
 
   let weekAnchor = startOfWeek(new Date());
@@ -1437,14 +754,10 @@
           if(!parsed.allDayEvents) parsed.allDayEvents = [];
           if(!parsed.lists) parsed.lists = [];
           if(!parsed.longTermGoals) parsed.longTermGoals = [];
-          if(!parsed.budgetTransactions) parsed.budgetTransactions = [];
-          if(!parsed.categoryBudgetLimits) parsed.categoryBudgetLimits = {};
           if(!parsed.journalEntries) parsed.journalEntries = {};
-          if(!parsed.scoreOptIn) parsed.scoreOptIn = { budget: false };
           if(!parsed.blockedSenders) parsed.blockedSenders = [];
           if(!parsed.birthdays) parsed.birthdays = [];
           if(!parsed.tomorrowPlans) parsed.tomorrowPlans = {};
-          if(!parsed.recurringTransactions) parsed.recurringTransactions = [];
           if(!parsed.autoScheduleRules) parsed.autoScheduleRules = [];
           if(!parsed.tomorrowWakeTimes) parsed.tomorrowWakeTimes = {};
           if(!parsed.goalPrompts) parsed.goalPrompts = { lastDaily:null, lastWeekly:null, lastMonthly:null, lastYearly:null };
@@ -1487,13 +800,10 @@
       items, workOff: {}, tasks: [], healthLog: {}, seedFlags: {}, datedEvents: {},
       dailyGoals: [], weeklyGoals: [], dailyGoalLog: {}, weeklyGoalLog: {},
       allDayEvents: [], lists: [], longTermGoals: [],
-      budgetTransactions: [], categoryBudgetLimits: {},
       journalEntries: {},
-      scoreOptIn: { budget: false },
       blockedSenders: [],
       birthdays: [],
       tomorrowPlans: {},
-      recurringTransactions: [],
       autoScheduleRules: [],
       tomorrowWakeTimes: {},
       goalPrompts: { lastDaily:null, lastWeekly:null, lastMonthly:null, lastYearly:null },
@@ -2112,10 +1422,6 @@
         Try: <b>task:</b> call dentist tomorrow · <b>habit:</b> drink water · <b>weekly habit:</b> gym 3x · <b>goal:</b> read 12 books · <b>tomorrow:</b> workout at 6pm
       </div>
       <div class="empty-note" id="gdStatus" style="display:none"></div>
-      <button type="button" class="custom-select" id="gdScanBtn" style="margin-top:10px">
-        <span class="custom-select-label">Scan a receipt or statement</span>
-        <span class="custom-select-chev">›</span>
-      </button>
       <div class="modal-actions">
         <button class="cancel" id="gdCancel">Cancel</button>
         <button class="save" id="gdSubmit">Add</button>
@@ -2125,7 +1431,6 @@
     const input = document.getElementById('gdText');
     const status = document.getElementById('gdStatus');
     document.getElementById('gdCancel').onclick = closeModal;
-    document.getElementById('gdScanBtn').onclick = openGoldieScanModal;
     document.getElementById('gdHelpBtn').onclick = () => {
       const hint = document.getElementById('gdHint');
       hint.style.display = hint.style.display === 'none' ? 'block' : 'none';
@@ -2146,207 +1451,6 @@
     document.getElementById('gdSubmit').onclick = submit;
     input.addEventListener('keydown', e => { if(e.key === 'Enter') submit(); });
     setTimeout(() => input.focus(), 50);
-  }
-
-  /* ---------------- Goldie: scan a receipt/statement (free, on-device OCR) ----------------
-     Tesseract.js (loaded from a CDN on first use, not bundled) runs OCR
-     entirely in the browser — the image itself never leaves the device,
-     no AI, no API key, no cost. This is text extraction, not real
-     understanding, so results go through a review screen (editable
-     description/amount/date/category per row) before anything touches
-     state.budgetTransactions. Works best on a clean statement screenshot;
-     a photo of a crumpled receipt will need more correcting. */
-
-  let _tesseractLoadPromise = null;
-  function loadTesseract(){
-    if(window.Tesseract) return Promise.resolve(window.Tesseract);
-    if(_tesseractLoadPromise) return _tesseractLoadPromise;
-    _tesseractLoadPromise = new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-      script.onload = () => resolve(window.Tesseract);
-      script.onerror = () => { _tesseractLoadPromise = null; reject(new Error('Could not load OCR library')); };
-      document.head.appendChild(script);
-    });
-    return _tesseractLoadPromise;
-  }
-
-  // Order matters — checked in sequence, first match wins.
-  const GOLDIE_BUDGET_CATEGORY_KEYWORDS = {
-    'coffee-drinks': ['starbucks','dunkin','coffee'],
-    'dining-out': ['restaurant','mcdonald','chipotle','doordash','uber eats','grubhub','cafe','diner','wendy','chick-fil-a','taco bell','pizza'],
-    gas: ['shell','chevron','exxon','bp #','gas station','fuel','mobil','marathon'],
-    groceries: ['publix','kroger','walmart','trader joe','whole foods','aldi','grocery','safeway'],
-    hygiene: ['cvs','walgreens','pharmacy'],
-    'car-maintenance': ['auto ','mechanic','oil change','tire','jiffy lube'],
-    clothing: ['nike','uniqlo','gap','old navy','clothing','apparel'],
-    subscriptions: ['netflix','spotify','hulu','subscription','disney+','prime video'],
-    paycheck: ['payroll','direct deposit','salary','paycheck'],
-    'other-income': ['deposit','refund','reimbursement'],
-  };
-  function goldieGuessBudgetCategory(text){
-    const lower = text.toLowerCase();
-    for(const cat in GOLDIE_BUDGET_CATEGORY_KEYWORDS){
-      if(GOLDIE_BUDGET_CATEGORY_KEYWORDS[cat].some(kw => lower.includes(kw))) return cat;
-    }
-    return 'misc';
-  }
-
-  // One line of OCR'd text -> one candidate transaction, if it has a
-  // dollar-amount-shaped number on it. Reuses goldieParseDate for the
-  // MM/DD a statement line usually carries.
-  function parseTransactionsFromOcrText(text){
-    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-    const amountRe = /-?\$?\d{1,3}(?:,\d{3})*\.\d{2}\b/;
-    const candidates = [];
-    lines.forEach(line => {
-      const m = line.match(amountRe);
-      if(!m) return;
-      const amount = Math.abs(parseFloat(m[0].replace(/[^0-9.-]/g, '')));
-      if(!amount) return;
-      const rest = line.replace(m[0], '').trim();
-      const { dueDate, cleaned } = goldieParseDate(rest);
-      let description = (cleaned || rest).replace(/[-–|.\s]+$/, '').trim();
-      if(!description) description = 'Transaction';
-      candidates.push({
-        _rowId: 'ocrtx-' + Date.now() + '-' + Math.random().toString(36).slice(2,7),
-        date: dueDate || todayStr(),
-        description,
-        amount,
-        category: goldieGuessBudgetCategory(description),
-      });
-    });
-    return candidates;
-  }
-
-  function openGoldieScanModal(){
-    const overlay = document.getElementById('modalOverlay');
-    const content = document.getElementById('modalContent');
-    content.style.removeProperty('--chip-color');
-    content.innerHTML = `
-      <div class="modal-handle"></div>
-      <div class="modal-title"><span class="sw" style="background:var(--accent)"></span>Goldie — Scan</div>
-      <div class="modal-subtitle">Free, on-device OCR — the image never leaves your phone. Best on a clear statement screenshot; a receipt photo may need more fixing up after.</div>
-      <div style="margin-top:10px">${customFileHtml('gdScanFile', 'image/*', 'Choose a photo')}</div>
-      <div class="modal-actions">
-        <button class="cancel" id="gdScanCancel" style="flex:1">Cancel</button>
-      </div>
-    `;
-    overlay.classList.remove('hidden');
-    document.getElementById('gdScanCancel').onclick = closeModal;
-    wireCustomFile('gdScanFile', (file) => {
-      if(!file) return;
-      renderGoldieScanStatus('Reading the image… this can take a few seconds the first time.');
-      loadTesseract()
-        .then(Tesseract => Tesseract.recognize(file, 'eng'))
-        .then(({ data:{ text } }) => {
-          const candidates = parseTransactionsFromOcrText(text);
-          if(!candidates.length){
-            renderGoldieScanStatus("Couldn't find anything that looked like a transaction in that image. Try a clearer photo, or add it manually in the Budget tab.", true, text);
-          } else {
-            renderGoldieScanReview(candidates, text);
-          }
-        })
-        .catch(() => renderGoldieScanStatus("Couldn't read that image — check your connection (the OCR library loads from the internet the first time) and try again.", true));
-    });
-  }
-
-  // rawText (optional): shown in a collapsible section so the raw OCR
-  // output can be inspected/copied when the parsing gets something
-  // wrong — screenshot layouts vary a lot app to app, so seeing the
-  // actual extracted text is how a parsing mismatch gets diagnosed.
-  function goldieRawTextDetailsHtml(rawText){
-    if(!rawText) return '';
-    return `
-      <details style="margin-top:10px">
-        <summary class="proj-desc" style="cursor:pointer">Show raw scanned text</summary>
-        <textarea readonly rows="6" style="width:100%;margin-top:6px;font-family:var(--font-mono);font-size:11px">${escapeHtml(rawText)}</textarea>
-      </details>
-    `;
-  }
-
-  function renderGoldieScanStatus(message, withClose, rawText){
-    const content = document.getElementById('modalContent');
-    content.innerHTML = `
-      <div class="modal-handle"></div>
-      <div class="modal-title"><span class="sw" style="background:var(--accent)"></span>Goldie — Scan</div>
-      <div class="empty-note">${escapeHtml(message)}</div>
-      ${goldieRawTextDetailsHtml(rawText)}
-      ${withClose ? '<div class="modal-actions"><button class="save" id="gdScanClose" style="flex:1">Close</button></div>' : ''}
-    `;
-    if(withClose) document.getElementById('gdScanClose').onclick = closeModal;
-  }
-
-  function renderGoldieScanReview(candidates, rawText){
-    const content = document.getElementById('modalContent');
-    const catOptionsHtml = ['expense','neutral','income'].map(type => {
-      const opts = BUDGET_CATEGORIES.filter(c => c.type === type)
-        .map(c => '<option value="' + c.id + '">' + escapeHtml(c.label) + '</option>').join('');
-      const groupLabel = type === 'expense' ? 'Expense' : type === 'neutral' ? 'Savings / Transfer' : 'Income';
-      return '<optgroup label="' + groupLabel + '">' + opts + '</optgroup>';
-    }).join('');
-
-    content.innerHTML = `
-      <div class="modal-handle"></div>
-      <div class="modal-title"><span class="sw" style="background:var(--accent)"></span>Goldie — Review</div>
-      <div class="modal-subtitle">Found ${candidates.length} possible transaction${candidates.length === 1 ? '' : 's'} — OCR guesses at date/category, so check before adding.</div>
-      <div id="gdReviewList"></div>
-      ${goldieRawTextDetailsHtml(rawText)}
-      <div class="modal-actions">
-        <button class="cancel" id="gdReviewCancel">Cancel</button>
-        <button class="save" id="gdReviewAdd">Add ${candidates.length}</button>
-      </div>
-    `;
-    const list = document.getElementById('gdReviewList');
-    candidates.forEach(c => {
-      const dateId = 'gdDate-' + c._rowId;
-      const catId = 'gdCat-' + c._rowId;
-      const row = document.createElement('div');
-      row.className = 'lg-card';
-      row.style.marginBottom = '10px';
-      row.dataset.rowId = c._rowId;
-      row.innerHTML = `
-        <div class="lg-card-top">
-          <div style="flex:1">
-            <input type="text" class="gdReviewDesc" value="${escapeHtml(c.description)}" maxlength="60" style="width:100%;margin-bottom:6px">
-            <div style="display:flex;gap:8px;align-items:center">
-              <input type="number" class="gdReviewAmount" value="${c.amount}" min="0" step="0.01" style="width:90px">
-              ${customDateHtml(dateId, c.date)}
-            </div>
-          </div>
-          <button class="lg-card-del gdReviewRemove">×</button>
-        </div>
-        <div style="margin-top:8px">${customSelectHtml(catId, catOptionsHtml, c.category, 'Category')}</div>
-      `;
-      list.appendChild(row);
-      wireCustomDate(dateId, {});
-      wireCustomSelect(catId, catOptionsHtml, 'Category');
-      row.querySelector('.gdReviewRemove').onclick = () => {
-        row.remove();
-        const remaining = list.children.length;
-        document.getElementById('gdReviewAdd').textContent = 'Add ' + remaining;
-        if(!remaining) closeModal();
-      };
-    });
-
-    document.getElementById('gdReviewCancel').onclick = closeModal;
-    document.getElementById('gdReviewAdd').onclick = () => {
-      let count = 0;
-      list.querySelectorAll('[data-row-id]').forEach(row => {
-        const rowId = row.dataset.rowId;
-        const description = row.querySelector('.gdReviewDesc').value.trim();
-        const amount = Math.max(0, parseFloat(row.querySelector('.gdReviewAmount').value) || 0);
-        const date = document.getElementById('gdDate-' + rowId).value || todayStr();
-        const category = document.getElementById('gdCat-' + rowId).value || 'misc';
-        if(!description || !amount) return;
-        state.budgetTransactions.push({ id: Date.now() + '-' + Math.random().toString(36).slice(2,7), date, description, amount, category });
-        count++;
-      });
-      if(!count) return;
-      save();
-      closeModal();
-      renderAll();
-    };
   }
 
   /* ---------------- Tomorrow (time-blocked plan for the next day) ----------------
@@ -3550,29 +2654,24 @@
       </div>
     `;
     // Tapping opens a centered pop-up with the per-category breakdown,
-    // same pattern as Budget/Tasks below, instead of navigating away.
+    // same pattern as Tasks below, instead of navigating away.
     overallTile.onclick = () => openDashDetailModal('Overall Score', (body) => {
       const s = computeScores();
       const cards = [
         { key:'core',    title:'Core productivity', note:'Habits, tasks, and weekly goals — last 7 days.' },
         { key:'journal', title:'Journal',            note:'Days with a journal entry — last 7 days.' },
-        { key:'budget',  title:'Budget',             note:'Days within category limits this month.' },
       ];
       cards.forEach(c => {
         const row = document.createElement('div');
         row.className = 'dash-expand-row';
-        if(c.key === 'budget' && !s.budget.optedIn){
-          row.innerHTML = `<span class="drow-name">${escapeHtml(c.title)}</span><span class="drow-amt">off</span>`;
-        } else {
-          const val = s[c.key].score;
-          row.innerHTML = `<span class="drow-name">${escapeHtml(c.title)}</span><span class="drow-amt">${val === null ? '–' : val + ' / 100'}</span>`;
-        }
+        const val = s[c.key].score;
+        row.innerHTML = `<span class="drow-name">${escapeHtml(c.title)}</span><span class="drow-amt">${val === null ? '–' : val + ' / 100'}</span>`;
         body.appendChild(row);
       });
       const note = document.createElement('div');
       note.className = 'proj-desc';
       note.style.marginTop = '4px';
-      note.textContent = 'Turn Budget scoring on/off in Settings. For the full breakdown, see Scores in the More menu.';
+      note.textContent = 'For the full breakdown, see Scores in the More menu.';
       body.appendChild(note);
     });
     grid.appendChild(overallTile);
@@ -3629,39 +2728,6 @@
       }
     });
     grid.appendChild(habitsTile);
-
-    // Budget — remaining for the month against category limits, not just
-    // raw spend, so the number answers "how much do I have left." Tapping
-    // the tile opens a centered pop-up with the per-category breakdown
-    // instead of navigating to the Budget tab.
-    const bmKey = budgetMonthKey(new Date());
-    const monthTxns = state.budgetTransactions.filter(t => t.date.startsWith(bmKey));
-    const monthExpense = monthTxns.filter(t => budgetCatById[t.category]?.type === 'expense').reduce((s,t) => s + t.amount, 0);
-    const totalLimit = Object.values(state.categoryBudgetLimits).reduce((s,v) => s + (v || 0), 0);
-    const hasLimits = totalLimit > 0;
-    const remaining = totalLimit - monthExpense;
-    grid.appendChild(makeDashModalTile({
-      color: hasLimits ? (remaining < 0 ? 'var(--error)' : '#3FC7D6') : '#3FC7D6',
-      title: 'Budget',
-      stat: hasLimits ? '$' + Math.abs(remaining).toFixed(0) : '$' + monthExpense.toFixed(0),
-      sub: hasLimits ? (remaining < 0 ? 'over this month' : 'left this month') : 'spent this month',
-      renderBody: (body) => {
-        const statuses = computeCategoryBudgetStatus(monthTxns);
-        if(!statuses.length){
-          const empty = document.createElement('div');
-          empty.className = 'empty-note';
-          empty.textContent = 'No category budgets set yet.';
-          body.appendChild(empty);
-          return;
-        }
-        statuses.forEach(s => {
-          const row = document.createElement('div');
-          row.className = 'dash-expand-row';
-          row.innerHTML = `<span class="drow-name">${escapeHtml(s.cat.label)}</span><span class="drow-amt${s.over ? ' over' : ''}">$${s.spent.toFixed(0)} / $${s.limit.toFixed(0)}</span>`;
-          body.appendChild(row);
-        });
-      }
-    }));
 
     // Tasks — same centered-pop-up pattern: the tile shows a compact
     // due-today/overdue count, the modal lists everything due within the
@@ -3764,506 +2830,6 @@
     `;
     tile.onclick = () => openDashDetailModal(opts.title, opts.renderBody);
     return tile;
-  }
-
-  /* ---------------- Budget ---------------- */
-
-  function budgetMonthKey(d){ return d.getFullYear() + '-' + pad2(d.getMonth()+1); }
-  let budgetSelectedMonth = budgetMonthKey(new Date());
-  let budgetViewMode = 'month'; // 'month' | 'quarter' | 'ytd'
-  let budgetSelectedQuarter = { year: new Date().getFullYear(), q: Math.floor(new Date().getMonth()/3) + 1 };
-  let budgetSelectedYear = new Date().getFullYear();
-  // Transactions list's collapsible groups — start open (same visibility
-  // as before this was split up), collapsible per-group from there.
-  let budgetTxnGroupsExpanded = { income: true, expense: true, neutral: true };
-
-  function budgetMonthLabel(monthKeyStr){
-    const [y,m] = monthKeyStr.split('-').map(Number);
-    return new Date(y, m-1, 1).toLocaleDateString('en-US', { month:'long', year:'numeric' });
-  }
-
-  function shiftBudgetMonth(delta){
-    const [y,m] = budgetSelectedMonth.split('-').map(Number);
-    const d = new Date(y, m-1+delta, 1);
-    budgetSelectedMonth = budgetMonthKey(d);
-    renderBudgetSection();
-  }
-
-  function shiftBudgetQuarter(delta){
-    let { year, q } = budgetSelectedQuarter;
-    q += delta;
-    if(q < 1){ q = 4; year--; } else if(q > 4){ q = 1; year++; }
-    budgetSelectedQuarter = { year, q };
-    renderBudgetSection();
-  }
-
-  function shiftBudgetYear(delta){
-    budgetSelectedYear += delta;
-    renderBudgetSection();
-  }
-
-  function txnsForQuarter(year, q){
-    const startMonth = (q - 1) * 3 + 1;
-    const monthKeys = [startMonth, startMonth+1, startMonth+2].map(m => year + '-' + pad2(m));
-    return state.budgetTransactions.filter(t => monthKeys.includes(t.date.slice(0,7)));
-  }
-
-  function txnsForYearToDate(year){
-    const realCurrentYear = new Date().getFullYear();
-    if(year === realCurrentYear){
-      const todayS = todayStr();
-      return state.budgetTransactions.filter(t => t.date.slice(0,4) === String(year) && t.date <= todayS);
-    }
-    return state.budgetTransactions.filter(t => t.date.slice(0,4) === String(year));
-  }
-
-  // Shared stats + category breakdown renderer, used by all three views.
-  function renderBudgetStatsAndCategories(wrap, txns, showBudgets){
-    const totalIncome = txns.filter(t => budgetCatById[t.category]?.type === 'income').reduce((s,t) => s + t.amount, 0);
-    const totalExpense = txns.filter(t => budgetCatById[t.category]?.type === 'expense').reduce((s,t) => s + t.amount, 0);
-    const net = totalIncome - totalExpense;
-
-    const stats = document.createElement('div');
-    stats.className = 'budget-stats-row';
-    stats.innerHTML = `
-      <div class="budget-stat"><div class="budget-stat-num" style="color:var(--success)">$${totalIncome.toFixed(2)}</div><div class="budget-stat-label">Income</div></div>
-      <div class="budget-stat"><div class="budget-stat-num" style="color:var(--error)">$${totalExpense.toFixed(2)}</div><div class="budget-stat-label">Expenses</div></div>
-      <div class="budget-stat"><div class="budget-stat-num" style="color:${net >= 0 ? 'var(--success)' : 'var(--error)'}">$${net.toFixed(2)}</div><div class="budget-stat-label">Net</div></div>
-    `;
-    wrap.appendChild(stats);
-
-    ['expense','neutral','income'].forEach(type => {
-      const catsOfType = BUDGET_CATEGORIES.filter(c => c.type === type);
-      const rows = catsOfType.map(c => {
-        const total = txns.filter(t => t.category === c.id).reduce((s,t) => s + t.amount, 0);
-        return { cat:c, total };
-      }).filter(r => r.total > 0).sort((a,b) => b.total - a.total);
-      if(!rows.length) return;
-
-      const title = document.createElement('div');
-      title.className = 'task-section-title';
-      title.style.cursor = 'default';
-      title.style.marginTop = '16px';
-      title.innerHTML = '<span>' + (type === 'expense' ? 'Spending' : type === 'neutral' ? 'Savings & Transfers' : 'Income') + ' by category</span>';
-      wrap.appendChild(title);
-
-      rows.forEach(r => {
-        const row = document.createElement('div');
-        row.className = 'budget-cat-row';
-        row.style.setProperty('--accent-color', BUDGET_TYPE_COLORS[type]);
-        const limit = (showBudgets && type === 'expense') ? state.categoryBudgetLimits[r.cat.id] : null;
-        let amtHtml = '$' + r.total.toFixed(2);
-        let amtStyle = '';
-        if(limit){
-          amtHtml += ' <span style="opacity:0.6">/ $' + limit.toFixed(2) + '</span>';
-          if(r.total > limit) amtStyle = 'color:var(--error)';
-        }
-        row.innerHTML = '<span class="budget-cat-name">' + escapeHtml(r.cat.label) + '</span><span class="budget-cat-amt" style="' + amtStyle + '">' + amtHtml + '</span>';
-        wrap.appendChild(row);
-      });
-    });
-
-    return { totalIncome, totalExpense, net };
-  }
-
-  function computeCategoryBudgetStatus(monthTxns){
-    const results = [];
-    BUDGET_CATEGORIES.filter(c => c.type === 'expense').forEach(c => {
-      const limit = state.categoryBudgetLimits[c.id];
-      if(!limit) return;
-      const spent = monthTxns.filter(t => t.category === c.id).reduce((s,t) => s + t.amount, 0);
-      results.push({ cat:c, limit, spent, over: spent > limit });
-    });
-    return results;
-  }
-
-  function renderCategoryBudgetsBar(wrap, monthTxns){
-    const box = document.createElement('div');
-    box.className = 'budget-limit-box';
-    const statuses = computeCategoryBudgetStatus(monthTxns);
-    const overOnes = statuses.filter(s => s.over);
-
-    if(overOnes.length){
-      box.innerHTML = '<div class="budget-limit-top" style="color:var(--error)">'
-        + overOnes.length + ' categor' + (overOnes.length > 1 ? 'ies' : 'y') + ' over budget</div>'
-        + overOnes.map(s => '<div style="font-size:11.5px;color:var(--error);margin-top:4px">'
-            + escapeHtml(s.cat.label) + ' — $' + s.spent.toFixed(2) + ' of $' + s.limit.toFixed(2) + '</div>').join('')
-        + '<button class="budget-limit-edit" id="budgetLimitEdit" style="margin-top:9px">Edit category budgets</button>';
-    } else if(statuses.length){
-      box.innerHTML = '<div class="budget-limit-top"><span>' + statuses.length + ' categor' + (statuses.length > 1 ? 'ies' : 'y')
-        + ' budgeted — all on track</span><button class="budget-limit-edit" id="budgetLimitEdit">Edit</button></div>';
-    } else {
-      box.innerHTML = '<button class="budget-limit-edit" id="budgetLimitEdit">+ Set category budgets to track against</button>';
-    }
-    wrap.appendChild(box);
-    box.querySelector('#budgetLimitEdit').onclick = openCategoryBudgetsModal;
-  }
-
-  function openCategoryBudgetsModal(){
-    const overlay = document.getElementById('modalOverlay');
-    const content = document.getElementById('modalContent');
-    content.style.removeProperty('--chip-color');
-    const expenseCats = BUDGET_CATEGORIES.filter(c => c.type === 'expense');
-    const rowsHtml = expenseCats.map(c => `
-      <div class="dur-row">
-        <span class="dur-key" style="text-transform:none">${escapeHtml(c.label)}</span>
-        <input type="number" class="cb-input" data-cat="${c.id}" min="0" step="10" value="${state.categoryBudgetLimits[c.id] || ''}" placeholder="none" style="width:80px">
-      </div>
-    `).join('');
-
-    content.innerHTML = `
-      <div class="modal-handle"></div>
-      <div class="modal-title">Category budgets</div>
-      <div class="modal-subtitle">Monthly limit per expense category — leave blank for none</div>
-      <div class="dur-list">${rowsHtml}</div>
-      <div class="modal-actions">
-        <button class="cancel" id="cbClose" style="flex:1">Done</button>
-      </div>
-    `;
-    overlay.classList.remove('hidden');
-
-    content.querySelectorAll('.cb-input').forEach(inp => {
-      inp.onchange = () => {
-        const catId = inp.dataset.cat;
-        const val = parseFloat(inp.value);
-        if(val && val > 0) state.categoryBudgetLimits[catId] = val;
-        else delete state.categoryBudgetLimits[catId];
-        save();
-      };
-    });
-    document.getElementById('cbClose').onclick = () => { closeModal(); renderAll(); };
-  }
-
-  // One collapsible group (Income / Expenses / Savings & Transfers) within
-  // the month view's Transactions list. Income and Expenses always show
-  // their header even with nothing in them that month; Savings & Transfers
-  // only appears once something's actually been logged under it, so it
-  // doesn't clutter the view for people who never use those categories.
-  function renderBudgetTxnGroup(wrap, monthTxns, type, label){
-    const groupTxns = monthTxns.filter(t => (budgetCatById[t.category]?.type || 'expense') === type);
-    if(!groupTxns.length && type === 'neutral') return;
-
-    const expanded = budgetTxnGroupsExpanded[type];
-    const header = document.createElement('div');
-    header.className = 'dash-section-header';
-    header.style.marginTop = '14px';
-    header.innerHTML = `<span class="dash-header-title"><span class="chev${expanded ? '' : ' collapsed'}">▾</span> ${escapeHtml(label)} (${groupTxns.length})</span>`;
-    header.querySelector('.dash-header-title').onclick = () => {
-      budgetTxnGroupsExpanded[type] = !budgetTxnGroupsExpanded[type];
-      renderBudgetSection();
-    };
-    wrap.appendChild(header);
-    if(!expanded) return;
-
-    if(!groupTxns.length){
-      const empty = document.createElement('div');
-      empty.className = 'empty-note';
-      empty.textContent = 'Nothing here for ' + budgetMonthLabel(budgetSelectedMonth) + '.';
-      wrap.appendChild(empty);
-      return;
-    }
-
-    groupTxns.slice().sort((a,b) => b.date.localeCompare(a.date)).forEach(t => {
-      const cat = budgetCatById[t.category];
-      const row = document.createElement('div');
-      row.className = 'budget-txn-row';
-      row.style.setProperty('--accent-color', BUDGET_TYPE_COLORS[cat?.type || 'expense']);
-      row.innerHTML = `
-        <div style="flex:1">
-          <div class="budget-txn-desc">${escapeHtml(t.description || cat?.label || 'Transaction')}</div>
-          <div class="budget-txn-meta">${fmtDate(t.date)} · ${escapeHtml(cat?.label || t.category)}</div>
-        </div>
-        <div class="budget-txn-amt ${cat?.type || 'expense'}">${cat?.type === 'income' ? '+' : cat?.type === 'expense' ? '−' : ''}$${t.amount.toFixed(2)}</div>
-        <button class="budget-txn-del">×</button>
-      `;
-      row.querySelector('.budget-txn-del').onclick = () => {
-        state.budgetTransactions = state.budgetTransactions.filter(x => x.id !== t.id);
-        save();
-        renderBudgetSection();
-      };
-      wrap.appendChild(row);
-    });
-  }
-
-  /* ---------------- Recurring transactions ----------------
-     A template (description/amount/category/day-of-month) that
-     auto-generates one real transaction per month, tagged with
-     recurringId so it's never duplicated if generated again — lets
-     genuinely recurring bills (rent, subscriptions) get entered once
-     instead of re-typed every month. */
-  let budgetRecurringExpanded = false; // starts closed — setup, not daily-use
-
-  function daysInMonth(monthKey){
-    const [y, m] = monthKey.split('-').map(Number);
-    return new Date(y, m, 0).getDate();
-  }
-
-  function generateRecurringTransactionsForCurrentMonth(){
-    if(!state.recurringTransactions.length) return;
-    const monthKey = budgetMonthKey(new Date());
-    let added = false;
-    state.recurringTransactions.filter(r => r.active).forEach(r => {
-      const already = state.budgetTransactions.some(t => t.recurringId === r.id && t.date.startsWith(monthKey));
-      if(already) return;
-      const day = Math.min(r.dayOfMonth, daysInMonth(monthKey));
-      state.budgetTransactions.push({
-        id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
-        date: monthKey + '-' + pad2(day),
-        description: r.description, amount: r.amount, category: r.category,
-        recurringId: r.id
-      });
-      added = true;
-    });
-    if(added) save();
-  }
-
-  function renderRecurringSection(wrap){
-    const header = document.createElement('div');
-    header.className = 'dash-section-header';
-    header.style.marginTop = '14px';
-    header.innerHTML = `<span class="dash-header-title"><span class="chev${budgetRecurringExpanded ? '' : ' collapsed'}">▾</span> Recurring (${state.recurringTransactions.length})</span>`;
-    header.querySelector('.dash-header-title').onclick = () => {
-      budgetRecurringExpanded = !budgetRecurringExpanded;
-      renderBudgetSection();
-    };
-    wrap.appendChild(header);
-    if(!budgetRecurringExpanded) return;
-
-    const note = document.createElement('div');
-    note.className = 'settings-row-sub';
-    note.style.margin = '0 0 10px';
-    note.textContent = 'Auto-adds one transaction each month on the day you pick — turn one off instead of deleting it to pause without losing the setup.';
-    wrap.appendChild(note);
-
-    if(state.recurringTransactions.length){
-      const list = document.createElement('div');
-      list.className = 'task-list';
-      list.style.marginBottom = '10px';
-      state.recurringTransactions.forEach(r => {
-        const cat = budgetCatById[r.category];
-        const row = document.createElement('div');
-        row.className = 'budget-txn-row';
-        row.style.setProperty('--accent-color', BUDGET_TYPE_COLORS[cat?.type || 'expense']);
-        row.innerHTML = `
-          <div style="flex:1">
-            <div class="budget-txn-desc">${escapeHtml(r.description)}</div>
-            <div class="budget-txn-meta">Day ${r.dayOfMonth} · ${escapeHtml(cat?.label || r.category)}</div>
-          </div>
-          <div class="budget-txn-amt ${cat?.type || 'expense'}">$${r.amount.toFixed(2)}</div>
-          <button class="toggle-switch${r.active ? ' on' : ''}" style="margin-left:8px"></button>
-          <button class="budget-txn-del">×</button>
-        `;
-        row.querySelector('.toggle-switch').onclick = () => {
-          r.active = !r.active;
-          save();
-          renderBudgetSection();
-        };
-        row.querySelector('.budget-txn-del').onclick = () => {
-          state.recurringTransactions = state.recurringTransactions.filter(x => x.id !== r.id);
-          save();
-          renderBudgetSection();
-        };
-        list.appendChild(row);
-      });
-      wrap.appendChild(list);
-    }
-
-    const catOptionsHtml = ['expense','neutral','income'].map(type => {
-      const opts = BUDGET_CATEGORIES.filter(c => c.type === type)
-        .map(c => '<option value="' + c.id + '">' + escapeHtml(c.label) + '</option>').join('');
-      const groupLabel = type === 'expense' ? 'Expense' : type === 'neutral' ? 'Savings / Transfer' : 'Income';
-      return '<optgroup label="' + groupLabel + '">' + opts + '</optgroup>';
-    }).join('');
-
-    const addRow = document.createElement('div');
-    addRow.className = 'blocklist-add-row';
-    addRow.style.flexWrap = 'wrap';
-    addRow.innerHTML = `
-      <input type="text" id="recDesc" placeholder="e.g. Rent" style="flex:1 1 100%">
-      <input type="number" id="recAmount" min="0" step="0.01" placeholder="0.00" style="width:80px">
-      ${customSelectHtml('recCategory', catOptionsHtml, 'misc', 'Category')}
-      <input type="number" id="recDay" min="1" max="31" placeholder="Day" style="width:56px">
-      <button id="recAdd">Add</button>
-    `;
-    wrap.appendChild(addRow);
-    wireCustomSelect('recCategory', catOptionsHtml, 'Category');
-    addRow.querySelector('#recAdd').onclick = () => {
-      const description = document.getElementById('recDesc').value.trim();
-      const amount = Math.max(0, parseFloat(document.getElementById('recAmount').value) || 0);
-      const category = document.getElementById('recCategory').value;
-      const dayOfMonth = Math.max(1, Math.min(31, parseInt(document.getElementById('recDay').value, 10) || 0));
-      if(!description || !amount || !dayOfMonth) return;
-      state.recurringTransactions.push({ id: Date.now() + '-' + Math.random().toString(36).slice(2,7), description, amount, category, dayOfMonth, active: true });
-      generateRecurringTransactionsForCurrentMonth();
-      save();
-      renderBudgetSection();
-    };
-  }
-
-  function renderBudgetSection(){
-    generateRecurringTransactionsForCurrentMonth();
-    const wrap = document.getElementById('budgetContent');
-    wrap.innerHTML = '';
-
-    // Links back to the existing sheet/form, for the Jan–Jun history and
-    // as a fallback entry point.
-    const links = document.createElement('div');
-    links.className = 'budget-links';
-    links.innerHTML = `
-      <a class="budget-link-btn" href="${BUDGET_SHEET_URL}" target="_blank" rel="noopener">Open Sheet</a>
-      <a class="budget-link-btn" href="${BUDGET_FORM_URL}" target="_blank" rel="noopener">Open Form</a>
-    `;
-    wrap.appendChild(links);
-
-    // Month / Quarter / YTD toggle
-    const modeToggle = document.createElement('div');
-    modeToggle.className = 'view-toggle';
-    modeToggle.style.margin = '0 0 14px';
-    modeToggle.innerHTML = `
-      <button id="budgetModeMonth" class="${budgetViewMode === 'month' ? 'active' : ''}">Month</button>
-      <button id="budgetModeQuarter" class="${budgetViewMode === 'quarter' ? 'active' : ''}">Quarter</button>
-      <button id="budgetModeYtd" class="${budgetViewMode === 'ytd' ? 'active' : ''}">Year to date</button>
-    `;
-    wrap.appendChild(modeToggle);
-    modeToggle.querySelector('#budgetModeMonth').onclick = () => { budgetViewMode = 'month'; renderBudgetSection(); };
-    modeToggle.querySelector('#budgetModeQuarter').onclick = () => { budgetViewMode = 'quarter'; renderBudgetSection(); };
-    modeToggle.querySelector('#budgetModeYtd').onclick = () => { budgetViewMode = 'ytd'; renderBudgetSection(); };
-
-    if(budgetViewMode === 'month'){
-      const monthNav = document.createElement('div');
-      monthNav.className = 'budget-month-nav';
-      monthNav.innerHTML = `
-        <button class="week-nav-btn" id="budgetPrevMonth">‹</button>
-        <span class="budget-month-label">${budgetMonthLabel(budgetSelectedMonth)}</span>
-        <button class="week-nav-btn" id="budgetNextMonth">›</button>
-      `;
-      wrap.appendChild(monthNav);
-      monthNav.querySelector('#budgetPrevMonth').onclick = () => shiftBudgetMonth(-1);
-      monthNav.querySelector('#budgetNextMonth').onclick = () => shiftBudgetMonth(1);
-
-      const monthTxns = state.budgetTransactions.filter(t => t.date.startsWith(budgetSelectedMonth));
-      renderBudgetStatsAndCategories(wrap, monthTxns, true);
-      renderCategoryBudgetsBar(wrap, monthTxns);
-      renderRecurringSection(wrap);
-
-      const txnTitle = document.createElement('div');
-      txnTitle.className = 'task-section-title';
-      txnTitle.style.cursor = 'default';
-      txnTitle.style.marginTop = '18px';
-      txnTitle.innerHTML = '<span>Transactions</span>';
-      wrap.appendChild(txnTitle);
-
-      if(!monthTxns.length){
-        const empty = document.createElement('div');
-        empty.className = 'empty-note';
-        empty.textContent = 'Nothing logged for ' + budgetMonthLabel(budgetSelectedMonth) + ' yet — tap + to add one.';
-        wrap.appendChild(empty);
-      } else {
-        renderBudgetTxnGroup(wrap, monthTxns, 'expense', 'Expenses');
-        renderBudgetTxnGroup(wrap, monthTxns, 'income', 'Income');
-        renderBudgetTxnGroup(wrap, monthTxns, 'neutral', 'Savings & Transfers');
-      }
-    }
-
-    else if(budgetViewMode === 'quarter'){
-      const { year, q } = budgetSelectedQuarter;
-      const qNav = document.createElement('div');
-      qNav.className = 'budget-month-nav';
-      qNav.innerHTML = `
-        <button class="week-nav-btn" id="budgetPrevQ">‹</button>
-        <span class="budget-month-label">Q${q} ${year}</span>
-        <button class="week-nav-btn" id="budgetNextQ">›</button>
-      `;
-      wrap.appendChild(qNav);
-      qNav.querySelector('#budgetPrevQ').onclick = () => shiftBudgetQuarter(-1);
-      qNav.querySelector('#budgetNextQ').onclick = () => shiftBudgetQuarter(1);
-
-      const qTxns = txnsForQuarter(year, q);
-      renderBudgetStatsAndCategories(wrap, qTxns);
-      if(!qTxns.length){
-        const empty = document.createElement('div');
-        empty.className = 'empty-note';
-        empty.style.marginTop = '14px';
-        empty.textContent = 'Nothing logged for Q' + q + ' ' + year + '.';
-        wrap.appendChild(empty);
-      }
-    }
-
-    else if(budgetViewMode === 'ytd'){
-      const yNav = document.createElement('div');
-      yNav.className = 'budget-month-nav';
-      yNav.innerHTML = `
-        <button class="week-nav-btn" id="budgetPrevY">‹</button>
-        <span class="budget-month-label">${budgetSelectedYear} Year to Date</span>
-        <button class="week-nav-btn" id="budgetNextY">›</button>
-      `;
-      wrap.appendChild(yNav);
-      yNav.querySelector('#budgetPrevY').onclick = () => shiftBudgetYear(-1);
-      yNav.querySelector('#budgetNextY').onclick = () => shiftBudgetYear(1);
-
-      const yTxns = txnsForYearToDate(budgetSelectedYear);
-      renderBudgetStatsAndCategories(wrap, yTxns);
-      if(!yTxns.length){
-        const empty = document.createElement('div');
-        empty.className = 'empty-note';
-        empty.style.marginTop = '14px';
-        empty.textContent = 'Nothing logged for ' + budgetSelectedYear + ' yet.';
-        wrap.appendChild(empty);
-      }
-    }
-  }
-
-  function openAddTransactionModal(){
-    const overlay = document.getElementById('modalOverlay');
-    const content = document.getElementById('modalContent');
-    content.style.removeProperty('--chip-color');
-    let selectedBudgetCat = 'misc';
-
-    const catOptionsHtml = ['expense','neutral','income'].map(type => {
-      const opts = BUDGET_CATEGORIES.filter(c => c.type === type)
-        .map(c => '<option value="' + c.id + '">' + escapeHtml(c.label) + '</option>').join('');
-      const groupLabel = type === 'expense' ? 'Expense' : type === 'neutral' ? 'Savings / Transfer' : 'Income';
-      return '<optgroup label="' + groupLabel + '">' + opts + '</optgroup>';
-    }).join('');
-
-    content.innerHTML = `
-      <div class="modal-handle"></div>
-      <div class="modal-title">Add transaction</div>
-      <label>Date</label>
-      ${customDateHtml('txnDate', todayStr())}
-      <label>Description</label>
-      <input type="text" id="txnDesc" placeholder="e.g. Publix" maxlength="60">
-      <label>Amount</label>
-      <input type="number" id="txnAmount" min="0" step="0.01" placeholder="0.00">
-      <label>Category</label>
-      ${customSelectHtml('txnCategory', catOptionsHtml, selectedBudgetCat, 'Category')}
-      <div class="modal-actions">
-        <button class="cancel" id="txnCancel">Cancel</button>
-        <button class="save" id="txnSave">Save</button>
-      </div>
-    `;
-    overlay.classList.remove('hidden');
-    wireCustomDate('txnDate', {});
-    wireCustomSelect('txnCategory', catOptionsHtml, 'Category');
-
-    document.getElementById('txnCancel').onclick = closeModal;
-    document.getElementById('txnSave').onclick = () => {
-      const date = document.getElementById('txnDate').value || todayStr();
-      const description = document.getElementById('txnDesc').value.trim();
-      const amount = Math.max(0, parseFloat(document.getElementById('txnAmount').value) || 0);
-      const category = document.getElementById('txnCategory').value;
-      if(!amount) return;
-      state.budgetTransactions.push({
-        id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
-        date, description, amount, category
-      });
-      save();
-      // Jump the month view to wherever this transaction landed
-      budgetSelectedMonth = date.slice(0,7);
-      closeModal();
-      renderAll();
-    };
-    setTimeout(() => document.getElementById('txnAmount').focus(), 50);
   }
 
   /* ---------------- Journal ---------------- */
@@ -6174,14 +4740,13 @@
   }
 
   // Icon markup follows the brand guideline's custom set (2px stroke,
-  // rounded joins, outline treatment; bold stroke for Budget).
+  // rounded joins, outline treatment).
   // Scores/Email/Settings aren't in the guideline's defined set, so
   // those three are drawn to match its conventions rather than left as
   // mismatched leftover glyphs.
   const OVERFLOW_SECTIONS = [
     { id:'lists',     icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="4.5" cy="6" r="1.3" fill="currentColor" stroke="none"/><path d="M9 6h11"/><circle cx="4.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><path d="M9 12h11"/><circle cx="4.5" cy="18" r="1.3" fill="currentColor" stroke="none"/><path d="M9 18h11"/></svg>', label:'Lists' },
     { id:'longgoals', icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg>', label:'Goals' },
-    { id:'budget',    icon:'<svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="4" x2="12" y2="18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M16.5 7.2c-.9-1.6-2.7-2.5-4.5-2.5c-2.5 0-4.5 1.3-4.5 3.1c0 4 8.8 2 8.8 6c0 1.9-2 3.2-4.5 3.2c-1.9 0-3.7-.9-4.6-2.4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>', label:'Budget' },
     { id:'journal',   icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.2c-2-1.5-5-2-9-1.5v13c4-.5 7 0 9 1.5c2-1.5 5-2 9-1.5v-13c-4-.5-7 0-9 1.5z"/><path d="M12 6.2v13"/></svg>', label:'Journal' },
     { id:'scores',    icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19V11"/><path d="M12 19V5"/><path d="M19 19V14"/></svg>', label:'Scores' },
     { id:'email',     icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M4 7l8 6l8-6"/></svg>', label:'Email' },
@@ -6189,8 +4754,8 @@
   ];
 
   /* ---------------- Scores ----------------
-     Derived entirely from existing data — nothing new is stored except the
-     budget opt-in flag — so scores always stay in sync with real state.
+     Derived entirely from existing data — nothing new is stored — so
+     scores always stay in sync with real state.
 
      Each category is a 0-100 rating: for each of the last 7 days we work
      out a 0-100 "how much of what was possible got done" value, then
@@ -6255,38 +4820,18 @@
     return (entry && entry.text && entry.text.trim()) ? 100 : 0;
   }
 
-  // Budget: 100 if every category with a limit was within it, based on
-  // spend booked by that date within its month; 0 if any was over. Not
-  // applicable (null) unless opted in and at least one limit is set.
-  function budgetDayScore(dateStr, limitedCats){
-    if(!limitedCats.length) return null;
-    const monthKey = dateStr.slice(0,7);
-    const within = limitedCats.every(catId => {
-      const limit = state.categoryBudgetLimits[catId];
-      const spent = state.budgetTransactions
-        .filter(t => t.category === catId && t.date.startsWith(monthKey) && t.date <= dateStr)
-        .reduce((s,t) => s + t.amount, 0);
-      return spent <= limit;
-    });
-    return within ? 100 : 0;
-  }
-
   function computeScores(){
     const dates = scoreWindowDates();
-    const budgetOptedIn = !!(state.scoreOptIn && state.scoreOptIn.budget);
-    const limitedCats = budgetOptedIn ? Object.keys(state.categoryBudgetLimits) : [];
 
     const core    = averageOrNull(dates.map(coreDayScore));
     const journal = averageOrNull(dates.map(journalDayScore));
-    const budget  = budgetOptedIn ? averageOrNull(dates.map(d => budgetDayScore(d, limitedCats))) : null;
 
-    const overall = averageOrNull([core, journal, budget]);
+    const overall = averageOrNull([core, journal]);
 
     return {
       overall: { score: overall },
       core:    { score: core },
       journal: { score: journal },
-      budget:  { score: budget, optedIn: budgetOptedIn },
     };
   }
 
@@ -6315,22 +4860,9 @@
     const cards = [
       { key:'core',    accent:'#5B8DEF', title:'Core productivity', note:'Habits checked off, tasks done vs. due, weekly goals hit — last 7 days.' },
       { key:'journal', accent:'#B18CF2', title:'Journal', note:'Days with a journal entry written — last 7 days.' },
-      { key:'budget',  accent:'#F2A93B', title:'Budget', note:'Days within your category limits so far this month — last 7 days.' },
     ];
 
     cards.forEach(c => {
-      if(c.key === 'budget' && !scores.budget.optedIn){
-        const row = document.createElement('div');
-        row.className = 'settings-row';
-        row.innerHTML = `
-          <div>
-            <div class="settings-row-label">Budget score is off</div>
-            <div class="settings-row-sub">Turn it on in Settings to include it here</div>
-          </div>
-        `;
-        wrap.appendChild(row);
-        return;
-      }
       const s = scores[c.key];
       const card = document.createElement('div');
       card.className = 'score-card';
@@ -6354,29 +4886,6 @@
     heading.className = 'section-label';
     heading.textContent = 'Settings';
     wrap.appendChild(heading);
-
-    const subheading = document.createElement('div');
-    subheading.className = 'section-label';
-    subheading.style.marginTop = '18px';
-    subheading.textContent = 'Scores';
-    wrap.appendChild(subheading);
-
-    const budgetOn = !!(state.scoreOptIn && state.scoreOptIn.budget);
-    const row = document.createElement('div');
-    row.className = 'settings-row';
-    row.innerHTML = `
-      <div>
-        <div class="settings-row-label">Include Budget score</div>
-        <div class="settings-row-sub">Off by default — spending limits are personal</div>
-      </div>
-      <button class="toggle-switch${budgetOn ? ' on' : ''}" id="budgetScoreToggle"></button>
-    `;
-    wrap.appendChild(row);
-    row.querySelector('#budgetScoreToggle').onclick = () => {
-      state.scoreOptIn.budget = !state.scoreOptIn.budget;
-      save();
-      renderAll();
-    };
 
     const emailSub = document.createElement('div');
     emailSub.className = 'section-label';
@@ -7021,7 +5530,6 @@
     document.getElementById('tabViewport').style.display = isPrimary ? 'block' : 'none';
     document.getElementById('listsSection').style.display = section === 'lists' ? 'block' : 'none';
     document.getElementById('longGoalsSection').style.display = section === 'longgoals' ? 'block' : 'none';
-    document.getElementById('budgetSection').style.display = section === 'budget' ? 'block' : 'none';
     document.getElementById('journalSection').style.display = section === 'journal' ? 'block' : 'none';
     document.getElementById('scoresSection').style.display = section === 'scores' ? 'block' : 'none';
     document.getElementById('emailSection').style.display = section === 'email' ? 'block' : 'none';
@@ -7063,7 +5571,6 @@
     renderHabitsSection();
     renderListsSection();
     renderLongGoalsSection();
-    renderBudgetSection();
     renderJournalSection();
     renderScoresSection();
     renderEmailSection();
@@ -7098,7 +5605,6 @@
     else if(currentSection === 'lists') openAddListModal();
     else if(currentSection === 'habits') openAddHabitModal();
     else if(currentSection === 'longgoals') openAddLongGoalModal();
-    else if(currentSection === 'budget') openAddTransactionModal();
   };
 
   (function setupSwipeNav(){
