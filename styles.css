@@ -1475,6 +1475,7 @@
     padding: 3px;
     width: fit-content;
   }
+  #calendarSection > .view-toggle{ margin-bottom: 14px; }
   .view-toggle button{
     font-family: var(--font-mono);
     font-size: 10.5px;
@@ -1557,7 +1558,10 @@
     min-width: 0;
   }
 
-  #allDayBanners{ display:flex; flex-direction:column; gap:6px; margin-bottom: 10px; }
+  /* Same 14px above as the week strip -> view toggle gap; the toggle's own
+     14px margin-top spaces the banners from it below. */
+  #allDayBanners{ display:flex; flex-direction:column; gap:6px; margin-top: 14px; }
+  #allDayBanners:empty{ display:none; }
   .allday-chip{
     display:flex;
     align-items:center;
